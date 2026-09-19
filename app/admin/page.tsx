@@ -1,17 +1,14 @@
 import AdminShell from '@/components/admin-shell';
 import { demoData } from '@/lib/demo-data';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminContext, loadAdminData } from '@/lib/admin-data';
 import { redirect } from 'next/navigation';
 
 export default async function AdminPage() {
-  const supabase = await createClient();
-  let demoMode = true;
-  if (supabase) {
-    const { data } = await supabase.auth.getClaims();
-    if (!data?.claims?.sub) redirect('/login');
-    const { data: profile } = await supabase.from('profiles').select('role,status').eq('id', data.claims.sub).single();
-    if (!profile || !['super_admin','manager','editor','reviewer'].includes(profile.role) || profile.status !== 'active') redirect('/login');
-    demoMode = false;
+  const context = await getAdminContext();
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    return <AdminShell initialData={demoData} demoMode currentUser="Karyera Mərkəzi" currentRole="Super Admin"/>;
   }
-  return <AdminShell initialData={demoData} demoMode={demoMode}/>;
+  if (!context) redirect('/login');
+  const data = await loadAdminData(context);
+  return <AdminShell initialData={data} demoMode={false} currentUser={context.fullName} currentRole={context.role}/>;
 }

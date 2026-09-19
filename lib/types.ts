@@ -8,6 +8,7 @@ export type AdminRow = {
   status: Status;
   meta: string;
   updatedAt: string;
+  fields?: Record<string, string | number | boolean | null>;
 };
 
 export type AdminRole = 'super_admin' | 'manager' | 'editor' | 'reviewer';
