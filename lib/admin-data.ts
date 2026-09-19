@@ -42,11 +42,14 @@ export async function getAdminContext(): Promise<AdminContext | null> {
   const claims = data?.claims;
   const userId = typeof claims?.sub === 'string' ? claims.sub : '';
   if (!userId) return null;
-  const { data: profile } = await supabase.from('profiles').select('full_name,role,status').eq('id', userId).single();
-  if (!profile || profile.role !== 'admin' || profile.status !== 'active') return null;
   const metadata = claims?.app_metadata as Record<string, unknown> | undefined;
   const requestedRole = metadata?.admin_role;
-  const role = adminRoles.includes(requestedRole as AdminRole) ? requestedRole as AdminRole : 'manager';
+  if (!adminRoles.includes(requestedRole as AdminRole)) return null;
+  const { data: profile } = await supabase.from('profiles').select('full_name,role,status').eq('id', userId).single();
+  if (!profile || profile.status !== 'active') return null;
+  // All Career Center administrators have the same full-access permission set.
+  // The metadata claim is only used to distinguish admins from student accounts.
+  const role: AdminRole = 'super_admin';
   return { supabase, userId, role, fullName: profile.full_name || 'Karyera Mərkəzi' };
 }
 
