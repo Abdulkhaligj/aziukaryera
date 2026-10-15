@@ -1,0 +1,405 @@
+/*!
+ * ADNSU Karyera — açıq açılış səhifəsi (landing).
+ * Hər şey `.lp` altında adlanır ki, tətbiqin öz stilləri ilə toqquşmasın.
+ * Rənglər tətbiqlə eyni tokenlərdən gəlir — tünd tema avtomatik işləyir.
+ */
+
+.lp {
+  /* Açıq ana səhifə təqdimat dizaynında həmişə ağ qalır; kabinetin seçilmiş
+     açıq/tünd mövzusu yalnız istifadəçi panelinə aiddir. */
+  color-scheme: light;
+  --ground: #F5F7FC;
+  --surface: #FFFFFF;
+  --surface-2: #EDF0F8;
+  --surface-3: #DDE3F8;
+  --ink: #0F1524;
+  --ink-2: #4A5568;
+  --muted: #7C879B;
+  --line: #E4E8F3;
+  --line-2: #C5CDE4;
+  --brand: #001C80;
+  --brand-2: #2A47D8;
+  --brand-soft: #EEF1FC;
+  --brand-ring: #C6D0F4;
+  --on-brand: #FFFFFF;
+  --accent: #8A5A00;
+  --accent-soft: #FBF0DA;
+  --good: #0E7A46;
+  --good-soft: #E2F4EB;
+  --warn: #8A5A00;
+  --warn-soft: #FBF0DA;
+  --bad: #B03027;
+  --bad-soft: #FBE7E5;
+  --shadow-1: 0 1px 2px rgba(15, 21, 36, .04);
+  --shadow-2: 0 4px 10px rgba(15, 21, 36, .05), 0 20px 40px -24px rgba(0, 28, 128, .30);
+  --shadow-3: 0 8px 20px rgba(15, 21, 36, .07), 0 40px 70px -30px rgba(0, 28, 128, .40);
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--ground);
+}
+.lp img { max-width: 100%; }
+.lp a { color: inherit; text-decoration: none; }
+.lp h1, .lp h2, .lp h3 { margin: 0; line-height: 1.14; letter-spacing: -.03em; font-weight: 800; text-wrap: balance; }
+.lp h2 { font-size: clamp(25px, 3.6vw, 37px); }
+.lp h3 { font-size: 19px; font-weight: 700; }
+.lp p { margin: 0; }
+.lp .wrap { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: 20px; }
+.lp .lede { color: var(--ink-2); max-width: 60ch; }
+.lp .center { text-align: center; margin-inline: auto; }
+.lp .kicker {
+  font-size: 12.5px; font-weight: 800; color: var(--brand);
+  text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px;
+}
+
+/* ---------- düymələr ---------- */
+.lp .b {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 2px solid transparent; border-radius: var(--pill); padding: 11px 24px;
+  font-size: 14.5px; font-weight: 700; white-space: nowrap;
+  background: var(--surface-2); color: var(--ink);
+  transition: background .18s, border-color .18s, color .18s, transform .14s;
+}
+.lp .b:hover { transform: translateY(-2px); }
+.lp .b-primary { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.lp .b-primary:hover { background: var(--brand-2); border-color: var(--brand-2); }
+.lp .b-outline { background: transparent; border-color: var(--line-2); color: var(--ink); }
+.lp .b-outline:hover { border-color: var(--brand); color: var(--brand); }
+.lp .b-white { background: #fff; color: #001C80; border-color: #fff; }
+.lp .b-sm { padding: 8px 17px; font-size: 13.5px; }
+.lp .b-lg { padding: 14px 30px; font-size: 15.5px; }
+.lp .b-block { width: 100%; }
+
+/* ---------- kampaniya zolağı ---------- */
+.lp-promo { background: var(--brand); color: #fff; }
+.lp-promo .wrap {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  padding-block: 11px; flex-wrap: wrap; text-align: center; font-size: 13.5px;
+}
+.lp-promo .b { padding: 6px 16px; font-size: 12.5px; }
+
+/* ---------- başlıq ---------- */
+.lp-head {
+  position: sticky; top: 0; z-index: 70;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px); border-bottom: 1px solid var(--line);
+}
+.lp-head .row { display: flex; align-items: center; gap: 16px; height: 72px; }
+.lp-nav { display: flex; align-items: center; gap: 2px; flex: 1; margin-left: 10px; }
+.lp-nav button, .lp-nav a {
+  padding: 8px 12px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  color: var(--ink-2); background: none; border: 0;
+}
+.lp-nav button:hover, .lp-nav a:hover { background: var(--surface-2); color: var(--brand); }
+.lp-head .right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.lp-burger {
+  display: none; border: 1px solid var(--line); background: var(--surface);
+  border-radius: 12px; width: 42px; height: 42px; place-items: center; color: var(--ink);
+}
+.lp-burger svg { width: 19px; height: 19px; }
+@media (max-width: 1080px) { .lp-nav { display: none; } .lp-burger { display: grid; } }
+@media (max-width: 600px) { .lp-head .right .b-outline { display: none; } }
+
+.lp-mob { display: none; background: var(--surface); border-bottom: 1px solid var(--line); }
+.lp-mob.open { display: block; }
+.lp-mob .wrap { display: flex; flex-direction: column; gap: 2px; padding-block: 14px; }
+.lp-mob button {
+  text-align: left; padding: 11px 12px; border-radius: 12px; font-weight: 600;
+  color: var(--ink-2); background: none; border: 0; font-size: 14.5px;
+}
+.lp-mob button:hover { background: var(--surface-2); color: var(--brand); }
+
+/* ---------- hero ---------- */
+.lp-hero {
+  background: linear-gradient(180deg, var(--brand-soft) 0%, var(--ground) 72%);
+  padding-block: 56px 64px; overflow: hidden;
+}
+.lp-hero-grid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 48px; align-items: center; }
+.lp-hero h1 { font-size: clamp(33px, 5.2vw, 56px); line-height: 1.04; letter-spacing: -.04em; }
+.lp-hero h1 span { color: var(--brand); }
+.lp-hero .lede { margin-top: 18px; font-size: 16.5px; max-width: 52ch; }
+.lp-cta { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; }
+
+.lp-search {
+  display: grid; grid-template-columns: 1.5fr 1fr auto; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--pill); padding: 7px; box-shadow: var(--shadow-2);
+  max-width: 660px; margin-top: 26px;
+}
+.lp-sf { display: flex; align-items: center; gap: 10px; padding: 8px 16px; min-width: 0; }
+.lp-sf svg { width: 18px; height: 18px; color: var(--brand); flex-shrink: 0; }
+.lp-sf input, .lp-sf select {
+  width: 100%; border: 0; background: transparent; color: var(--ink);
+  font: 700 14.5px/1.3 var(--font-body); padding: 0;
+}
+.lp-sf input:focus, .lp-sf select:focus { outline: none; }
+.lp-sf + .lp-sf { border-left: 1px solid var(--line); padding-left: 16px; }
+@media (max-width: 720px) {
+  .lp-search { grid-template-columns: 1fr; border-radius: var(--r-lg); padding: 9px; }
+  .lp-sf + .lp-sf { border-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+}
+
+/* maskot səhnəsi (telefon maketinin yerinə — bizim maskot) */
+.lp-stage { position: relative; display: grid; place-items: center; min-height: 380px; }
+.lp-blob {
+  position: absolute; width: 330px; height: 330px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brand-2), var(--brand));
+  opacity: .16; filter: blur(10px);
+}
+.lp-stage .mascot { width: 280px; position: relative; filter: drop-shadow(0 22px 40px rgba(0,28,128,.28)); }
+.lp-badge {
+  position: absolute; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); box-shadow: var(--shadow-2); padding: 11px 15px;
+  display: grid; gap: 2px; z-index: 2;
+}
+.lp-badge b { font-family: var(--font-display); font-size: 19px; font-weight: 800; color: var(--brand); }
+.lp-badge span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.lp-badge.one { left: 0; top: 18%; }
+.lp-badge.two { right: 0; bottom: 16%; }
+@media (max-width: 940px) {
+  .lp-hero-grid { grid-template-columns: 1fr; gap: 28px; }
+  .lp-stage { min-height: 0; order: -1; }
+  .lp-stage .mascot { width: 190px; }
+  .lp-badge { display: none; }
+}
+
+/* ---------- bölmələr ---------- */
+.lp-sec { padding-block: 58px; }
+.lp-sec.tint { background: var(--surface-2); }
+.lp-sec-top {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 24px; margin-bottom: 24px; flex-wrap: wrap;
+}
+
+/* loqo lenti */
+.lp-logos { display: flex; gap: 12px; overflow: hidden; position: relative; margin-top: 24px; }
+.lp-logos::before, .lp-logos::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none;
+}
+.lp-logos::before { left: 0; background: linear-gradient(90deg, var(--ground), transparent); }
+.lp-logos::after { right: 0; background: linear-gradient(270deg, var(--ground), transparent); }
+.lp-track { display: flex; gap: 12px; width: max-content; animation: lpRoll 46s linear infinite; }
+@keyframes lpRoll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.lp-logos:hover .lp-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-track { animation: none; } .lp-logos { overflow-x: auto; }
+}
+.lp-lgo {
+  width: 236px; height: 72px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 12px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r);
+  padding: 10px 14px; white-space: nowrap; box-shadow: var(--shadow-1);
+}
+.lp-lgo .m {
+  width: 76px; height: 48px; flex: 0 0 76px; box-sizing: border-box;
+  border-radius: 11px; display: grid; place-items: center;
+  color: #fff; font-size: 12px; font-weight: 800; background: var(--brand);
+}
+.lp-lgo .m.has-company-logo {
+  width: 76px; height: 48px; padding: 6px; background: #fff !important;
+  border: 1px solid var(--line); overflow: hidden;
+}
+.lp-lgo > span:last-child {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  font-size: 13.5px; font-weight: 700; color: var(--ink-2);
+}
+
+/* filtr tabları */
+.lp-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.lp-tabs::-webkit-scrollbar { display: none; }
+.lp-tab {
+  border: 1px solid var(--line); background: var(--surface); border-radius: var(--pill);
+  padding: 9px 18px; font-size: 13.5px; font-weight: 700; color: var(--ink-2); white-space: nowrap;
+}
+.lp-tab:hover { border-color: var(--brand); color: var(--brand); }
+.lp-tab[aria-selected="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+
+/* şəbəkə */
+.lp-grid { display: grid; gap: 18px; }
+.lp-g4 { grid-template-columns: repeat(4, 1fr); }
+.lp-g3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1050px) { .lp-g4 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 900px)  { .lp-g4, .lp-g3 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 620px)  {
+  .lp-g4, .lp-g3 { grid-template-columns: 1fr; }
+  .lp-detail-head { align-items: flex-start; padding: 18px; }
+}
+
+/* şirkət kartı */
+.lp-co {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  overflow: hidden; display: flex; flex-direction: column;
+  transition: box-shadow .2s, transform .2s, border-color .2s;
+}
+.lp-co:hover { box-shadow: var(--shadow-2); transform: translateY(-4px); border-color: var(--brand-ring); }
+.lp-cover { height: 84px; }
+.lp-cobody { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.lp-cologo {
+  width: 54px; height: 54px; border-radius: 16px; margin-top: -27px;
+  border: 3px solid var(--surface); color: #fff; display: grid; place-items: center;
+  font-size: 15px; font-weight: 800; box-shadow: var(--shadow-1);
+}
+.lp-cologo.has-company-logo {
+  width: 82px; height: 58px; margin-top: -29px; box-sizing: border-box;
+  padding: 7px; background: #fff !important; overflow: hidden;
+}
+.lp-coname { display: flex; align-items: center; gap: 7px; font-size: 16.5px; font-weight: 800; }
+.lp-desc {
+  font-size: 13.5px; color: var(--ink-2); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lp-pills { display: flex; flex-wrap: wrap; gap: 7px; }
+.lp-pill {
+  font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: var(--pill);
+  background: var(--surface-2); color: var(--ink-2);
+}
+.lp-pill.blue { background: var(--brand-soft); color: var(--brand); }
+.lp-pill.ok   { background: var(--good-soft); color: var(--good); }
+.lp-pill.warn { background: var(--warn-soft); color: var(--warn); }
+.lp-pill.hot  { background: var(--bad-soft);  color: var(--bad); }
+.lp-cofoot {
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.lp-cofoot .fl { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+
+/* elan / tədbir / güzəşt kartı */
+.lp-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  transition: box-shadow .2s, transform .2s, border-color .2s;
+}
+.lp-card:hover { box-shadow: var(--shadow-2); transform: translateY(-4px); border-color: var(--brand-ring); }
+.lp-card-click { cursor: pointer; }
+.lp-card-click:focus-visible { box-shadow: 0 0 0 4px var(--brand-soft), var(--shadow-2); outline: none; }
+.lp-card-button { width: 100%; color: var(--ink); text-align: left; cursor: pointer; }
+.lp-card-button span { color: var(--muted); font-size: 12px; }
+.lp-detail-head {
+  display: flex; gap: 18px; align-items: center; padding: 24px;
+  border: 1px solid var(--line); border-radius: 22px; background: var(--surface);
+}
+.lp-detail-head .lp-logo { width: 72px; height: 72px; font-size: 20px; }
+.lp-detail-head h1 { margin: 4px 0; font-size: clamp(28px, 4vw, 44px); }
+.lp-top { display: flex; align-items: flex-start; gap: 13px; }
+.lp-logo {
+  width: 46px; height: 46px; border-radius: 14px; flex-shrink: 0; color: #fff;
+  display: grid; place-items: center; font-size: 13px; font-weight: 800;
+}
+.lp-logo.has-company-logo {
+  width: 60px; height: 48px; box-sizing: border-box;
+  padding: 6px; background: #fff !important;
+  border: 1px solid var(--line); overflow: hidden;
+}
+.lp-org { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.lp-title { font-size: 16.5px; font-weight: 800; line-height: 1.25; margin-top: 2px; }
+.lp-meta {
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--muted); font-weight: 600;
+}
+.lp-meta .i { display: inline-flex; align-items: center; gap: 6px; }
+.lp-meta svg { width: 14px; height: 14px; }
+.lp-empty {
+  grid-column: 1/-1; border: 2px dashed var(--line-2); border-radius: var(--r-lg);
+  padding: 40px 20px; text-align: center; color: var(--muted);
+}
+.lp-empty b { display: block; font-size: 17px; color: var(--ink-2); margin-bottom: 6px; }
+.lp-count { font-size: 13.5px; color: var(--muted); font-weight: 600; margin-bottom: 16px; }
+.lp-count b { color: var(--brand); }
+
+/* banner */
+.lp-banner {
+  background: linear-gradient(105deg, var(--brand) 0%, var(--brand-2) 100%);
+  border-radius: var(--r-lg); padding: 34px 40px; color: #fff;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 26px; flex-wrap: wrap; position: relative; overflow: hidden;
+}
+.lp-banner::before {
+  content: ""; position: absolute; right: -60px; top: -60px; width: 250px; height: 250px;
+  border-radius: 50%; background: rgba(255,255,255,.09);
+}
+.lp-banner > * { position: relative; z-index: 1; }
+.lp-banner h3 { font-size: 23px; color: #fff; }
+.lp-banner p { color: rgba(255,255,255,.84); margin-top: 8px; max-width: 52ch; font-size: 14.5px; }
+
+/* imkanlar */
+.lp-feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.lp-f {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 24px; display: flex; flex-direction: column; gap: 11px; overflow: hidden;
+}
+.lp-f.wide { grid-column: span 2; }
+.lp-f.dark {
+  background: linear-gradient(130deg, var(--brand), var(--brand-2));
+  border-color: transparent; color: #fff;
+}
+.lp-f.dark h3 { color: #fff; }
+.lp-f.dark .kicker { color: #fff; opacity: .74; }
+.lp-f.dark p { color: rgba(255,255,255,.86); }
+.lp-f p { font-size: 14px; color: var(--ink-2); }
+.lp-f .kicker { margin-bottom: 0; font-size: 11.5px; }
+@media (max-width: 900px) { .lp-feat { grid-template-columns: 1fr 1fr; } .lp-f.wide { grid-column: span 2; } }
+@media (max-width: 620px) { .lp-feat { grid-template-columns: 1fr; } .lp-f.wide { grid-column: span 1; } }
+
+/* uyğunluq sətirləri (40/40/20 nümayişi) */
+.lp-mrow { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
+.lp-mrow .n {
+  font-size: 13.5px; font-weight: 700; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-mbar {
+  width: 104px; height: 7px; border-radius: var(--pill);
+  background: rgba(255,255,255,.28); overflow: hidden; flex-shrink: 0; display: flex;
+}
+.lp-mbar i { display: block; height: 100%; }
+.lp-mpct { font-size: 13px; font-weight: 800; width: 42px; text-align: right; }
+
+/* FAQ */
+.lp-faq { max-width: 840px; margin-inline: auto; display: grid; gap: 12px; }
+.lp-qa { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.lp-qa[open] { border-color: var(--brand-ring); box-shadow: var(--shadow-1); }
+.lp-qa summary {
+  list-style: none; cursor: pointer; padding: 17px 52px 17px 22px;
+  position: relative; font-size: 16px; font-weight: 800;
+}
+.lp-qa summary::-webkit-details-marker { display: none; }
+.lp-qa summary::after {
+  content: ""; position: absolute; right: 24px; top: 50%; width: 12px; height: 2px;
+  background: var(--brand); transform: translateY(-50%); border-radius: 2px;
+}
+.lp-qa summary::before {
+  content: ""; position: absolute; right: 29px; top: 50%; width: 2px; height: 12px;
+  background: var(--brand); transform: translateY(-50%); border-radius: 2px; transition: opacity .2s;
+}
+.lp-qa[open] summary::before { opacity: 0; }
+.lp-qa .ans { padding: 0 22px 20px; color: var(--ink-2); font-size: 14.5px; }
+
+/* Qeyd: açılış səhifəsinə qayıtma düyməsi artıq giriş ekranının brend panelinin
+   başlıq sətrindədir (.auth-back — styles.css), üzən .lp-back deyil. */
+
+/* footer */
+.lp-foot { background: var(--brand); color: #fff; margin-top: 64px; padding-block: 48px 26px; }
+.lp-foot-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 32px; }
+@media (max-width: 900px) { .lp-foot-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .lp-foot-grid { grid-template-columns: 1fr; } }
+.lp-foot .about p { font-size: 13.5px; color: rgba(255,255,255,.74); margin-top: 14px; max-width: 34ch; }
+.lp-foot .logo-mark { color: #fff; }
+.lp-foot .logo-text b { color: #fff; }
+.lp-foot .logo-text span { color: #C9D3F7; }
+.lp-foot .logo-text small { color: #93A3D8; }
+.lp-foot .logo-rule { background: rgba(255,255,255,.3); }
+.lp-fcol h4 {
+  font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
+  color: rgba(255,255,255,.56); margin: 0 0 14px;
+}
+.lp-fcol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.lp-fcol button {
+  background: none; border: 0; padding: 0; text-align: left;
+  font-size: 13.5px; color: rgba(255,255,255,.84); font-weight: 500;
+}
+.lp-fcol button:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.lp-legal {
+  margin-top: 34px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.16);
+  display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  font-size: 12.5px; color: rgba(255,255,255,.64);
+}

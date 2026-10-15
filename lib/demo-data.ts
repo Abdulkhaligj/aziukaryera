@@ -6,6 +6,7 @@ export const demoData: Record<ResourceKey, AdminRow[]> = {
     {id:'j2',title:'Junior Data Analyst',subtitle:'PASHA Technology · İş',status:'Aktiv',meta:'64 müraciət',updatedAt:'18 Sen, 12:05'},
     {id:'j3',title:'Career Fair Volunteer',subtitle:'ADNSU Karyera Mərkəzi',status:'Qaralama',meta:'Yayımlanmayıb',updatedAt:'17 Sen, 17:48'}
   ],
+  pending_jobs: [],
   companies: [
     {id:'c1',title:'SOCAR',subtitle:'Enerji · Təsdiqlənmiş tərəfdaş',status:'Aktiv',meta:'4 aktiv elan',updatedAt:'18 Sen, 10:14'},
     {id:'c2',title:'bp Azerbaijan',subtitle:'Enerji · Təsdiqlənmiş tərəfdaş',status:'Aktiv',meta:'2 aktiv elan',updatedAt:'16 Sen, 16:20'},
@@ -29,6 +30,18 @@ export const demoData: Record<ResourceKey, AdminRow[]> = {
     {id:'s1',title:'Tələbə 001',subtitle:'Mexanika mühəndisliyi · IV kurs',status:'Aktiv',meta:'Profil 75%',updatedAt:'18 Sen, 15:44'},
     {id:'s2',title:'Tələbə 002',subtitle:'Kimya mühəndisliyi · III kurs',status:'Aktiv',meta:'Profil 92%',updatedAt:'18 Sen, 11:37'}
   ],
+  master_students: [],
+  alumni: [],
+  network: [],
+  reports: [],
+  moderation_logs: [],
+  subscriptions: [],
+  plans: [],
+  payments: [],
+  cv_analytics: [],
+  interview_analytics: [],
+  ai_usage: [],
+  notifications: [],
   content: [
     {id:'p1',title:'Ana səhifə elanı',subtitle:'Career & Innovation Fair 2026',status:'Aktiv',meta:'24 Okt 2026',updatedAt:'18 Sen, 08:22'},
     {id:'p2',title:'Tez-tez verilən suallar',subtitle:'5 sual və cavab',status:'Aktiv',meta:'Saytın alt hissəsi',updatedAt:'15 Sen, 10:30'}

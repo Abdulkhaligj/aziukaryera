@@ -349,6 +349,27 @@ textarea:focus-visible {
   background: #fff0f1;
   color: var(--red);
 }
+.dangerButton.solid {
+  background: var(--red);
+  color: #fff;
+}
+.successBox,
+.noticeBox {
+  border-radius: 11px;
+  padding: 12px 14px;
+  font-size: var(--text-sm);
+  margin-bottom: 16px;
+}
+.successBox {
+  background: #e7f7f0;
+  color: var(--green);
+  border: 1px solid #bde8d7;
+}
+.noticeBox {
+  background: #eef3ff;
+  color: #294070;
+  border: 1px solid #d9e3fb;
+}
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -568,6 +589,31 @@ textarea:focus-visible {
   transform: rotate(-90deg);
   color: #9ca5b6;
 }
+.dangerZone {
+  margin-top: 18px;
+  border-color: #f1c5ca;
+  background: #fffafb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.dangerZone > div > span {
+  color: var(--red);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.dangerZone h3 {
+  margin: 6px 0 5px;
+  font-size: var(--text-lg);
+}
+.dangerZone p {
+  margin: 0;
+  max-width: 780px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
 .tableTools {
   display: flex;
   gap: 10px;
@@ -763,11 +809,48 @@ textarea:focus-visible {
   min-height: 120px;
   resize: vertical;
 }
+.resetWarning {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: #fff0f1;
+  color: var(--red);
+  border: 1px solid #f4c4c9;
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 14px;
+}
+.resetWarning svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.resetWarning p {
+  color: #7a3a42;
+  font-size: var(--text-sm);
+  margin: 4px 0 0;
+}
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.featureChecks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.featureChecks .checkLine {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+}
+.featureChecks input { min-height: 0; width: auto; }
 .modalActions {
   border-top: 1px solid var(--line);
   padding-top: 17px;
@@ -879,6 +962,10 @@ textarea:focus-visible {
   .welcome {
     align-items: flex-start;
     gap: 18px;
+  }
+  .dangerZone {
+    align-items: flex-start;
+    flex-direction: column;
   }
   .welcome h2 {
     font-size: 1.625rem;

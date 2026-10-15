@@ -1,48 +1,69 @@
-# ADNSU Career Admin v1
+# ADNSU Career Center
 
-ADNSU Karyera Mərkəzinin əməkdaşları üçün Next.js + Supabase idarəetmə paneli.
+ADNSU Career Center tələbə, magistr, məzun, şirkət və Karyera Mərkəzi əməkdaşlarını eyni Supabase backend-i üzərindən birləşdirən karyera platformasıdır.
 
-## Modullar
+## İstehsal ünvanları
 
-- ümumi statistika və son fəaliyyət;
-- vakansiya, şirkət, tədbir və tələbə güzəşti CRUD;
-- müraciətlərin mərhələlər üzrə idarəsi;
-- tələbə siyahısı və profil statusu;
-- ana səhifə/FAQ kimi sayt məzmunu;
-- əməkdaş rolları: `super_admin`, `manager`, `editor`, `reviewer`;
-- bütün dəyişikliklərin audit tarixçəsi;
-- mobil və masaüstü uyğun interfeys;
-- Supabase konfiqurasiya edilmədən işləyən demo rejimi.
+- Əsas platforma: https://asoiu-career.vercel.app/
+- Admin panel: https://asoiu-career-admin.vercel.app/
 
-## İşə salma
+## Əsas axın
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
+1. Tələbə və ya şirkət ayrıca qeydiyyatdan keçir.
+2. Şirkət `FREE`, `PRO` və ya `BUSINESS` paketini seçir.
+3. Şirkət təsdiqləndikdən sonra vakansiya yaradır.
+4. Yeni vakansiya `pending_approval` statusu ilə admin növbəsinə düşür.
+5. Admin vakansiyanı təsdiqlədikdə elan əsas saytda görünür.
+6. Tələbə müraciət edir, şirkət müraciəti seçim mərhələləri üzrə idarə edir.
+
+## Repozitoriya quruluşu
+
+```text
+student-web/                 əsas tələbə və şirkət portalı
+app/, components/, lib/     Next.js admin paneli
+supabase/migrations/         verilənlər bazası sxemi və təhlükəsizlik qaydaları
+supabase/functions/          admin istifadəçiləri və AI funksiyaları
+docs/                        texniki və istifadəçi təlimatları
+output/pdf/                  yekun layihə sənədi
 ```
 
-Sonra `http://localhost:3000/admin` açın. `.env.local` boş qaldıqda panel demo rejimində işləyir.
+## Lokal işə salma
 
-## Supabase inteqrasiyası
+Admin panel:
 
-1. `supabase/migrations/202609180001_admin_panel.sql` faylını Supabase SQL Editor-da işə salın.
-2. Project Connect bölməsindən URL və Publishable Key götürüb `.env.local` faylına yazın.
-3. Authentication bölməsində əməkdaş hesabını yaradın.
-4. İstifadəçinin `app_metadata.role` dəyərini `super_admin`, `manager`, `editor` və ya `reviewer` edin.
-5. Eyni istifadəçi ID-si ilə `profiles` cədvəlinə ad, rol və `active` statusu əlavə edin.
+```bash
+pnpm install
+cp .env.example .env.local
+pnpm dev
+```
 
-Rol icazələri:
+Əsas portal statik saytdır və `student-web/` qovluğundan lokal HTTP server ilə açıla bilər.
 
-| Rol | Baxış | Əlavə/redaktə | Silmə | Rolları idarə etmə |
-|---|---:|---:|---:|---:|
-| Super Admin | ✓ | ✓ | ✓ | ✓ |
-| Manager | ✓ | ✓ | ✓ | — |
-| Editor | ✓ | ✓ | — | — |
-| Reviewer | ✓ | yalnız müraciət statusu | — | — |
+## Təhlükəsizlik
 
-## Mövcud sayta qoşulma
+- İstehsal autentifikasiyası Supabase Auth-dur; parollar tətbiq cədvəllərində və `localStorage`-da saxlanmır.
+- RLS siyasətləri tələbə, şirkət və admin məlumatlarını rol üzrə qoruyur.
+- Şirkət paket limitləri yalnız interfeysdə deyil, verilənlər bazasında da yoxlanılır.
+- Admin əməliyyatları audit tarixçəsinə yazılır.
+- Service Role açarı heç vaxt brauzerə və repozitoriyaya daxil edilmir.
+- Admin heyəti maksimum 5 aktiv istifadəçi ilə məhdudlaşdırılıb.
 
-Bu paketdəki `app/admin`, `app/api/admin`, `components/admin-shell.tsx`, `lib/supabase` və `proxy.ts` mövcud Next.js layihəsinə köçürülür. Canlı tələbə saytındakı statik `jobs`, `companies`, `events` və `benefits` massivləri Supabase sorğuları ilə əvəz edilməlidir. Beləliklə admin paneldə yayımlanan dəyişiklik tələbə kabinetində avtomatik görünəcək.
+## Sənədlər
 
-Vacib: frontend-də yalnız Publishable Key saxlanır. Supabase Secret/Service Role açarı brauzerə və `NEXT_PUBLIC_` dəyişənlərinə yazılmamalıdır.
+- [Arxitektura](docs/ARCHITECTURE.md)
+- [Quraşdırma](docs/SETUP.md)
+- [Yerləşdirmə](docs/DEPLOYMENT.md)
+- [Admin təlimatı](docs/ADMIN_GUIDE.md)
+- [Şirkət təlimatı](docs/COMPANY_GUIDE.md)
+- [Tələbə təlimatı](docs/STUDENT_GUIDE.md)
+- [Funksiyalar](docs/FEATURES.md)
+- [Test siyahısı](docs/TEST_CHECKLIST.md)
+
+## Keyfiyyət yoxlaması
+
+```bash
+pnpm typecheck
+pnpm build
+```
+
+AI CV və müsahibə imkanları `career-ai` Edge Function vasitəsilə işləyir. Provayder açarı olmadıqda saxta cavab göstərilmir; təhlükəsiz xəta qaytarılır. Dəstəklənən provayderlər Gemini və Groq-dur.

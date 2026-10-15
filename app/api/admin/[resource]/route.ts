@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext, loadResource, writeAudit } from '@/lib/admin-data';
 import type { ResourceKey } from '@/lib/types';
 
-const resources = new Set<ResourceKey>(['jobs', 'companies', 'events', 'benefits', 'applications', 'students', 'content', 'admins', 'audit_logs']);
-const creatable = new Set<ResourceKey>(['jobs', 'companies', 'events', 'benefits', 'content']);
+const resources = new Set<ResourceKey>(['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs']);
+const creatable = new Set<ResourceKey>(['jobs', 'companies', 'events', 'benefits', 'content', 'students', 'master_students', 'alumni', 'admins']);
+const people = new Set<ResourceKey>(['students', 'master_students', 'alumni', 'admins']);
 
 function text(value: unknown) { return typeof value === 'string' ? value.trim() : ''; }
 function number(value: unknown, fallback = 0) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
+function list(value: unknown, separator = ',') { return text(value).split(separator).map(item => item.trim()).filter(Boolean); }
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ resource: string }> }) {
   const { resource } = await params;
@@ -26,15 +28,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const context = await getAdminContext();
   if (!context || context.role === 'reviewer') return NextResponse.json({ error: 'İcazə yoxdur' }, { status: 403 });
   const body = await request.json() as Record<string, unknown>;
+
+  if (people.has(resource as ResourceKey)) {
+    const { data, error } = await context.supabase.functions.invoke('admin-users', {
+      body: { ...body, action: 'invite', resource }
+    });
+    if (error || !data?.ok) return NextResponse.json({ error: data?.error || error?.message || 'Dəvət göndərilmədi' }, { status: 400 });
+    return NextResponse.json(data, { status: 201 });
+  }
+
   const title = text(body.title);
   if (!title) return NextResponse.json({ error: 'Başlıq məcburidir' }, { status: 400 });
 
   let table = resource;
   let payload: Record<string, unknown>;
   if (resource === 'companies') {
-    payload = { name: title, sector: text(body.sector), email: text(body.email), website: text(body.website), about: text(body.about), status: text(body.status) || 'pending' };
+    payload = { name: title, sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: text(body.website), company_size: text(body.company_size), address: text(body.address), logo_url: text(body.logo_url) || null, about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: body.verified === true || body.verified === 'true', status: text(body.status) || 'pending' };
   } else if (resource === 'jobs') {
-    payload = { company_id: text(body.company_id), title, type: text(body.type) || 'tecrube', mode: text(body.mode) || 'Əyani', location: text(body.location) || 'Bakı', deadline: text(body.deadline), summary: text(body.summary), status: text(body.status) || 'draft' };
+    payload = { company_id: text(body.company_id), title, type: text(body.type) || 'tecrube', mode: text(body.mode) || 'Əyani', location: text(body.location) || 'Bakı', deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: text(body.salary_min) ? number(body.salary_min) : null, salary_max: text(body.salary_max) ? number(body.salary_max) : null, currency: text(body.currency) || 'AZN', salary_visible: body.salary_visible === true || body.salary_visible === 'true', positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: text(body.application_url) || null, changes_requested: text(body.changes_requested) || null, status: text(body.status) || 'draft' };
   } else if (resource === 'events') {
     payload = { title, kind: text(body.kind), starts_at: text(body.starts_at), place: text(body.place), seats: number(body.seats) };
   } else if (resource === 'benefits') {
