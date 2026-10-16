@@ -1,10 +1,10 @@
-const CACHE_NAME = 'adnsu-career-shell-20261016a';
+const CACHE_NAME = 'adnsu-career-shell-20261016b';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/css/styles.css?v=20261016a',
-  '/assets/css/landing.css?v=20261016a',
+  '/assets/css/styles.css?v=20261016b',
+  '/assets/css/landing.css?v=20261016b',
   '/assets/js/config.js?v=20261016a',
   '/assets/js/data.js?v=20261016a',
   '/assets/js/match.js?v=20261016a',
