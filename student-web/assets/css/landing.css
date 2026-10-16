@@ -163,6 +163,44 @@
   .lp-badge { display: none; }
 }
 
+@media (max-width: 620px) {
+  .lp .wrap { padding-inline: max(16px, env(safe-area-inset-left)); }
+  .lp-promo .wrap { padding-block: 9px; gap: 10px; }
+  .lp-promo .wrap > span { font-size: 12px; line-height: 1.35; }
+  .lp-head .row { height: 64px; gap: 8px; }
+  .lp-head .logo-text { display: none; }
+  .lp-head .logo-rule { display: none; }
+  .lp-head .right { gap: 6px; }
+  .lp-head .right .b-primary { padding-inline: 14px; }
+  .lp-burger { width: 40px; height: 40px; }
+  .lp-hero { padding-block: 32px 42px; }
+  .lp-hero-grid { gap: 20px; }
+  .lp-stage .mascot { width: 150px; }
+  .lp-hero h1 { font-size: clamp(34px, 11vw, 46px); }
+  .lp-hero .lede { font-size: 15px; line-height: 1.65; }
+  .lp-cta { display: grid; grid-template-columns: 1fr; }
+  .lp-cta .b { width: 100%; }
+  .lp-sec { padding-block: 42px; }
+  .lp-sec-top { gap: 14px; margin-bottom: 18px; }
+  .lp-card { padding: 17px; }
+  .lp-banner { padding: 26px 20px; }
+  .lp-banner .b { width: 100%; }
+  .lp-detail-head { flex-direction: column; }
+  .lp-detail-head .lp-logo { width: 64px; height: 64px; }
+  .lp-foot { margin-top: 42px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .lp-legal { flex-direction: column; }
+}
+
+@media (max-width: 380px) {
+  .lp-promo .b { display: none; }
+  .lp-head .right .b-primary { font-size: 12.5px; padding-inline: 12px; }
+  .lp-hero h1 { font-size: 34px; }
+}
+
+@media (display-mode: standalone) {
+  .lp-promo { padding-top: env(safe-area-inset-top); }
+}
+
 /* ---------- bölmələr ---------- */
 .lp-sec { padding-block: 58px; }
 .lp-sec.tint { background: var(--surface-2); }
