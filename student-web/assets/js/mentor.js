@@ -149,6 +149,6 @@ document.addEventListener('click',e=>{
 /* Yalnız yeni marşrutlar; mövcud app.js, AI və profil foto kodu dəyişmir. */
 if(typeof NAV!=='undefined'&&typeof VIEWS!=='undefined'){
  if(!NAV.student.some(x=>x.id==='mentor'))NAV.student.push({id:'mentor',label:'Mentor dəstəyi',ico:'◉'});
- if(!NAV.admin.some(x=>x.id==='mentor'))NAV.admin.push({id:'mentor',label:'Mentor müraciətləri',ico:'◉'});
+ if(!NAV.admin.some(x=>x.id==='mentor')){const pos=NAV.admin.findIndex(x=>x.id==='events');NAV.admin.splice(pos>=0?pos+1:NAV.admin.length,0,{id:'mentor',label:'Mentor müraciətləri',ico:'◉'});}
  VIEWS.student.mentor=viewMentorSupport;VIEWS.admin.mentor=viewMentorAdmin;
 }
