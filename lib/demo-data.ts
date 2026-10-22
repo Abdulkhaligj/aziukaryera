@@ -18,6 +18,7 @@ export const demoData: Record<ResourceKey, AdminRow[]> = {
     {id:'e3',title:'CV və LinkedIn emalatxanası',subtitle:'9 Okt 2026 · Onlayn',status:'Qaralama',meta:'Qeydiyyat bağlıdır',updatedAt:'17 Sen, 12:11'}
   ],
   awards: [],
+  ads: [],
   benefits: [
     {id:'b1',title:'Tamaşalara tələbə bileti',subtitle:'Milli Dram Teatrı · 50%',status:'Aktiv',meta:'312 istifadə',updatedAt:'18 Sen, 13:20'},
     {id:'b2',title:'Tələbə seansı',subtitle:'CinemaPlus · 30%',status:'Aktiv',meta:'QR ilə istifadə',updatedAt:'16 Sen, 10:00'},

@@ -7,11 +7,13 @@ import {
   PanelsTopLeft, ShieldCheck, ScrollText, Search, Plus, Bell, ChevronRight, Trophy,
   TrendingUp, UserCheck, Clock3, X, Save, Trash2, Menu, GraduationCap, KeyRound, LogOut,
   MessageSquareText, Flag, CreditCard, FileText, MessagesSquare, Sparkles, RotateCcw,
-  AlertTriangle, Copy, Check, Eye, LoaderCircle, Pencil
+  AlertTriangle, Copy, Check, Eye, LoaderCircle, Pencil, Megaphone
 } from 'lucide-react';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 import { can, roleDescriptions, roleLabels } from '@/lib/permissions';
 import { logout } from '@/app/login/actions';
+import ImageField from '@/components/image-field';
+import Assistant from '@/components/assistant';
 
 type Store = Record<ResourceKey, AdminRow[]>;
 type View = 'dashboard' | ResourceKey;
@@ -36,6 +38,7 @@ const nav: NavItem[] = [
   { key: 'plans', label: 'Paketlər', icon: PanelsTopLeft, group: 'Kommersiya' },
   { key: 'subscriptions', label: 'Abunəliklər', icon: CreditCard, group: 'Kommersiya' },
   { key: 'payments', label: 'Ödənişlər', icon: CreditCard, group: 'Kommersiya' },
+  { key: 'ads', label: 'Reklamlar', icon: Megaphone, group: 'Kommersiya' },
   { key: 'cv_analytics', label: 'CV analitikası', icon: FileText, group: 'Analitika' },
   { key: 'interview_analytics', label: 'Müsahibə analitikası', icon: MessagesSquare, group: 'Analitika' },
   { key: 'ai_usage', label: 'AI istifadəsi', icon: Sparkles, group: 'Analitika' },
@@ -45,11 +48,11 @@ const nav: NavItem[] = [
 ];
 const groups = ['İdarəetmə', 'Məzmun', 'İnsanlar', 'İcma və nəzarət', 'Kommersiya', 'Analitika', 'Sistem'];
 /* Telefonda alt menyu: ən çox işlənən bölmələr */
-const bottomNav: View[] = ['dashboard', 'pending_jobs', 'applications', 'network'];
+const bottomNav: View[] = ['dashboard', 'pending_jobs', 'applications'];
 
 const titles: Record<ResourceKey, string> = {
   jobs: 'Vakansiyalar', pending_jobs: 'Təsdiq gözləyən vakansiyalar', companies: 'Şirkətlər', events: 'Tədbirlər',
-  benefits: 'Tələbə güzəştləri', awards: 'Awards', applications: 'Müraciətlər', students: 'Tələbələr',
+  benefits: 'Tələbə güzəştləri', awards: 'Awards', ads: 'Reklamlar', applications: 'Müraciətlər', students: 'Tələbələr',
   master_students: 'Magistrlər', alumni: 'Məzunlar', network: 'Şəbəkə paylaşımları', reports: 'Şikayətlər',
   moderation_logs: 'Moderasiya tarixçəsi', plans: 'Paketlər və limitlər', subscriptions: 'Abunəliklər',
   payments: 'Ödənişlər', cv_analytics: 'CV analitikası', interview_analytics: 'Müsahibə analitikası',
@@ -57,7 +60,7 @@ const titles: Record<ResourceKey, string> = {
   admins: 'Əməkdaşlar və rollar', audit_logs: 'Əməliyyat tarixçəsi'
 };
 const singular: Partial<Record<ResourceKey, string>> = {
-  jobs: 'vakansiya', companies: 'şirkət', events: 'tədbir', benefits: 'güzəşt', awards: 'mükafat', content: 'məzmun',
+  jobs: 'vakansiya', companies: 'şirkət', events: 'tədbir', benefits: 'güzəşt', awards: 'mükafat', ads: 'reklam', content: 'məzmun',
   students: 'tələbə', master_students: 'magistr', alumni: 'məzun', admins: 'əməkdaş'
 };
 const people = new Set<ResourceKey>(['students', 'master_students', 'alumni', 'admins']);
@@ -121,13 +124,17 @@ function EditorFields({ resource, row, data, lookups, mode, self = false }: { re
     <details className="moreFields"><summary>Əlaqəli şəxs, ünvan və loqo</summary>
       <div className="formGrid"><label className="field">Əlaqəli şəxs<input name="contact" defaultValue={String(f.contact || '')}/></label><label className="field">Vəzifə<input name="contact_position" defaultValue={String(f.contact_position || '')}/></label></div>
       <div className="formGrid"><label className="field">Əlaqə e-poçtu<input name="contact_email" type="email" defaultValue={String(f.contact_email || '')}/></label><label className="field">Əlaqə telefonu<input name="contact_phone" type="tel" defaultValue={String(f.contact_phone || '')}/></label></div>
-      <div className="formGrid"><label className="field">Ünvan<input name="address" defaultValue={String(f.address || '')}/></label><label className="field">Loqo linki (https://)<input name="logo_url" type="url" defaultValue={String(f.logo_url || '')}/></label></div>
+      <label className="field">Ünvan<input name="address" defaultValue={String(f.address || '')}/></label>
     </details>
+    <ImageField name="logo_url" label="Loqo" defaultValue={String(f.logo_url || '')} folder="logos" hint="Şəffaf fonlu PNG və ya WebP ən yaxşı görünür. Saytda şirkət kartlarında böyük göstərilir."/>
   </>;
   if (resource === 'events') return <>
     <label className="field">Tədbirin adı<input name="title" defaultValue={row?.title} required/></label>
     <div className="formGrid"><label className="field">Növü<input name="kind" list="eventKinds" defaultValue={String(f.kind || '')} placeholder="Seminar, Karyera sərgisi..."/><datalist id="eventKinds"><option value="Seminar"/><option value="Karyera sərgisi"/><option value="Master-klass"/><option value="Təlim"/><option value="Görüş"/></datalist></label><label className="field">Tarix və saat<input name="starts_at" type="datetime-local" defaultValue={String(f.starts_at || '')} required/></label></div>
     <div className="formGrid"><label className="field">Məkan<input name="place" defaultValue={String(f.place || '')}/></label><label className="field">Yer sayı<input name="seats" type="number" inputMode="numeric" min="0" defaultValue={String(f.seats ?? 0)}/></label></div>
+    <label className="field">Təşkilatçılar və tərəfdaşlar <small>(vergüllə)</small><input name="organizers" defaultValue={String(f.organizers || '')} placeholder="Karyera Mərkəzi, SOCAR"/></label>
+    <label className="field">Təsvir<textarea name="description" rows={4} defaultValue={String(f.description || '')} placeholder="Tələbələr üçün qısa, maraqlı təsvir"/></label>
+    <ImageField name="image_url" label="Poster və ya loqo" defaultValue={String(f.image_url || '')} folder="events" wide hint="Saytda tədbir kartının üstündə böyük göstərilir."/>
   </>;
   if (resource === 'benefits') return <>
     <label className="field">Güzəştin adı<input name="title" defaultValue={row?.title} required/></label>
@@ -136,12 +143,26 @@ function EditorFields({ resource, row, data, lookups, mode, self = false }: { re
     <div className="formGrid"><label className="field">Başlama tarixi<input name="valid_from" type="date" defaultValue={String(f.valid_from || '')}/></label><label className="field">Bitmə tarixi<input name="valid_to" type="date" defaultValue={String(f.valid_to || '')}/></label></div>
     <label className="field">Status<select name="active" defaultValue={String(f.active ?? true)}><option value="true">Aktiv</option><option value="false">Bitib</option></select></label>
     <label className="field">Açıqlama<textarea name="description" rows={3} defaultValue={String(f.description || '')}/></label>
+    <ImageField name="partner_logo_url" label="Tərəfdaşın loqosu" defaultValue={String(f.partner_logo_url || '')} folder="partners"/>
+  </>;
+  if (resource === 'ads') return <>
+    <div className="noticeBox subtle">Reklam saytda “Reklam” nişanı ilə göstərilir. Yalnız status “Aktiv” və tarix aralığı bu günü əhatə edəndə görünür.</div>
+    <label className="field">Reklamın başlığı<input name="title" defaultValue={row?.title} maxLength={90} required/></label>
+    <div className="formGrid"><label className="field">Reklamçı<input name="advertiser" defaultValue={String(f.advertiser || '')} placeholder="Şirkətin adı" required/></label><label className="field">Platformadakı şirkət<select name="company_id" defaultValue={String(f.company_id || '')}><option value="">— Yoxdur —</option>{companies.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label></div>
+    <ImageField name="image_url" label="Banner və ya loqo" defaultValue={String(f.image_url || '')} folder="ads" wide hint="Böyük banner üçün enli şəkil (təxminən 1600×600). Sponsor kartı üçün loqo da olar."/>
+    <label className="field">Qısa mətn<textarea name="description" rows={2} maxLength={280} defaultValue={String(f.description || '')}/></label>
+    <div className="formGrid"><label className="field">Link (https://)<input name="link_url" type="url" defaultValue={String(f.link_url || '')}/></label><label className="field">Düymənin mətni<input name="cta_label" maxLength={30} defaultValue={String(f.cta_label || 'Ətraflı')}/></label></div>
+    <label className="field">Saytda yeri<select name="placement" defaultValue={String(f.placement || 'landing_strip')}><option value="landing_hero">Ana səhifə — böyük banner</option><option value="landing_strip">Ana səhifə — sponsor kartı</option><option value="dashboard">Kabinet — tələbə daxil olanda</option></select></label>
+    <div className="formGrid"><label className="field">Başlama tarixi<input name="starts_on" type="date" defaultValue={String(f.starts_on || new Date().toISOString().slice(0, 10))} required/></label><label className="field">Bitmə tarixi<input name="ends_on" type="date" defaultValue={String(f.ends_on || '')} required/></label></div>
+    <div className="formGrid"><label className="field">Status<select name="status" defaultValue={String(f.status || 'draft')}><option value="draft">Qaralama</option><option value="active">Aktiv — saytda görünür</option><option value="paused">Dayandırılıb</option><option value="ended">Bitib</option></select></label><label className="field">Prioritet <small>(böyük rəqəm öndə)</small><input name="priority" type="number" inputMode="numeric" defaultValue={String(f.priority ?? 0)}/></label></div>
+    <div className="formGrid"><label className="field">Qiymət (AZN)<input name="price_azn" type="number" inputMode="decimal" step="0.01" min="0" defaultValue={String(f.price_azn ?? '')}/></label><label className="checkLine"><input type="checkbox" name="paid" value="true" defaultChecked={Boolean(f.paid)}/> Ödəniş alınıb</label></div>
+    {row?.id && <div className="readGrid"><div className="wide"><span>Statistika</span><b>{row.meta}</b></div></div>}
   </>;
   if (resource === 'awards') return <>
     <div className="formGrid"><label className="field">İl<input name="year" type="number" inputMode="numeric" min="2020" max="2100" defaultValue={String(f.year || new Date().getFullYear())} required/></label><label className="field">Dərəcə<select name="tier" defaultValue={String(f.tier || 'gold')}><option value="gold">🥇 Qızıl</option><option value="silver">🥈 Gümüş</option><option value="bronze">🥉 Bürünc</option></select></label></div>
     <label className="field">Nominasiya<input name="nomination" list="awardNoms" maxLength={80} defaultValue={String(f.nomination || '')} placeholder="məsələn, İlin işəgötürəni" required/><datalist id="awardNoms">{[...new Set(['İlin işəgötürəni', 'Ən yaxşı təcrübə proqramı', 'Tələbələrin seçimi', 'Gənc istedadlara investisiya', 'Karyera tədbirlərində fəallıq', 'İnnovasiya və texnologiya', ...data.awards.map(a => String(a.fields?.nomination || ''))])].filter(Boolean).map(n => <option key={n} value={n}/>)}</datalist></label>
     <div className="formGrid"><label className="field">Platformadakı şirkət<select name="company_id" defaultValue={String(f.company_id || '')}><option value="">— Siyahıda yoxdur —</option>{companies.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label><label className="field">və ya şirkətin adı<input name="company_name" defaultValue={String(f.company_name || '')} placeholder="Siyahıda yoxdursa yazın"/></label></div>
-    <label className="field">Loqo linki (istəyə bağlı, https://)<input name="logo_url" type="url" defaultValue={String(f.logo_url || '')}/></label>
+    <ImageField name="logo_url" label="Loqo (istəyə bağlı)" defaultValue={String(f.logo_url || '')} folder="logos"/>
     <label className="field">Qısa əsaslandırma<textarea name="citation" rows={2} maxLength={300} defaultValue={String(f.citation || '')} placeholder="Niyə bu mükafata layiq görüldü"/></label>
     <label className="checkLine"><input type="checkbox" name="published" value="true" defaultChecked={Boolean(f.published)}/> Dərc et — əsas saytda görünsün</label>
   </>;
@@ -222,7 +243,9 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
   const [errors, setErrors] = useState(initialErrors);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<Status | ''>('');
-  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; row?: AdminRow } | null>(null);
+  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; row?: AdminRow; origin?: string } | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantDone, setAssistantDone] = useState<Record<string, string>>({});
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -235,7 +258,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
 
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4200); return () => clearTimeout(t); }, [toast]);
   /* Açıq pəncərə və ya menyu varkən arxa fon sürüşməsin (telefon) */
-  useEffect(() => { document.body.style.overflow = modal || menuOpen || secret || resetOpen ? 'hidden' : ''; }, [modal, menuOpen, secret, resetOpen]);
+  useEffect(() => { document.body.style.overflow = modal || menuOpen || secret || resetOpen || assistantOpen ? 'hidden' : ''; }, [modal, menuOpen, secret, resetOpen, assistantOpen]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) { setModal(null); setMenuOpen(false); setUserMenu(false); } };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
@@ -300,6 +323,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'Əməliyyat alınmadı');
       await refreshResource(active);
+      if (modal.origin) setAssistantDone(previous => ({ ...previous, [modal.origin as string]: 'done' }));
       setModal(null);
       if (result.temporaryPassword) setSecret({ title: 'Hesab yaradıldı', email: String(result.email || payload.email || ''), password: result.temporaryPassword });
       else setToast({ tone: 'good', text: modal.mode === 'create' ? 'Əlavə edildi.' : 'Dəyişikliklər yadda saxlanıldı.' });
@@ -335,6 +359,27 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       await refreshResource(active);
     } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Şifrə sıfırlanmadı'); }
     finally { setBusy(false); }
+  }
+
+  /* AI qaralaması: adi forma sahələri ilə doldurulmuş "Yeni ..." pəncərəsi */
+  function openFromAssistant(resource: ResourceKey, row: AdminRow, key: string) {
+    setFormError(''); setActive(resource); setModal({ mode: 'create', row, origin: key });
+  }
+
+  /* AI qaralamasını formasız dərc etmək — eyni API və icazə yoxlaması */
+  async function publishFromAssistant(resource: ResourceKey, payload: Record<string, unknown>, key: string) {
+    setAssistantDone(previous => ({ ...previous, [key]: 'busy' }));
+    try {
+      const response = await fetch(`/api/admin/${resource}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const result = await response.json();
+      if (response.status === 401) { window.location.href = '/login'; return; }
+      if (!response.ok) throw new Error(result.error || 'Yaradılmadı');
+      setAssistantDone(previous => ({ ...previous, [key]: 'done' }));
+      await refreshResource(resource);
+      setToast({ tone: 'good', text: `${titles[resource]}: yeni qeyd dərc olundu.` });
+    } catch (caught) {
+      setAssistantDone(previous => ({ ...previous, [key]: caught instanceof Error ? caught.message : 'Yaradılmadı' }));
+    }
   }
 
   async function resetPlatform() {
@@ -379,6 +424,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
         <button className="menuButton" aria-label="Menyunu aç" onClick={() => setMenuOpen(true)}><Menu size={22}/></button>
         <div className="pageIdentity"><h1>{active === 'dashboard' ? 'İcmal' : titles[active]}</h1><p>{subtitle}</p></div>
         <div className="topActions">
+          <button className="aiButton hideMobile" onClick={() => setAssistantOpen(true)}><Sparkles size={18}/>AI köməkçi</button>
           {canCreate && <button className="primaryButton hideMobile" onClick={() => { setFormError(''); setModal({ mode: 'create' }); }}><Plus size={18}/>Yeni {singular[active as ResourceKey] || 'qeyd'}</button>}
           <div className="userMenuWrap">
             <button className="profileButton" aria-label="Profil menyusu" aria-expanded={userMenu} onClick={() => setUserMenu(v => !v)}><span>{initialsOf(currentUser)}</span><div><b>{currentUser}</b><small>{roleLabels[currentRole]}</small></div></button>
@@ -393,7 +439,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
 
       <section className="content">
         {active === 'dashboard' ? <>
-          <div className="welcome"><div><span>Salam, {currentUser.split(' ')[0]}</span><h2>Bu gün nəyə baxmaq lazımdır?</h2><p>Gözləyən işlər aşağıdadır. Qalan bölmələr menyudadır.</p></div></div>
+          <div className="welcome"><div><span>Salam, {currentUser.split(' ')[0]}</span><h2>Bu gün nəyə baxmaq lazımdır?</h2><p>Gözləyən işlər aşağıdadır. Tədbir, elan və ya sayt mətnini AI köməkçiyə deyin, o hazırlasın.</p></div><button className="aiButton light" onClick={() => setAssistantOpen(true)}><Sparkles size={18}/>AI köməkçi ilə yarat</button></div>
 
           <div className="attentionGrid">
             {[
@@ -458,10 +504,12 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
 
     {/* Telefon: aşağı menyu və üzən "+" düyməsi */}
     <nav className="bottomNav" aria-label="Əsas bölmələr">
-      {bottomNav.map(key => { const item = nav.find(n => n.key === key)!; const Icon = item.icon; const n = badge(key); return <button key={key} className={active === key ? 'active' : ''} onClick={() => go(key)}><Icon size={21}/><span>{key === 'pending_jobs' ? 'Təsdiq' : key === 'network' ? 'Şəbəkə' : item.label}</span>{n > 0 && <em>{n}</em>}</button>; })}
+      {bottomNav.slice(0, 2).map(key => { const item = nav.find(n => n.key === key)!; const Icon = item.icon; const n = badge(key); return <button key={key} className={active === key ? 'active' : ''} onClick={() => go(key)}><Icon size={21}/><span>{key === 'pending_jobs' ? 'Təsdiq' : item.label}</span>{n > 0 && <em>{n}</em>}</button>; })}
+      <button className="aiTab" onClick={() => setAssistantOpen(true)} aria-label="AI köməkçi"><span><Sparkles size={22}/></span></button>
+      {bottomNav.slice(2).map(key => { const item = nav.find(n => n.key === key)!; const Icon = item.icon; return <button key={key} className={active === key ? 'active' : ''} onClick={() => go(key)}><Icon size={21}/><span>{item.label}</span></button>; })}
       <button onClick={() => setMenuOpen(true)}><Menu size={21}/><span>Menyu</span></button>
     </nav>
-    {canCreate && !modal && <button className="fab" aria-label={`Yeni ${singular[active as ResourceKey] || 'qeyd'}`} onClick={() => { setFormError(''); setModal({ mode: 'create' }); }}><Plus size={24}/></button>}
+    {canCreate && !modal && !assistantOpen && <button className="fab" aria-label={`Yeni ${singular[active as ResourceKey] || 'qeyd'}`} onClick={() => { setFormError(''); setModal({ mode: 'create' }); }}><Plus size={24}/></button>}
 
     {modal && resource && <div className="modalBackdrop" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setModal(null); }}>
       <form className="modal" onSubmit={saveRow} noValidate={false}>
@@ -505,6 +553,10 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       </div>
       <div className="modalActions"><span className="spacer"/><button type="button" className="secondaryButton" onClick={() => setResetOpen(false)} disabled={busy}>Ləğv et</button><button type="button" className="dangerButton solid" onClick={resetPlatform} disabled={busy || resetPhrase !== 'SIFIRLA'}><RotateCcw size={17}/>{busy ? 'Sıfırlanır…' : 'Hər şeyi sıfırla'}</button></div>
     </div></div>}
+
+    <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} role={currentRole} userId={currentUserId}
+      companies={data.companies} completed={assistantDone} onOpenForm={openFromAssistant} onPublish={publishFromAssistant}/>
+    {assistantOpen && <div className="assistantBackdrop" onClick={() => setAssistantOpen(false)}/>}
 
     {toast && <div className={`toast ${toast.tone}`} role="status" onClick={() => setToast(null)}>{toast.tone === 'good' ? <Check size={18}/> : <AlertTriangle size={18}/>}{toast.text}</div>}
   </div>;

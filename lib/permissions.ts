@@ -15,13 +15,13 @@ export type Action = 'create' | 'edit' | 'delete';
 const content = new Set<ResourceKey>(['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'content']);
 const moderation = new Set<ResourceKey>(['applications', 'network', 'reports']);
 const people = new Set<ResourceKey>(['students', 'master_students', 'alumni']);
-const commerce = new Set<ResourceKey>(['subscriptions', 'plans', 'payments']);
+const commerce = new Set<ResourceKey>(['subscriptions', 'plans', 'payments', 'ads']);
 const records = new Set<ResourceKey>(['cv_analytics', 'interview_analytics', 'ai_usage', 'notifications']);
 
 /* What can exist at all, independent of the role */
-const creatable = new Set<ResourceKey>(['jobs', 'companies', 'events', 'benefits', 'awards', 'content', 'students', 'master_students', 'alumni', 'admins']);
+const creatable = new Set<ResourceKey>(['jobs', 'companies', 'events', 'benefits', 'awards', 'ads', 'content', 'students', 'master_students', 'alumni', 'admins']);
 const editable = new Set<ResourceKey>([...content, ...moderation, ...people, ...commerce, 'admins']);
-const removable = new Set<ResourceKey>([...content, 'applications', 'network', 'reports', ...people, 'subscriptions', 'payments', ...records, 'admins']);
+const removable = new Set<ResourceKey>([...content, 'applications', 'network', 'reports', ...people, 'subscriptions', 'payments', 'ads', ...records, 'admins']);
 
 export function can(role: AdminRole | string, action: Action, resource: ResourceKey): boolean {
   const allowed = action === 'create' ? creatable : action === 'edit' ? editable : removable;

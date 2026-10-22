@@ -13,7 +13,7 @@ export type AdminContext = {
   mustChangePassword: boolean;
 };
 
-export const resourceKeys: ResourceKey[] = ['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs'];
+export const resourceKeys: ResourceKey[] = ['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'ads', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs'];
 
 const adminRoles: AdminRole[] = ['super_admin', 'manager', 'editor', 'reviewer'];
 
@@ -78,6 +78,14 @@ function labelMaps(lookups?: Lookups) {
 
 const tierLabel: Record<string, string> = { gold: 'Qızıl', silver: 'Gümüş', bronze: 'Bürünc' };
 const jobTypeLabel: Record<string, string> = { is: 'İş', tecrube: 'Təcrübə', graduate: 'Məzun proqramı', konullu: 'Könüllülük' };
+const placementLabel: Record<string, string> = { landing_hero: 'Ana səhifə banneri', landing_strip: 'Ana səhifə sponsor kartı', dashboard: 'Kabinetdə' };
+/* timestamptz → Bakı vaxtı ilə "YYYY-MM-DDTHH:MM" (datetime-local sahəsi üçün) */
+function bakuLocal(value?: string | null) {
+  if (!value) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baku', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value));
+  const get = (t: string) => parts.find(p => p.type === t)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+}
 
 export async function loadResource(context: AdminContext, resource: ResourceKey, lookups?: Lookups): Promise<AdminRow[]> {
   const { supabase } = context;
@@ -102,21 +110,21 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'events') {
-    const { data, error } = await supabase.from('events').select('id,title,kind,starts_at,place,seats,created_at').order('starts_at', { ascending: false });
+    const { data, error } = await supabase.from('events').select('id,title,kind,starts_at,place,seats,description,organizers,image_url,created_at').order('starts_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.title, subtitle: row.kind || 'Tədbir', status: new Date(row.starts_at) >= new Date() ? 'Aktiv' : 'Bitib',
       meta: `${row.place || 'Məkan qeyd edilməyib'} · ${row.seats || 0} yer`, updatedAt: dateLabel(row.starts_at),
-      fields: { kind: row.kind, starts_at: row.starts_at?.slice(0, 16), place: row.place, seats: row.seats }
+      fields: { kind: row.kind, starts_at: bakuLocal(row.starts_at), place: row.place, seats: row.seats, description: row.description, organizers: (row.organizers || []).join(', '), image_url: row.image_url }
     }));
   }
   if (resource === 'benefits') {
-    const { data, error } = await supabase.from('benefits').select('id,title,description,discount_label,valid_from,valid_to,active,created_at,partner_id,benefit_partners(name)').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('benefits').select('id,title,description,discount_label,valid_from,valid_to,active,created_at,partner_id,benefit_partners(name,logo_url)').order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.title, subtitle: row.benefit_partners?.name || 'Tərəfdaş', status: row.active ? 'Aktiv' : 'Bitib',
       meta: `${row.discount_label || 'Güzəşt'} · ${row.valid_to ? dateLabel(row.valid_to) : 'müddətsiz'}`, updatedAt: dateLabel(row.created_at),
-      fields: { partner_id: row.partner_id, partner_name: row.benefit_partners?.name, description: row.description, discount_label: row.discount_label, valid_from: row.valid_from, valid_to: row.valid_to, active: row.active }
+      fields: { partner_id: row.partner_id, partner_name: row.benefit_partners?.name, partner_logo_url: row.benefit_partners?.logo_url, description: row.description, discount_label: row.discount_label, valid_from: row.valid_from, valid_to: row.valid_to, active: row.active }
     }));
   }
   if (resource === 'applications') {
@@ -213,6 +221,18 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     const { data, error } = await supabase.from('ai_usage').select('id,task,provider,model,input_chars,output_chars,success,error_code,created_at').order('created_at', { ascending: false }).limit(250);
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: String(row.id), title: row.task, subtitle: `${row.provider || '—'} · ${row.model || '—'}`, status: row.success ? 'Aktiv' : 'Bitib', meta: `${row.input_chars} → ${row.output_chars} simvol${row.error_code ? ` · ${row.error_code}` : ''}`, updatedAt: dateLabel(row.created_at) }));
+  }
+  if (resource === 'ads') {
+    const { data, error } = await supabase.from('ads').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    const today = new Date().toISOString().slice(0, 10);
+    return (data || []).map((row: any) => ({
+      id: row.id, title: row.title, subtitle: `${row.advertiser} · ${placementLabel[row.placement] || row.placement}`,
+      status: row.status === 'active' && row.ends_on >= today ? 'Aktiv' : row.status === 'draft' ? 'Qaralama' : row.status === 'paused' ? 'Yoxlamada' : 'Bitib',
+      meta: `${dateLabel(row.starts_on)} – ${dateLabel(row.ends_on)} · ${row.impressions} baxış · ${row.clicks} klik${row.price_azn != null ? ` · ${row.price_azn} AZN${row.paid ? ' (ödənilib)' : ' (ödənilməyib)'}` : ''}`,
+      updatedAt: dateLabel(row.updated_at || row.created_at),
+      fields: { title: row.title, advertiser: row.advertiser, company_id: row.company_id, description: row.description, image_url: row.image_url, link_url: row.link_url, cta_label: row.cta_label, placement: row.placement, starts_on: row.starts_on, ends_on: row.ends_on, status: row.status, priority: row.priority, price_azn: row.price_azn, paid: row.paid }
+    }));
   }
   if (resource === 'awards') {
     const { data, error } = await supabase.from('company_awards').select('*').order('year', { ascending: false }).order('nomination');

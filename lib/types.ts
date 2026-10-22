@@ -1,6 +1,6 @@
 export type Status = 'Aktiv' | 'Qaralama' | 'Bitib' | 'Yoxlamada';
 export type ResourceKey =
-  | 'jobs' | 'pending_jobs' | 'companies' | 'events' | 'benefits' | 'awards' | 'applications'
+  | 'jobs' | 'pending_jobs' | 'companies' | 'events' | 'benefits' | 'awards' | 'ads' | 'applications'
   | 'students' | 'master_students' | 'alumni'
   | 'network' | 'reports' | 'moderation_logs' | 'subscriptions' | 'plans' | 'payments'
   | 'cv_analytics' | 'interview_analytics' | 'ai_usage'
