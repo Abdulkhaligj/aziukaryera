@@ -1,0 +1,528 @@
+/*
+ * ADNSU Career Center — Student Workspace UI
+ * Tələbə kabinetinin bütün səhifələri üçün vahid, rol üzrə izolə olunmuş stil.
+ * Şirkət və admin panellərinin funksionallığı və görünüşü dəyişmir.
+ */
+.student-workspace {
+  --work-blue: #001c80;
+  --work-blue-light: #2a47d8;
+  --work-canvas: #f6f8fd;
+  --work-line: #e6eaf4;
+  --work-text: #111d39;
+  --work-muted: #637087;
+  --work-radius: 16px;
+  --work-shadow: 0 1px 3px rgba(12,32,77,.035), 0 14px 38px -30px rgba(0,28,128,.24);
+  background: var(--ground);
+  padding: 27px clamp(17px, 2.6vw, 42px) 76px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.student-workspace > * { min-width: 0; }
+.student-workspace h1,
+.student-workspace h2,
+.student-workspace h3,
+.student-workspace h4 {
+  letter-spacing: -.025em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.student-workspace button,
+.student-workspace a,
+.student-workspace input,
+.student-workspace textarea,
+.student-workspace select {
+  -webkit-tap-highlight-color: transparent;
+}
+.student-workspace .student-crumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px 3px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.student-workspace .student-crumb strong { color: var(--brand); font-weight: 750; }
+.student-workspace .crumb-divider { color: var(--line-2); }
+.student-workspace .page-head {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--work-radius);
+  padding: clamp(21px, 2.4vw, 30px);
+  margin-bottom: 20px;
+  align-items: center;
+  gap: 20px;
+  box-shadow: var(--work-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.student-workspace .page-head::before {
+  content: "";
+  width: 4px;
+  position: absolute;
+  top: 23px;
+  bottom: 23px;
+  left: 0;
+  border-radius: 0 5px 5px 0;
+  background: var(--brand);
+}
+.student-workspace .page-head h1 {
+  font-size: clamp(25px, 2.65vw, 35px);
+  font-weight: 800;
+  line-height: 1.16;
+  margin: 4px 0 0;
+}
+.student-workspace .page-head p {
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 10px 0 0;
+  max-width: 68ch;
+  color: var(--ink-2);
+}
+.student-workspace .eyebrow {
+  font-family: var(--font-body);
+  font-weight: 750;
+  font-size: 10.5px;
+  letter-spacing: .10em;
+  line-height: 1.4;
+}
+.student-workspace .page-head .eyebrow { color: var(--brand); }
+.student-workspace .page-head .mascot-inline {
+  align-items: center;
+  gap: 20px;
+}
+.student-workspace .page-head .mascot-inline .mascot {
+  width: clamp(65px, 6vw, 84px);
+  flex: none;
+}
+.student-workspace .card,
+.student-workspace .tile,
+.student-workspace .job,
+.student-workspace .post,
+.student-workspace .q-card,
+.student-workspace .table-wrap,
+.student-workspace .cvsheet {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--work-radius);
+  box-shadow: var(--work-shadow);
+}
+.student-workspace .card {
+  padding: 20px;
+  min-width: 0;
+}
+.student-workspace .card.pad-lg { padding: clamp(20px, 2.1vw, 28px); }
+.student-workspace .card > h2,
+.student-workspace .card > h3 {
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+.student-workspace .stack { gap: 15px; min-width: 0; }
+.student-workspace .section { margin-top: 30px; }
+.student-workspace .section-head {
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.student-workspace .section-head h2 {
+  font-size: clamp(18px, 1.6vw, 21px);
+  font-weight: 750;
+}
+.student-workspace .section-head .hint { font-size: 12px; color: var(--muted); }
+.student-workspace .grid { gap: 18px; }
+.student-workspace .grid.side {
+  grid-template-columns: minmax(0,1fr) minmax(270px, 315px);
+  gap: 20px;
+  align-items: start;
+}
+.student-workspace .tiles { gap: 14px; }
+.student-workspace .tile {
+  padding: 19px 20px;
+  gap: 7px;
+  min-height: 118px;
+  box-shadow: var(--work-shadow);
+  transition: border-color .16s, transform .16s;
+}
+.student-workspace .tile:hover { border-color: var(--brand-ring); transform: translateY(-2px); }
+.student-workspace .tile .k {
+  font: 750 11px/1.3 var(--font-body);
+  letter-spacing: .065em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.student-workspace .tile .v {
+  font-size: clamp(28px, 2.7vw, 36px);
+  font-weight: 800;
+  color: var(--ink);
+}
+.student-workspace .tile .s { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.student-workspace .tile.accent .v { color: var(--brand); }
+.student-workspace .btn {
+  min-height: 40px;
+  padding: 9px 17px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background .16s, border-color .16s, color .16s, transform .16s;
+}
+.student-workspace .btn.sm { min-height: 36px; font-size: 12.5px; padding: 7px 13px; }
+.student-workspace .btn.primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.student-workspace .btn:hover:not([disabled]) { transform: translateY(-1px); }
+.student-workspace .btn:focus-visible,
+.student-workspace .pills button:focus-visible,
+.student-workspace .network-filters button:focus-visible,
+.student-workspace .student-shortcut:focus-visible { outline: 3px solid var(--brand-ring); outline-offset: 2px; }
+.student-workspace .pills,
+.student-workspace .network-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--work-radius);
+}
+.student-workspace .pills button,
+.student-workspace .network-filters button {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: 650 12.5px/1.25 var(--font-body);
+  cursor: pointer;
+}
+.student-workspace .pills button:hover,
+.student-workspace .network-filters button:hover {
+  background: var(--brand-soft);
+  border-color: var(--brand-ring);
+  color: var(--brand);
+}
+.student-workspace .pills button[aria-pressed="true"],
+.student-workspace .network-filters button[aria-pressed="true"] {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: var(--brand-ring);
+  box-shadow: inset 0 -2px 0 var(--brand);
+}
+.student-workspace .student-tool-tabs {
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--work-shadow);
+}
+.student-workspace .field { gap: 7px; }
+.student-workspace .field > label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.student-workspace .field .help { font-size: 11.5px; line-height: 1.55; }
+.student-workspace input[type="text"],
+.student-workspace input[type="email"],
+.student-workspace input[type="number"],
+.student-workspace input[type="tel"],
+.student-workspace input[type="url"],
+.student-workspace input[type="search"],
+.student-workspace select,
+.student-workspace textarea {
+  min-height: 43px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  border-color: var(--line-2);
+  max-width: 100%;
+}
+.student-workspace textarea { min-height: 100px; }
+.student-workspace input[readonly] { color: var(--muted); background: var(--surface-2); cursor: not-allowed; }
+.student-workspace .searchbar { min-width: 240px; flex: 1; }
+.student-workspace .searchbar input { min-height: 43px; }
+.student-workspace .note {
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.student-workspace .chip {
+  min-height: 25px;
+  padding: 4px 10px;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.student-workspace .skillrow { gap: 7px; }
+.student-workspace .skillrow .sk { padding: 5px 9px; border-radius: 8px; font-size: 11.5px; }
+.student-workspace .empty {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px;
+  border-radius: var(--work-radius);
+  background: var(--surface);
+  border: 1px dashed var(--line-2);
+  box-shadow: none;
+  gap: 11px;
+}
+.student-workspace .empty b { font-size: 16px; font-weight: 750; color: var(--ink); }
+.student-workspace .empty > span { color: var(--muted); max-width: 48ch; line-height: 1.6; }
+.student-workspace .empty .btn { margin-top: 7px; }
+
+/* İcmal: sürətli keçidlər, vahid statistika və vakansiya kartları. */
+.student-workspace .welcome {
+  border-radius: 20px;
+  padding: clamp(24px, 2.6vw, 34px);
+  margin-bottom: 23px;
+  min-height: 194px;
+  background: linear-gradient(112deg, #081e75 0%, #1439bb 61%, #3759de 100%);
+}
+.student-workspace .welcome-text h2 { font-size: clamp(23px, 2.3vw, 31px); font-weight: 800; }
+.student-workspace .welcome-text p { font-size: 13px; line-height: 1.6; }
+.student-workspace .welcome-stats { gap: clamp(14px, 2.2vw, 32px); }
+.student-workspace .welcome-stats b { font-size: 23px; }
+.student-workspace .welcome-stats span {
+  font: 650 10.5px/1.35 var(--font-body); letter-spacing: .025em;
+  text-transform: none; color: #c4d4ff;
+}
+.student-workspace .student-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 13px;
+  margin-bottom: 18px;
+}
+.student-workspace .student-shortcut {
+  display: flex; align-items: center; gap: 13px; min-width: 0;
+  min-height: 90px; padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--work-shadow);
+  cursor: pointer;
+  transition: transform .16s, border-color .16s, background .16s;
+}
+.student-workspace .student-shortcut:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-ring);
+  background: var(--brand-soft);
+}
+.student-workspace .shortcut-icon {
+  display: grid; place-items: center; flex: none;
+  width: 43px; height: 43px;
+  border-radius: 12px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-size: 20px;
+}
+.student-workspace .student-shortcut > span:nth-child(2) { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.student-workspace .student-shortcut b { font-size: 13px; line-height: 1.35; }
+.student-workspace .student-shortcut small { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+.student-workspace .student-shortcut > span:last-child { font-size: 17px; color: var(--brand); }
+
+/* Vakansiyalar: kart iyerarxiyası, aktiv filtr göstəriciləri. */
+.student-workspace .results-count {
+  font-size: 13px; font-weight: 650; color: var(--ink-2);
+}
+.student-workspace .results-count b { color: var(--brand); font-size: 17px; }
+.student-workspace .joblist { gap: 15px; }
+.student-workspace .job {
+  padding: clamp(17px,2vw,23px);
+  gap: 16px;
+  transition: border-color .16s, transform .16s, box-shadow .16s;
+}
+.student-workspace .job:hover {
+  border-color: var(--brand-ring);
+  transform: translateY(-2px);
+  box-shadow: 0 7px 22px rgba(0,28,128,.07);
+}
+.student-workspace .job.top { border-color: var(--brand-ring); box-shadow: inset 4px 0 0 var(--brand); }
+.student-workspace .job-head { align-items: center; gap: 14px; }
+.student-workspace .brandbox { width: 48px; height: 48px; border-radius: 12px; }
+.student-workspace .brandbox.has-company-logo { width: 52px; height: 52px; }
+.student-workspace .job-title h3 { font-size: clamp(15px, 1.3vw, 18px); font-weight: 750; line-height: 1.35; }
+.student-workspace .job-title .org { font-size: 12.5px; margin-top: 4px; }
+.student-workspace .job-meta { gap: 8px 18px; font-size: 12.5px; line-height: 1.5; }
+.student-workspace .job-foot { margin-top: 1px; padding-top: 15px; }
+.student-workspace .job-match { width: 160px; }
+.student-workspace .match-pct { font-size: 22px; }
+.student-workspace .meter { height: 8px; border-radius: 5px; }
+.student-workspace .meter.lg { height: 11px; }
+
+/* Müraciətlər: xülasə sayğacları və rahat cədvəl. */
+.student-workspace .student-metrics-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 13px;
+  margin-bottom: 19px;
+}
+.student-workspace .student-metric {
+  display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  min-height: 92px;
+  padding: 17px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--work-shadow);
+}
+.student-workspace .student-metric span { color: var(--ink-2); font-size: 12px; font-weight: 650; }
+.student-workspace .student-metric b { color: var(--brand); font-size: 27px; font-weight: 800; line-height: 1.1; }
+.student-workspace .table-wrap { padding: 0; overflow-x: auto; }
+.student-workspace .table-wrap table { min-width: 670px; width: 100%; }
+.student-workspace table thead { background: var(--surface-2); }
+.student-workspace table th {
+  font-family: var(--font-body); font-size: 11px; font-weight: 750;
+  letter-spacing: .065em; text-transform: uppercase; color: var(--ink-2);
+}
+.student-workspace table th,
+.student-workspace table td { padding: 15px 17px; vertical-align: middle; }
+.student-workspace table tr:hover td { background: var(--brand-soft); }
+.student-workspace table td .who b { font-size: 13px; font-weight: 750; }
+
+/* Tədbirlər: tarix kartı və başa çatmış sessiyaların statusu. */
+.student-workspace .student-events { align-items: stretch; }
+.student-workspace .event-card {
+  display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 205px;
+}
+.student-workspace .event-card h3 { font-size: 16px !important; font-weight: 750; }
+.student-workspace .event-card .bar { margin-top: 7px; }
+.student-workspace .event-past { opacity: .75; }
+.student-workspace .event-past:hover { opacity: 1; }
+
+/* CV Studio: şablonlar, sənəd baxışı və alətlər. */
+.student-view-cv .cvsheet {
+  padding: clamp(20px,2.5vw,38px);
+  border-radius: 14px;
+}
+.student-view-cv .cv-designer-head { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.student-view-cv .cv-designer-head > div:first-child { flex: 1; min-width: 260px; }
+.student-view-cv .cv-builder-wrap { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+.student-view-cv .cv-builder-frame { max-width: 100%; }
+
+/* Müsahibə: suallar, qiymətləndirmə və mərhələlər. */
+.student-view-interview .q-card { padding: clamp(18px,2.4vw,27px); margin-bottom: 14px; }
+.student-view-interview .q-head h3 { font-size: 17px; line-height: 1.4; }
+.student-view-interview .q-num {
+  border-radius: 10px; background: var(--brand-soft);
+  color: var(--brand); font-weight: 750;
+}
+.student-view-interview .q-card textarea { min-height: 126px; }
+.student-view-interview .q-hint { font-size: 12.5px; line-height: 1.65; }
+
+/* Karyera xəritəsi: mərhələ göstəricisi və bacarıqlar. */
+.student-workspace .student-roadmap-progress {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px; background: var(--surface);
+  padding: 14px 20px; margin-bottom: 18px; box-shadow: var(--work-shadow);
+}
+.student-workspace .student-roadmap-progress > span:first-child { color: var(--ink-2); font-weight: 650; }
+.student-workspace .student-roadmap-progress b { color: var(--brand); font-size: 16px; }
+.student-workspace .student-progress-track {
+  flex: 1; min-width: 90px; max-width: 360px;
+  height: 8px; background: var(--surface-3);
+  border-radius: 6px; overflow: hidden;
+}
+.student-workspace .student-progress-track i { display: block; height: 100%; background: var(--brand); border-radius: 6px; }
+.student-view-roadmap .rm-stage { padding: 22px 0; }
+.student-view-roadmap .rm-stage:first-child { padding-top: 8px; }
+.student-view-roadmap .rm-body h4 { font-size: 15px; font-weight: 750; }
+.student-view-roadmap .rm-when b { font-size: 13px; }
+
+/* Şəbəkə: paylaşım yazıcısı, filtrlər və post kartları. */
+.student-view-network .network-filters { margin-bottom: 0; }
+.student-view-network .post { padding: clamp(17px,2vw,23px); }
+.student-view-network .post-body {
+  font-size: 14px; line-height: 1.78; overflow-wrap: anywhere;
+}
+.student-view-network .post-head .who b { font-size: 14px; }
+.student-view-network .post-act { min-height: 35px; border-radius: 9px; }
+
+/* Güzəştlər: üç sütunlu kartlar və daha aydın CTA. */
+.student-view-benefits .benefit { display: flex; flex-direction: column; gap: 7px; }
+.student-view-benefits .benefit-off {
+  margin: 7px 0;
+  font-size: clamp(22px,2vw,28px);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  color: var(--brand);
+}
+.student-view-benefits .benefit > p { flex: 1; line-height: 1.65; }
+.student-view-benefits .benefit-mark { border-radius: 12px; }
+
+/* Profil: ardıcıl məlumat blokları və oxunaqlı formalar. */
+.student-view-profile .education-item {
+  padding: 17px 0;
+  border-bottom: 1px solid var(--line);
+}
+.student-view-profile .education-item:last-child { border-bottom: 0; }
+.student-view-profile .card.pad-lg > h2 { font-size: 18px !important; margin-bottom: 17px !important; }
+.student-view-profile .field { min-width: 0; }
+.student-view-profile .field input,
+.student-view-profile .field select { width: 100%; }
+
+/* Tablet və kiçik noutbuklar */
+@media (max-width: 1230px) {
+  .student-workspace .grid.side { grid-template-columns: minmax(0,1fr); }
+  .student-workspace .student-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .student-workspace .tiles { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .student-workspace .grid.c3 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+/* Telefon */
+@media (max-width: 680px) {
+  .student-workspace { padding: 17px 14px 52px; }
+  .student-workspace .student-crumb { margin: 0 0 13px 3px; }
+  .student-workspace .page-head { padding: 20px; margin-bottom: 16px; }
+  .student-workspace .page-head::before { top: 18px; bottom: 18px; }
+  .student-workspace .page-head h1 { font-size: clamp(23px, 7vw, 29px); }
+  .student-workspace .page-head p { font-size: 13px; }
+  .student-workspace .page-head .mascot-inline .mascot { display: none; }
+  .student-workspace .welcome { padding: 21px; min-height: 0; }
+  .student-workspace .welcome .mascot { width: 90px; }
+  .student-workspace .welcome-stats { gap: 14px 20px; }
+  .student-workspace .student-shortcuts,
+  .student-workspace .tiles,
+  .student-workspace .grid.c2,
+  .student-workspace .grid.c3,
+  .student-workspace .grid.c4 { grid-template-columns: minmax(0,1fr); }
+  .student-workspace .student-shortcut { min-height: 72px; }
+  .student-workspace .tile { min-height: 95px; padding: 15px 17px; }
+  .student-workspace .card { padding: 17px; }
+  .student-workspace .card.pad-lg { padding: 19px; }
+  .student-workspace .job-head { flex-wrap: wrap; }
+  .student-workspace .job-match { width: 100%; }
+  .student-workspace .job-foot { gap: 10px; }
+  .student-workspace .job-foot .spacer { display: none; }
+  .student-workspace .job-foot .btn { flex: 1; }
+  .student-workspace .page-head > .btn { width: 100%; }
+  .student-workspace .student-tool-tabs { overflow-x: auto; flex-wrap: nowrap; padding: 9px; }
+  .student-workspace .student-tool-tabs button { white-space: nowrap; flex: none; }
+  .student-workspace .student-metric { min-height: 81px; }
+  .student-workspace .field input,
+  .student-workspace .field select,
+  .student-workspace .field textarea { font-size: 16px; }
+}
+@media (max-width: 390px) {
+  .student-workspace .student-shortcut { padding: 12px; }
+  .student-workspace .page-head { padding: 18px 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-workspace .tile,
+  .student-workspace .job,
+  .student-workspace .student-shortcut,
+  .student-workspace .btn { transition: none; transform: none !important; }
+}
+/* Çap rejimində əlavə naviqasiya dekorasiyası yox olmalıdır. */
+@media print {
+  .student-crumb, .student-shortcuts, .student-tool-tabs { display: none !important; }
+  .student-workspace { background: #fff; padding: 0; }
+}
