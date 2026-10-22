@@ -2757,6 +2757,8 @@ const UI = {
   theme: null,
   booting: true,
   publicView: 'landing',
+  studentSidebarCollapsed: (() => { try { return localStorage.getItem('asoiu-student-rail-compact') === '1'; } catch (e) { return false; } })(),
+  studentMenuOpen: false,
   providers: {},
   userMenu: false,
   notificationsOpen: false,
@@ -2839,7 +2841,8 @@ function render() {
   const pendingCo = role === 'company' && user.status === 'pending';
 
   root.innerHTML = `
-    <header class="topbar">
+    <header class="topbar${role === 'student' ? ' student-topbar' : ''}">
+      ${role === 'student' ? `<button type="button" class="student-menu-trigger" data-act="student-menu" aria-label="Menyunu aç" aria-controls="student-navigation" aria-expanded="${UI.studentMenuOpen}">${studentNavIcon('menu')}</button>` : ''}
       ${logoLockup()}
       <div class="topbar-spacer"></div>
       <button class="topbar-home" data-act="home" aria-label="Ana səhifəyə keç">
@@ -2868,15 +2871,22 @@ function render() {
       </div>
     </header>
 
-    <div class="shell">
-      <nav class="rail" aria-label="Bölmələr">
+    <div class="shell${role === 'student' ? (' student-shell' + (UI.studentSidebarCollapsed ? ' is-collapsed' : '') + (UI.studentMenuOpen ? ' is-mobile-open' : '')) : ''}">
+      <nav class="rail${role === 'student' ? ' student-rail' : ''}" ${role === 'student' ? 'id="student-navigation"' : ''} aria-label="Bölmələr">
+        ${role === 'student' ? `<div class="student-rail-header">
+          <span class="student-rail-symbol" aria-hidden="true">${studentNavIcon('dashboard')}</span>
+          <span class="student-rail-identity"><b>Karyera menyusu</b><small>ADNSU tələbə kabineti</small></span>
+          <button type="button" class="student-rail-collapse" data-act="student-sidebar-collapse" aria-label="${UI.studentSidebarCollapsed ? 'Menyunu genişləndir' : 'Menyunu yığ'}" aria-expanded="${!UI.studentSidebarCollapsed}" title="${UI.studentSidebarCollapsed ? 'Menyunu genişləndir' : 'Menyunu yığ'}">${studentNavIcon('panel')}</button>
+          <button type="button" class="student-rail-close" data-act="student-menu-close" aria-label="Menyunu bağla">${studentNavIcon('close')}</button>
+        </div>` : ''}
         ${NAV[role].map(item => item.group
-          ? `<div class="rail-group">${esc(item.group)}</div>`
-          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" ${view === item.id ? 'aria-current="page"' : ''}>
-              <span class="ico" aria-hidden="true">${item.ico}</span>${esc(item.label)}
+          ? `<div class="rail-group" title="${esc(item.group)}"><span>${esc(item.group)}</span></div>`
+          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" title="${esc(item.label)}" aria-label="${esc(item.label)}" ${view === item.id ? 'aria-current="page"' : ''}>
+              <span class="ico" aria-hidden="true">${role === 'student' ? studentNavIcon(item.id) : item.ico}</span><span class="nav-label">${esc(item.label)}</span>
               ${navCounts(role, item.id) ? `<span class="count">${navCounts(role, item.id)}</span>` : ''}
             </a>`).join('')}
       </nav>
+      ${role === 'student' ? '<button type="button" class="student-rail-backdrop" data-act="student-menu-close" aria-label="Menyunu bağla"></button>' : ''}
 
       <main class="main" id="main">
         ${pendingCo ? `<div class="note warn" style="margin-bottom:18px"><span class="m">!</span>
