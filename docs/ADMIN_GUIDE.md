@@ -41,7 +41,15 @@ Tələbə, magistr və məzun profilləri baxıla, redaktə edilə, təsdiqlən�
 
 ## Admin heyəti
 
-Aktiv admin sayı maksimum 5-dir. Yeni əməkdaş təhlükəsiz Edge Function vasitəsilə dəvət olunur. Öz hesabınızı silmək mümkün deyil.
+Aktiv admin sayı maksimum 5-dir. Əməkdaşları yalnız Super Admin idarə edir (“Əməkdaşlar və rollar” bölməsi).
+
+1. “Yeni əməkdaş” → ad, e-poçt və rol seçin → “Yadda saxla”.
+2. Panel **müvəqqəti şifrə** göstərir (yalnız bir dəfə). Onu əməkdaşa üzbəüz və ya telefonla çatdırın; e-poçt göndərilmir, SMTP lazım deyil.
+3. Əməkdaş `https://asoiu-career-admin.vercel.app/login` ünvanında müvəqqəti şifrə ilə daxil olur və dərhal öz şifrəsini qurmalıdır.
+4. Şifrə unudulubsa: əməkdaşı açın → “Şifrəni sıfırla” → yeni müvəqqəti şifrə.
+5. Girişi bağlamaq üçün statusu “Dayandırılıb” edin. Öz rolunuzu, statusunuzu dəyişmək və öz hesabınızı silmək mümkün deyil.
+
+Rollar paneldə belə işləyir: Super Admin — hər şey; Menecer — bütün məzmun, istifadəçilər, ödənişlər və silmə; Redaktor — məzmun əlavə/redaktə və moderasiya, silmə yoxdur; Yoxlayıcı — hər şeyə baxış, yalnız müraciət, şikayət və paylaşım moderasiyası. Hər əməkdaş yalnız icazəsi olan düymələri görür. “Şifrəni dəyiş” və “Çıxış” profil menyusundadır.
 
 ## Sistem sıfırlaması
 

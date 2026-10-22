@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext, writeAudit } from '@/lib/admin-data';
+import { can } from '@/lib/permissions';
 import type { ResourceKey } from '@/lib/types';
 
-const editable = new Set<ResourceKey>(['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'content', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'subscriptions', 'plans', 'payments', 'admins']);
-const removable = new Set<ResourceKey>(['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'content', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'subscriptions', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'admins']);
+const moderationStates = new Set(['visible', 'pending', 'hidden']);
 const people = new Set<ResourceKey>(['students', 'master_students', 'alumni', 'admins']);
 function text(value: unknown) { return typeof value === 'string' ? value.trim() : ''; }
 function number(value: unknown, fallback = 0) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
@@ -14,13 +14,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { resource, id } = await params;
   const key = resource as ResourceKey;
   const context = await getAdminContext();
-  if (!context || !editable.has(key) || (context.role === 'reviewer' && key !== 'applications')) return NextResponse.json({ error: 'İcazə yoxdur' }, { status: 403 });
-  if (key === 'admins' && context.role !== 'super_admin') return NextResponse.json({ error: 'Əməkdaş hesablarını yalnız Super Admin idarə edə bilər' }, { status: 403 });
+  if (!context) return NextResponse.json({ error: 'Sessiya bitib. Yenidən daxil olun.' }, { status: 401 });
+  if (!can(context.role, 'edit', key)) {
+    return NextResponse.json({ error: key === 'admins' ? 'Əməkdaş hesablarını yalnız Super Admin idarə edə bilər' : 'Bu əməliyyata icazəniz yoxdur' }, { status: 403 });
+  }
   const body = await request.json() as Record<string, unknown>;
 
   if (people.has(key)) {
+    /* "Şifrəni sıfırla": yeni müvəqqəti şifrə qaytarılır (yalnız hesab yaratmaq hüququ olanlar) */
+    const action = body.__action === 'reset_password' ? 'reset_password' : 'update';
+    if (action === 'reset_password' && !can(context.role, 'create', key)) return NextResponse.json({ error: 'Şifrəni sıfırlamağa icazəniz yoxdur' }, { status: 403 });
     const { data, error } = await context.supabase.functions.invoke('admin-users', {
-      body: { ...body, action: 'update', resource: key, id }
+      body: { ...body, action, resource: key, id }
     });
     if (error || !data?.ok) return NextResponse.json({ error: data?.error || error?.message || 'İstifadəçi yenilənmədi' }, { status: 400 });
     return NextResponse.json(data);
@@ -47,7 +52,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     payload = { partner_id: partnerId, title: text(body.title), description: text(body.description), discount_label: text(body.discount_label), valid_from: text(body.valid_from), valid_to: text(body.valid_to) || null, active: body.active !== false };
   }
   else if (resource === 'applications') payload = { status: text(body.status), note: text(body.note) };
-  else if (resource === 'network') { table = 'posts'; payload = { moderation_status: text(body.moderation_status) || 'visible' }; }
+  else if (resource === 'network') {
+    table = 'posts';
+    const state = text(body.moderation_status);
+    if (!moderationStates.has(state)) return NextResponse.json({ error: 'Yanlış moderasiya statusu' }, { status: 400 });
+    /* "pending" paylaşımı AI yoxlamasına yenidən göndərir */
+    payload = { moderation_status: state };
+  }
+  else if (resource === 'awards') {
+    table = 'company_awards';
+    const nomination = text(body.nomination);
+    const companyId = text(body.company_id);
+    let companyName = text(body.company_name);
+    if (companyId) {
+      const { data: company } = await context.supabase.from('companies').select('name').eq('id', companyId).maybeSingle();
+      if (company?.name) companyName = company.name;
+    }
+    if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
+    payload = { year: number(body.year, new Date().getFullYear()), nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: text(body.logo_url) || null, citation: text(body.citation) || null, published: body.published === true || body.published === 'true' || body.published === 'on' };
+  }
   else if (resource === 'reports') { table = 'reports'; payload = { status: text(body.status), reviewed_by: context.userId, reviewed_at: new Date().toISOString() }; }
   else if (resource === 'subscriptions') { table = 'subscriptions'; payload = { plan_id: text(body.plan_id), status: text(body.status), approved_by: text(body.status) === 'active' ? context.userId : null }; }
   else if (resource === 'payments') { table = 'payments'; payload = { status: text(body.status), paid_at: text(body.status) === 'paid' ? new Date().toISOString() : null }; }
@@ -78,7 +101,8 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ res
   const { resource, id } = await params;
   const key = resource as ResourceKey;
   const context = await getAdminContext();
-  if (!context || !removable.has(key) || !['super_admin', 'manager'].includes(context.role)) return NextResponse.json({ error: 'İcazə yoxdur' }, { status: 403 });
+  if (!context) return NextResponse.json({ error: 'Sessiya bitib. Yenidən daxil olun.' }, { status: 401 });
+  if (!can(context.role, 'delete', key)) return NextResponse.json({ error: 'Silməyə icazəniz yoxdur' }, { status: 403 });
 
   if (people.has(key)) {
     const { data, error } = await context.supabase.functions.invoke('admin-users', {
@@ -89,7 +113,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ res
   }
 
   const table: Record<string, string> = {
-    content: 'site_content', network: 'posts', pending_jobs: 'jobs', cv_analytics: 'cv_documents',
+    content: 'site_content', network: 'posts', pending_jobs: 'jobs', cv_analytics: 'cv_documents', awards: 'company_awards',
     interview_analytics: 'interview_sessions', ai_usage: 'ai_usage'
   };
   const target = table[resource] || resource;

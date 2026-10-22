@@ -1,13 +1,19 @@
 import { createClient } from '@/lib/supabase/server';
-import type { AdminRole, AdminRow, ResourceKey, Status } from '@/lib/types';
+import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 
 export type AdminStore = Record<ResourceKey, AdminRow[]>;
+export type AdminLoad = { data: AdminStore; errors: Partial<Record<ResourceKey, string>>; lookups: Lookups };
 export type AdminContext = {
   supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>;
   userId: string;
   role: AdminRole;
   fullName: string;
+  email: string;
+  /* Super Admin müvəqqəti şifrə verəndə ilk girişdə yeni şifrə tələb olunur */
+  mustChangePassword: boolean;
 };
+
+export const resourceKeys: ResourceKey[] = ['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs'];
 
 const adminRoles: AdminRole[] = ['super_admin', 'manager', 'editor', 'reviewer'];
 
@@ -45,20 +51,43 @@ export async function getAdminContext(): Promise<AdminContext | null> {
   const metadata = claims?.app_metadata as Record<string, unknown> | undefined;
   const requestedRole = metadata?.admin_role;
   if (!adminRoles.includes(requestedRole as AdminRole)) return null;
-  const { data: profile } = await supabase.from('profiles').select('full_name,role,status').eq('id', userId).single();
+  const { data: profile } = await supabase.from('profiles').select('full_name,email,role,status').eq('id', userId).single();
   if (!profile || profile.role !== 'admin' || profile.status !== 'active') return null;
   const role = requestedRole as AdminRole;
-  return { supabase, userId, role, fullName: profile.full_name || 'Karyera Mərkəzi' };
+  return {
+    supabase, userId, role,
+    fullName: profile.full_name || 'Karyera Mərkəzi',
+    email: profile.email || (typeof claims?.email === 'string' ? claims.email : ''),
+    mustChangePassword: metadata?.must_change_password === true
+  };
 }
 
-export async function loadResource(context: AdminContext, resource: ResourceKey): Promise<AdminRow[]> {
+export async function loadLookups(context: AdminContext): Promise<Lookups> {
+  const [faculties, majors] = await Promise.all([
+    context.supabase.from('faculties').select('id,name').order('sort_order'),
+    context.supabase.from('majors').select('id,name,faculty_id').order('name')
+  ]);
+  return { faculties: faculties.data || [], majors: majors.data || [] };
+}
+
+function labelMaps(lookups?: Lookups) {
+  const faculty = new Map((lookups?.faculties || []).map(f => [f.id, f.name]));
+  const major = new Map((lookups?.majors || []).map(m => [m.id, m.name]));
+  return { faculty: (id?: string | null) => (id && faculty.get(id)) || id || '', major: (id?: string | null) => (id && major.get(id)) || id || '' };
+}
+
+const tierLabel: Record<string, string> = { gold: 'Qızıl', silver: 'Gümüş', bronze: 'Bürünc' };
+const jobTypeLabel: Record<string, string> = { is: 'İş', tecrube: 'Təcrübə', graduate: 'Məzun proqramı', konullu: 'Könüllülük' };
+
+export async function loadResource(context: AdminContext, resource: ResourceKey, lookups?: Lookups): Promise<AdminRow[]> {
   const { supabase } = context;
+  const label = labelMaps(lookups);
   if (resource === 'jobs' || resource === 'pending_jobs') {
     const { data, error } = await supabase.from('jobs').select('id,title,type,mode,location,deadline,summary,department,duties,requirements,skills,preferred_skills,faculty_ids,major_ids,experience_level,salary_min,salary_max,currency,salary_visible,positions,application_method,application_url,rejection_reason,changes_requested,status,company_id,created_at,companies(name)').order('created_at', { ascending: false });
     if (error) throw error;
     const rows = resource === 'pending_jobs' ? (data || []).filter((row: any) => ['pending', 'pending_approval', 'changes_requested'].includes(row.status)) : (data || []);
     return rows.map((row: any) => ({
-      id: row.id, title: row.title, subtitle: `${row.companies?.name || 'Şirkət'} · ${row.type || 'Elan'}`,
+      id: row.id, title: row.title, subtitle: `${row.companies?.name || 'Şirkət'} · ${jobTypeLabel[row.type] || row.type || 'Elan'}`,
       status: jobStatus(row.status), meta: `${row.location || 'Bakı'} · son tarix ${dateLabel(row.deadline)}`,
       updatedAt: dateLabel(row.created_at), fields: { company_id: row.company_id, type: row.type, mode: row.mode, location: row.location, deadline: row.deadline, summary: row.summary, department: row.department, duties: (row.duties || []).join('\n'), requirements: (row.requirements || []).join('\n'), skills: (row.skills || []).join(', '), preferred_skills: (row.preferred_skills || []).join(', '), faculty_ids: (row.faculty_ids || []).join(', '), major_ids: (row.major_ids || []).join(', '), experience_level: row.experience_level, salary_min: row.salary_min, salary_max: row.salary_max, currency: row.currency, salary_visible: row.salary_visible, positions: row.positions, application_method: row.application_method, application_url: row.application_url, rejection_reason: row.rejection_reason, changes_requested: row.changes_requested, status: row.status }
     }));
@@ -102,7 +131,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey)
     const { data, error } = await supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,updated_at').eq('role', 'student').eq('account_status', 'student').order('updated_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({
-      id: row.id, title: row.full_name || 'Tələbə', subtitle: `${row.course || '—'}. kurs · ${row.major_id || 'İxtisas qeyd edilməyib'}`,
+      id: row.id, title: row.full_name || 'Tələbə', subtitle: `${row.course || '—'}. kurs · ${label.major(row.major_id) || 'İxtisas qeyd edilməyib'}`,
       status: accountStatus(row.status), meta: row.gpa ? `ÜOMG: ${row.gpa}` : (row.email || 'Profil məlumatı'), updatedAt: dateLabel(row.updated_at),
       fields: { full_name: row.full_name, email: row.email, personal_email: row.personal_email, phone: row.phone, city: row.city, faculty_id: row.faculty_id, major_id: row.major_id, course: row.course, gpa: row.gpa, status: row.status, account_status: row.account_status, alumni_verified: row.alumni_verified }
     }));
@@ -115,7 +144,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey)
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.full_name || (alumni ? 'Məzun' : 'Magistr'),
-      subtitle: `${row.major_id || 'İxtisas qeyd edilməyib'} · ${row.email || ''}`,
+      subtitle: `${label.major(row.major_id) || 'İxtisas qeyd edilməyib'} · ${row.email || ''}`,
       status: accountStatus(row.status), meta: alumni ? (row.alumni_verified ? 'Təsdiqlənmiş məzun' : 'Təsdiq gözləyir') : `${row.course || '—'}. kurs`,
       updatedAt: dateLabel(row.updated_at), fields: { full_name: row.full_name, email: row.email, personal_email: row.personal_email, phone: row.phone, city: row.city, faculty_id: row.faculty_id, major_id: row.major_id, course: row.course, gpa: row.gpa, status: row.status, account_status: row.account_status, alumni_verified: row.alumni_verified }
     }));
@@ -185,6 +214,16 @@ export async function loadResource(context: AdminContext, resource: ResourceKey)
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: String(row.id), title: row.task, subtitle: `${row.provider || '—'} · ${row.model || '—'}`, status: row.success ? 'Aktiv' : 'Bitib', meta: `${row.input_chars} → ${row.output_chars} simvol${row.error_code ? ` · ${row.error_code}` : ''}`, updatedAt: dateLabel(row.created_at) }));
   }
+  if (resource === 'awards') {
+    const { data, error } = await supabase.from('company_awards').select('*').order('year', { ascending: false }).order('nomination');
+    if (error) throw error;
+    return (data || []).map((row: any) => ({
+      id: row.id, title: row.company_name, subtitle: `${row.year} · ${row.nomination}`,
+      status: row.published ? 'Aktiv' : 'Qaralama', meta: `${tierLabel[row.tier] || row.tier}${row.citation ? ` · ${row.citation}` : ''}`,
+      updatedAt: dateLabel(row.updated_at || row.created_at),
+      fields: { year: row.year, nomination: row.nomination, tier: row.tier, company_id: row.company_id, company_name: row.company_name, logo_url: row.logo_url, citation: row.citation, published: row.published }
+    }));
+  }
   if (resource === 'admins') {
     const { data, error } = await supabase.from('profiles').select('id,full_name,email,status,admin_role,updated_at').eq('role', 'admin').order('updated_at', { ascending: false });
     if (error) throw error;
@@ -203,10 +242,22 @@ export async function loadResource(context: AdminContext, resource: ResourceKey)
   return (data || []).map((row: any) => ({ id: row.id, title: row.title, subtitle: row.resource, status: 'Aktiv', meta: row.actor_name || 'Admin', updatedAt: dateLabel(row.created_at) }));
 }
 
-export async function loadAdminData(context: AdminContext): Promise<AdminStore> {
-  const keys: ResourceKey[] = ['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs'];
-  const values = await Promise.all(keys.map((key) => loadResource(context, key)));
-  return Object.fromEntries(keys.map((key, index) => [key, values[index]])) as AdminStore;
+/* Hər bölmə ayrıca yüklənir: biri xəta versə, panel açılır və həmin bölmədə səbəb göstərilir. */
+export async function loadAdminData(context: AdminContext): Promise<AdminLoad> {
+  const lookups = await loadLookups(context);
+  const results = await Promise.allSettled(resourceKeys.map((key) => loadResource(context, key, lookups)));
+  const data = {} as AdminStore;
+  const errors: Partial<Record<ResourceKey, string>> = {};
+  resourceKeys.forEach((key, index) => {
+    const result = results[index];
+    if (result.status === 'fulfilled') data[key] = result.value;
+    else {
+      data[key] = [];
+      const reason = result.reason as { message?: string } | undefined;
+      errors[key] = reason?.message || 'Məlumat yüklənmədi';
+    }
+  });
+  return { data, errors, lookups };
 }
 
 export async function writeAudit(context: AdminContext, resource: string, resourceId: string | null, action: string, title: string) {

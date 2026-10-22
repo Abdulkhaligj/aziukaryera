@@ -10,7 +10,7 @@ const cors = {
 type ManagedResource = "students" | "master_students" | "alumni" | "admins";
 type AdminAccessRole = "super_admin" | "manager" | "editor" | "reviewer";
 type RequestBody = {
-  action?: "invite" | "update" | "delete";
+  action?: "invite" | "create" | "update" | "delete" | "reset_password" | "password_changed";
   resource?: ManagedResource;
   id?: string;
   full_name?: string;
@@ -44,6 +44,18 @@ function optionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/* Müvəqqəti şifrə: 12 simvol, oxunaqlı (0/O, 1/l yoxdur), hərf və rəqəm mütləq var. */
+function tempPassword() {
+  const letters = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const all = letters + digits;
+  const bytes = crypto.getRandomValues(new Uint32Array(12));
+  const chars = Array.from(bytes, (b) => all[b % all.length]);
+  chars[0] = letters[bytes[0] % letters.length];
+  chars[11] = digits[bytes[11] % digits.length];
+  return `${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}-${chars.slice(8).join("")}`;
+}
+
 function resourceIdentity(resource: ManagedResource) {
   if (resource === "master_students") return { role: "student", accountStatus: "master_student" };
   if (resource === "alumni") return { role: "graduate", accountStatus: "alumni" };
@@ -75,6 +87,15 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
   const action = body.action;
   const resource = body.resource;
+
+  /* Əməkdaş müvəqqəti şifrəni öz şifrəsi ilə əvəz etdi — yalnız öz hesabı üçün tələbi götürür. */
+  if (action === "password_changed") {
+    const { error } = await service.auth.admin.updateUserById(actor.id, {
+      app_metadata: { ...actor.app_metadata, must_change_password: false },
+    });
+    if (error) return json({ ok: false, error: error.message }, 400);
+    return json({ ok: true });
+  }
   if (!action || !resource || !["students", "master_students", "alumni", "admins"].includes(resource)) {
     return json({ ok: false, error: "Naməlum əməliyyat" }, 400);
   }
@@ -97,6 +118,38 @@ Deno.serve(async (req: Request) => {
     alumni_verified: body.alumni_verified === true || body.alumni_verified === "true",
     admin_role: resource === "admins" ? (body.admin_role || "reviewer") : null,
   };
+
+  if (action === "create") {
+    if (!profileData.full_name || !profileData.email) return json({ ok: false, error: "Ad və e-poçt məcburidir" }, 400);
+    if (resource === "admins") {
+      const { count } = await service.from("profiles").select("id", { count: "exact", head: true }).eq("role", "admin").eq("status", "active");
+      if ((count || 0) >= 5) return json({ ok: false, error: "Admin giriş limiti dolub (maksimum 5 aktiv hesab)" }, 409);
+    }
+    const password = tempPassword();
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email: profileData.email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        role: resource === "alumni" || resource === "admins" ? "alumni" : "student",
+        account_status: resource === "master_students" ? "master_student" : resource === "alumni" || resource === "admins" ? "alumni" : "student",
+        full_name: profileData.full_name,
+      },
+      app_metadata: resource === "admins" ? { admin_role: profileData.admin_role, must_change_password: true } : {},
+    });
+    if (createError || !created.user) {
+      const message = createError?.message || "Hesab yaradılmadı";
+      return json({ ok: false, error: /already|registered|exists/i.test(message) ? "Bu e-poçt ilə hesab artıq var" : message }, 400);
+    }
+    const { error: profileError } = await service.from("profiles").update({ ...profileData, role: identity.role }).eq("id", created.user.id);
+    if (profileError) {
+      await service.auth.admin.deleteUser(created.user.id);
+      return json({ ok: false, error: profileError.message }, 400);
+    }
+    await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} hesabı yaradıldı`, resource, resource_id: created.user.id, action: "create-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    /* Şifrə yalnız bu cavabda bir dəfə qaytarılır, heç yerdə saxlanmır. */
+    return json({ ok: true, id: created.user.id, email: profileData.email, temporaryPassword: password }, 201);
+  }
 
   if (action === "invite") {
     if (!profileData.full_name || !profileData.email) return json({ ok: false, error: "Ad və e-poçt məcburidir" }, 400);
@@ -141,6 +194,19 @@ Deno.serve(async (req: Request) => {
   if (!target) return json({ ok: false, error: "İstifadəçi tapılmadı" }, 404);
   if (target.role === "admin" && actorRole !== "super_admin") return json({ ok: false, error: "Admin hesablarını yalnız Super Admin idarə edə bilər" }, 403);
 
+  if (action === "reset_password") {
+    const { data: targetAuth } = await service.auth.admin.getUserById(id);
+    if (!targetAuth.user) return json({ ok: false, error: "Auth istifadəçisi tapılmadı" }, 404);
+    const password = tempPassword();
+    const { error } = await service.auth.admin.updateUserById(id, {
+      password,
+      app_metadata: { ...targetAuth.user.app_metadata, must_change_password: target.role === "admin" },
+    });
+    if (error) return json({ ok: false, error: error.message }, 400);
+    await service.from("admin_audit_logs").insert({ title: `${target.full_name || target.email} üçün şifrə sıfırlandı`, resource, resource_id: id, action: "reset-password", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    return json({ ok: true, email: target.email, temporaryPassword: password });
+  }
+
   if (action === "delete") {
     const { error } = await service.auth.admin.deleteUser(id);
     if (error) return json({ ok: false, error: error.message }, 400);
@@ -149,6 +215,10 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "update") {
+    /* Öz hesabını dayandırmaq və ya rolunu endirmək paneli kilidləyə bilər */
+    if (id === actor.id && resource === "admins" && (profileData.admin_role !== actorRole || profileData.status !== "active")) {
+      return json({ ok: false, error: "Öz rolunuzu və ya statusunuzu dəyişə bilməzsiniz" }, 409);
+    }
     const { data: targetAuth } = await service.auth.admin.getUserById(id);
     if (!targetAuth.user) return json({ ok: false, error: "Auth istifadəçisi tapılmadı" }, 404);
     const authUpdate: Record<string, unknown> = {

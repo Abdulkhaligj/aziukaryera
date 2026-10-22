@@ -17,6 +17,7 @@ export const demoData: Record<ResourceKey, AdminRow[]> = {
     {id:'e2',title:'Mock Interview Marathon',subtitle:'3 Okt 2026 · Karyera Mərkəzi',status:'Aktiv',meta:'42/60 yer',updatedAt:'17 Sen, 15:18'},
     {id:'e3',title:'CV və LinkedIn emalatxanası',subtitle:'9 Okt 2026 · Onlayn',status:'Qaralama',meta:'Qeydiyyat bağlıdır',updatedAt:'17 Sen, 12:11'}
   ],
+  awards: [],
   benefits: [
     {id:'b1',title:'Tamaşalara tələbə bileti',subtitle:'Milli Dram Teatrı · 50%',status:'Aktiv',meta:'312 istifadə',updatedAt:'18 Sen, 13:20'},
     {id:'b2',title:'Tələbə seansı',subtitle:'CinemaPlus · 30%',status:'Aktiv',meta:'QR ilə istifadə',updatedAt:'16 Sen, 10:00'},
