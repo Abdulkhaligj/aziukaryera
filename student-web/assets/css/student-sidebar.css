@@ -1,0 +1,105 @@
+/* Yalnız tələbə kabinetinin sol menyusu. Digər rolların naviqasiyası dəyişmir. */
+.student-shell { --student-nav-width: 270px; grid-template-columns: var(--student-nav-width) minmax(0, 1fr); }
+.student-shell.is-collapsed { --student-nav-width: 78px; }
+.student-shell .student-rail {
+  padding: 18px 13px 26px; gap: 3px;
+  scrollbar-width: thin; scrollbar-color: var(--line-2) transparent;
+}
+.student-rail-header {
+  display: flex; align-items: center; gap: 10px; min-height: 50px;
+  margin: 0 3px 13px; padding: 0 4px 14px; border-bottom: 1px solid var(--line);
+}
+.student-rail-symbol {
+  width: 36px; height: 36px; flex: none; display: grid; place-items: center;
+  color: var(--brand); background: var(--brand-soft);
+  border: 1px solid var(--brand-ring); border-radius: 11px;
+}
+.student-rail-symbol svg { width: 20px; height: 20px; }
+.student-rail-identity { display: grid; min-width: 0; flex: 1; line-height: 1.4; }
+.student-rail-identity b { color: var(--ink); font-size: 13.5px; font-weight: 700; }
+.student-rail-identity small { color: var(--muted); font-size: 10px; }
+.student-rail-collapse, .student-rail-close, .student-menu-trigger {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px;
+  border: 1px solid var(--line); border-radius: 10px;
+  color: var(--ink-2); background: var(--surface); cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.student-rail-collapse:hover, .student-rail-close:hover, .student-menu-trigger:hover {
+  color: var(--brand); background: var(--brand-soft); border-color: var(--brand-ring);
+}
+.student-rail-collapse svg, .student-rail-close svg, .student-menu-trigger svg { width: 19px; height: 19px; }
+.student-rail-close, .student-menu-trigger, .student-rail-backdrop { display: none; }
+.student-rail .rail-group {
+  font-family: var(--font-body); font-size: 10.5px; font-weight: 750;
+  letter-spacing: .11em; padding: 18px 12px 8px; color: var(--muted);
+}
+.student-rail .rail-group:first-of-type { padding-top: 6px; }
+.student-rail a {
+  min-height: 44px; padding: 10px 12px; gap: 12px; border-radius: 11px;
+  font-size: 14px; font-weight: 550; position: relative;
+  transition: background .15s, color .15s;
+}
+.student-rail a:hover { background: var(--surface-2); color: var(--brand); }
+.student-rail a[aria-current="page"] {
+  color: var(--brand); background: var(--brand-soft); font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+.student-rail .ico { width: 20px; height: 20px; flex: none; display: grid; place-items: center; opacity: 1; }
+.student-rail .ico svg { width: 20px; height: 20px; display: block; }
+.student-rail .nav-label { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.student-rail .count {
+  margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px;
+  display: grid; place-items: center; background: var(--surface-2);
+  color: var(--ink-2); font-family: var(--font-body); font-weight: 700; font-size: 11px;
+}
+.student-rail a[aria-current="page"] .count { background: var(--surface); }
+.student-rail a:focus-visible, .student-rail-collapse:focus-visible,
+.student-rail-close:focus-visible, .student-menu-trigger:focus-visible {
+  outline: 3px solid var(--brand-ring); outline-offset: 2px;
+}
+/* Desktop: yığcam rejimdə ikonlar qalır, elementlər title və aria-label saxlayır. */
+@media (min-width: 901px) {
+  .student-shell.is-collapsed .student-rail { padding-inline: 10px; }
+  .student-shell.is-collapsed .student-rail-header { margin-inline: 0; padding-inline: 0; justify-content: center; }
+  .student-shell.is-collapsed .student-rail-symbol,
+  .student-shell.is-collapsed .student-rail-identity,
+  .student-shell.is-collapsed .student-rail .nav-label,
+  .student-shell.is-collapsed .student-rail .count,
+  .student-shell.is-collapsed .student-rail .rail-group span { display: none; }
+  .student-shell.is-collapsed .student-rail-collapse { transform: rotate(180deg); }
+  .student-shell.is-collapsed .student-rail a { justify-content: center; padding: 12px; }
+  .student-shell.is-collapsed .student-rail .rail-group {
+    padding: 12px 5px 5px; margin: 5px 8px 2px;
+    border-bottom: 1px solid var(--line); min-height: 1px;
+  }
+}
+/* Mobil/tablet: mövcud üfüqi naviqasiyanın yerinə açılıb-bağlanan drawer. */
+@media (max-width: 900px) {
+  .student-shell, .student-shell.is-collapsed { display: block; }
+  .student-topbar .student-menu-trigger { display: grid; }
+  .student-shell .student-rail {
+    display: none; position: fixed; top: 0; bottom: 0; left: 0; z-index: 105;
+    width: min(310px, 88vw); height: 100dvh; overflow-y: auto;
+    padding: max(16px, env(safe-area-inset-top)) 14px max(24px, env(safe-area-inset-bottom));
+    background: var(--surface); border-right: 1px solid var(--line);
+    box-shadow: 18px 0 45px rgba(13, 31, 78, .14);
+    flex-direction: column; gap: 3px;
+  }
+  .student-shell.is-mobile-open .student-rail { display: flex; }
+  .student-shell .student-rail-collapse { display: none; }
+  .student-shell .student-rail-close { display: grid; }
+  .student-shell.is-mobile-open .student-rail-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 104;
+    border: 0; padding: 0; background: rgba(9, 22, 56, .48);
+  }
+}
+@media (max-width: 620px) {
+  .student-topbar { gap: 9px; }
+  .student-topbar .topbar-home { display: none; }
+  .student-topbar .logo-mark { width: 29px; height: 29px; }
+  .student-topbar .logo-text b { font-size: 13px; }
+  .student-topbar .student-menu-trigger { width: 36px; height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-rail a, .student-rail-collapse, .student-rail-close, .student-menu-trigger { transition: none; }
+}

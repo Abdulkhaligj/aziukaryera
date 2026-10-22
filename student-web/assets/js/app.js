@@ -212,21 +212,27 @@ function notificationCenter() {
 /* ================================================================ *
  * Naviqasiya
  * ================================================================ */
+const STUDENT_NAV_ICONS = {"dashboard":"<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.4\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.4\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.4\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.4\"/>","jobs":"<rect x=\"3\" y=\"7\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18\"/>","applications":"<path d=\"m21 3-7.6 18-3.5-7.9L2 9.6 21 3Z\"/><path d=\"M9.9 13.1 21 3\"/>","events":"<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M16 3v4M8 3v4M3 10h18\"/>","cv":"<path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"/><path d=\"M14 2v6h6M8 13h8M8 17h6\"/>","interview":"<path d=\"M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.2A8.5 8.5 0 1 1 21 11.5Z\"/><path d=\"M8 11h8M8 14.5h5\"/>","roadmap":"<circle cx=\"6\" cy=\"19\" r=\"2\"/><path d=\"M9 19h7a4 4 0 0 0 0-8H8a4 4 0 0 1 0-8h7\"/><path d=\"m12 1 3 2-3 2\"/>","network":"<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5v1\"/>","benefits":"<rect x=\"3\" y=\"9\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M12 9v12M3 13h18M12 9H8a3 3 0 1 1 3-3c.7 1.5 1 3 1 3ZM12 9h4a3 3 0 1 0-3-3c-.7 1.5-1 3-1 3Z\"/>","profile":"<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21v-2a8 8 0 0 1 16 0v2\"/>","menu":"<path d=\"M4 6h16M4 12h16M4 18h16\"/>","panel":"<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M9 3v18M15 9l-3 3 3 3\"/>","close":"<path d=\"M5 5l14 14M19 5 5 19\"/>"};
+function studentNavIcon(id) {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (STUDENT_NAV_ICONS[id] || STUDENT_NAV_ICONS.dashboard) + '</svg>';
+}
+
 const NAV = {
   student: [
-    { group: 'Karyera' },
-    { id: 'dashboard',    label: 'Ana səhifə',        ico: '⌂' },
-    { id: 'jobs',         label: 'Sənə uyğun imkanlar', ico: '◎' },
-    { id: 'applications', label: 'Müraciətlərim',     ico: '▤' },
-    { id: 'events',       label: 'Tədbirlər',         ico: '◷' },
-    { group: 'İcma' },
-    { id: 'network',      label: 'Şəbəkə',            ico: '◍' },
-    { id: 'benefits',     label: 'Tələbə güzəştləri', ico: '★' },
-    { group: 'Hazırlıq' },
-    { id: 'profile',      label: 'Profil',            ico: '☰' },
-    { id: 'cv',           label: 'CV Mərkəzi',        ico: '▥' },
-    { id: 'interview',    label: 'Müsahibə hazırlığı', ico: '◐' },
-    { id: 'roadmap',      label: 'Karyera yol xəritəsi', ico: '◭' }
+    { group: 'Əsas' },
+    { id: 'dashboard',    label: 'İcmal',                ico: '⌂' },
+    { id: 'jobs',         label: 'Vakansiyalar',         ico: '◎' },
+    { id: 'applications', label: 'Müraciətlərim',        ico: '▤' },
+    { id: 'events',       label: 'Tədbirlər',            ico: '◷' },
+    { group: 'Karyera alətləri' },
+    { id: 'cv',           label: 'AI CV Studio',          ico: '▥' },
+    { id: 'interview',    label: 'Müsahibə hazırlığı',    ico: '◐' },
+    { id: 'roadmap',      label: 'Karyera xəritəm',       ico: '◭' },
+    { group: 'İcma və imkanlar' },
+    { id: 'network',      label: 'Şəbəkə',               ico: '◍' },
+    { id: 'benefits',     label: 'Tələbə güzəştləri',     ico: '★' },
+    { group: 'Hesab' },
+    { id: 'profile',      label: 'Profil və ayarlar',    ico: '☰' }
   ],
   company: [
     { group: 'İşə qəbul' },
@@ -2751,6 +2757,8 @@ const UI = {
   theme: null,
   booting: true,
   publicView: 'landing',
+  studentSidebarCollapsed: (() => { try { return localStorage.getItem('asoiu-student-rail-compact') === '1'; } catch (e) { return false; } })(),
+  studentMenuOpen: false,
   providers: {},
   userMenu: false,
   notificationsOpen: false,
@@ -2833,7 +2841,8 @@ function render() {
   const pendingCo = role === 'company' && user.status === 'pending';
 
   root.innerHTML = `
-    <header class="topbar">
+    <header class="topbar${role === 'student' ? ' student-topbar' : ''}">
+      ${role === 'student' ? `<button type="button" class="student-menu-trigger" data-act="student-menu" aria-label="Menyunu aç" aria-controls="student-navigation" aria-expanded="${UI.studentMenuOpen}">${studentNavIcon('menu')}</button>` : ''}
       ${logoLockup()}
       <div class="topbar-spacer"></div>
       <button class="topbar-home" data-act="home" aria-label="Ana səhifəyə keç">
@@ -2862,15 +2871,22 @@ function render() {
       </div>
     </header>
 
-    <div class="shell">
-      <nav class="rail" aria-label="Bölmələr">
+    <div class="shell${role === 'student' ? (' student-shell' + (UI.studentSidebarCollapsed ? ' is-collapsed' : '') + (UI.studentMenuOpen ? ' is-mobile-open' : '')) : ''}">
+      <nav class="rail${role === 'student' ? ' student-rail' : ''}" ${role === 'student' ? 'id="student-navigation"' : ''} aria-label="Bölmələr">
+        ${role === 'student' ? `<div class="student-rail-header">
+          <span class="student-rail-symbol" aria-hidden="true">${studentNavIcon('dashboard')}</span>
+          <span class="student-rail-identity"><b>Karyera menyusu</b><small>ADNSU tələbə kabineti</small></span>
+          <button type="button" class="student-rail-collapse" data-act="student-sidebar-collapse" aria-label="${UI.studentSidebarCollapsed ? 'Menyunu genişləndir' : 'Menyunu yığ'}" aria-expanded="${!UI.studentSidebarCollapsed}" title="${UI.studentSidebarCollapsed ? 'Menyunu genişləndir' : 'Menyunu yığ'}">${studentNavIcon('panel')}</button>
+          <button type="button" class="student-rail-close" data-act="student-menu-close" aria-label="Menyunu bağla">${studentNavIcon('close')}</button>
+        </div>` : ''}
         ${NAV[role].map(item => item.group
-          ? `<div class="rail-group">${esc(item.group)}</div>`
-          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" ${view === item.id ? 'aria-current="page"' : ''}>
-              <span class="ico" aria-hidden="true">${item.ico}</span>${esc(item.label)}
+          ? `<div class="rail-group" title="${esc(item.group)}"><span>${esc(item.group)}</span></div>`
+          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" title="${esc(item.label)}" aria-label="${esc(item.label)}" ${view === item.id ? 'aria-current="page"' : ''}>
+              <span class="ico" aria-hidden="true">${role === 'student' ? studentNavIcon(item.id) : item.ico}</span><span class="nav-label">${esc(item.label)}</span>
               ${navCounts(role, item.id) ? `<span class="count">${navCounts(role, item.id)}</span>` : ''}
             </a>`).join('')}
       </nav>
+      ${role === 'student' ? '<button type="button" class="student-rail-backdrop" data-act="student-menu-close" aria-label="Menyunu bağla"></button>' : ''}
 
       <main class="main" id="main">
         ${pendingCo ? `<div class="note warn" style="margin-bottom:18px"><span class="m">!</span>
@@ -3033,6 +3049,14 @@ function setTheme(t) {
   try { localStorage.setItem('asoiu-theme', t || ''); } catch (e) { /* ignore */ }
 }
 
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && UI.studentMenuOpen) {
+    UI.studentMenuOpen = false;
+    render();
+    document.querySelector('.student-menu-trigger')?.focus();
+  }
+});
+
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if (!t) return;
@@ -3042,6 +3066,27 @@ document.addEventListener('click', e => {
   const rerender = () => render();
 
   switch (act) {
+    case 'student-sidebar-collapse': {
+      e.preventDefault();
+      UI.studentSidebarCollapsed = !UI.studentSidebarCollapsed;
+      try { localStorage.setItem('asoiu-student-rail-compact', UI.studentSidebarCollapsed ? '1' : '0'); } catch (error) { /* storage may be disabled */ }
+      rerender();
+      break;
+    }
+    case 'student-menu': {
+      e.preventDefault();
+      UI.studentMenuOpen = !UI.studentMenuOpen;
+      rerender();
+      if (UI.studentMenuOpen) document.querySelector('.student-rail a[data-act="go"]')?.focus();
+      break;
+    }
+    case 'student-menu-close': {
+      e.preventDefault();
+      UI.studentMenuOpen = false;
+      rerender();
+      document.querySelector('.student-menu-trigger')?.focus();
+      break;
+    }
     case 'home':
       e.preventDefault();
       UI.publicView = 'landing';
@@ -3080,7 +3125,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'go': {
-      e.preventDefault(); UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null;
+      e.preventDefault(); UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null; UI.studentMenuOpen = false;
       S.view = t.dataset.view; Store.save(); rerender(); window.scrollTo(0, 0);
       /* Şəbəkə və güzəştlər serverdən gəlir — ilk açılışda yüklənir. */
       if (S.view === 'network'  && UI.feed === null)     loadFeed();
