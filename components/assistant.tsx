@@ -25,7 +25,8 @@ const fieldLabel: Record<string, string> = {
   discount_label: 'Endirim', valid_from: 'Başlama', valid_to: 'Bitmə', year: 'İl', nomination: 'Nominasiya', tier: 'Dərəcə',
   company_name: 'Şirkət', citation: 'Əsaslandırma', content_key: 'Açar', body: 'Mətn', name: 'Ad', sector: 'Sektor',
   website: 'Vebsayt', email: 'E-poçt', phone: 'Telefon', about: 'Haqqında', advertiser: 'Reklamçı', link_url: 'Link',
-  cta_label: 'Düymə', placement: 'Yer', starts_on: 'Başlama', ends_on: 'Bitmə', price_azn: 'Qiymət (AZN)'
+  cta_label: 'Düymə', placement: 'Yer', starts_on: 'Başlama', ends_on: 'Bitmə', price_azn: 'Qiymət (AZN)',
+  salary_min: 'Maaş (min, AZN)', salary_max: 'Maaş (maks, AZN)'
 };
 const valueLabel: Record<string, string> = {
   is: 'İş', tecrube: 'Təcrübə', graduate: 'Məzun proqramı', konullu: 'Könüllülük', gold: '🥇 Qızıl', silver: '🥈 Gümüş', bronze: '🥉 Bürünc',
@@ -58,8 +59,8 @@ export function actionToRow(action: AssistantAction, companies: AdminRow[]): { r
     row = { ...base, title: s('title'), subtitle: s('kind'), fields: { kind: s('kind'), starts_at: s('starts_at'), place: s('place'), seats: d.seats as number ?? 0, description: s('description'), organizers: join('organizers', ', '), image_url: s('image_url') } };
   } else if (action.type === 'create_job') {
     const co = find(s('company'));
-    if (s('company') && !co) warnings.push(`“${s('company')}” platformada tapılmadı — formada şirkəti seçin və ya əvvəl şirkəti əlavə edin.`);
-    row = { ...base, title: s('title'), subtitle: '', fields: { company_id: co?.id || '', type: s('type') || 'tecrube', mode: s('mode') || 'Əyani', location: s('location') || 'Bakı', deadline: s('deadline'), summary: s('summary'), duties: join('duties', '\n'), requirements: join('requirements', '\n'), skills: join('skills', ', '), status: 'published' } };
+    if (s('company') && !co) warnings.push(`“${s('company')}” platformada tapılmadı — əvvəl şirkəti dərc edin (AI qaralaması yuxarıdadır) və ya formada başqa şirkət seçin.`);
+    row = { ...base, title: s('title'), subtitle: '', fields: { company_id: co?.id || '', type: s('type') || 'tecrube', mode: s('mode') || 'Əyani', location: s('location') || 'Bakı', deadline: s('deadline'), salary_min: d.salary_min as number ?? '', salary_max: d.salary_max as number ?? '', salary_visible: d.salary_min != null || d.salary_max != null, currency: 'AZN', summary: s('summary'), duties: join('duties', '\n'), requirements: join('requirements', '\n'), skills: join('skills', ', '), status: 'published' } };
   } else if (action.type === 'create_benefit') {
     row = { ...base, title: s('title'), subtitle: s('partner_name'), fields: { partner_name: s('partner_name'), discount_label: s('discount_label'), valid_from: s('valid_from'), valid_to: s('valid_to'), description: s('description'), active: true } };
   } else if (action.type === 'create_award') {
@@ -224,7 +225,7 @@ export default function Assistant({ open, onClose, role, userId, companies, comp
     setImage({ file, preview: URL.createObjectURL(file) });
   }
 
-  return <aside className={`assistant ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="AI köməkçi">
+  return <aside className={`assistantPanel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="AI köməkçi">
     <header className="assistantHead">
       <span className="assistantMark"><Sparkles size={18}/></span>
       <div><b>AI köməkçi</b><small>Yazın və ya danışın — qaralamanı yoxlayıb dərc edirsiniz</small></div>
