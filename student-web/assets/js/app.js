@@ -212,27 +212,21 @@ function notificationCenter() {
 /* ================================================================ *
  * Naviqasiya
  * ================================================================ */
-const STUDENT_NAV_ICONS = {"dashboard":"<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.4\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.4\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.4\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.4\"/>","jobs":"<rect x=\"3\" y=\"7\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18\"/>","applications":"<path d=\"m21 3-7.6 18-3.5-7.9L2 9.6 21 3Z\"/><path d=\"M9.9 13.1 21 3\"/>","events":"<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M16 3v4M8 3v4M3 10h18\"/>","cv":"<path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"/><path d=\"M14 2v6h6M8 13h8M8 17h6\"/>","interview":"<path d=\"M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.2A8.5 8.5 0 1 1 21 11.5Z\"/><path d=\"M8 11h8M8 14.5h5\"/>","roadmap":"<circle cx=\"6\" cy=\"19\" r=\"2\"/><path d=\"M9 19h7a4 4 0 0 0 0-8H8a4 4 0 0 1 0-8h7\"/><path d=\"m12 1 3 2-3 2\"/>","network":"<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5v1\"/>","benefits":"<rect x=\"3\" y=\"9\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M12 9v12M3 13h18M12 9H8a3 3 0 1 1 3-3c.7 1.5 1 3 1 3ZM12 9h4a3 3 0 1 0-3-3c-.7 1.5-1 3-1 3Z\"/>","profile":"<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21v-2a8 8 0 0 1 16 0v2\"/>","menu":"<path d=\"M4 6h16M4 12h16M4 18h16\"/>","panel":"<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M9 3v18M15 9l-3 3 3 3\"/>","close":"<path d=\"M5 5l14 14M19 5 5 19\"/>"};
-function studentNavIcon(id) {
-  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (STUDENT_NAV_ICONS[id] || STUDENT_NAV_ICONS.dashboard) + '</svg>';
-}
-
 const NAV = {
   student: [
-    { group: 'Əsas' },
-    { id: 'dashboard',    label: 'İcmal',                ico: '⌂' },
-    { id: 'jobs',         label: 'Vakansiyalar',         ico: '◎' },
-    { id: 'applications', label: 'Müraciətlərim',        ico: '▤' },
-    { id: 'events',       label: 'Tədbirlər',            ico: '◷' },
-    { group: 'Karyera alətləri' },
-    { id: 'cv',           label: 'AI CV Studio',          ico: '▥' },
-    { id: 'interview',    label: 'Müsahibə hazırlığı',    ico: '◐' },
-    { id: 'roadmap',      label: 'Karyera xəritəm',       ico: '◭' },
-    { group: 'İcma və imkanlar' },
-    { id: 'network',      label: 'Şəbəkə',               ico: '◍' },
-    { id: 'benefits',     label: 'Tələbə güzəştləri',     ico: '★' },
-    { group: 'Hesab' },
-    { id: 'profile',      label: 'Profil və ayarlar',    ico: '☰' }
+    { group: 'Karyera' },
+    { id: 'dashboard',    label: 'Ana səhifə',        ico: '⌂' },
+    { id: 'jobs',         label: 'Sənə uyğun imkanlar', ico: '◎' },
+    { id: 'applications', label: 'Müraciətlərim',     ico: '▤' },
+    { id: 'events',       label: 'Tədbirlər',         ico: '◷' },
+    { group: 'İcma' },
+    { id: 'network',      label: 'Şəbəkə',            ico: '◍' },
+    { id: 'benefits',     label: 'Tələbə güzəştləri', ico: '★' },
+    { group: 'Hazırlıq' },
+    { id: 'profile',      label: 'Profil',            ico: '☰' },
+    { id: 'cv',           label: 'CV Mərkəzi',        ico: '▥' },
+    { id: 'interview',    label: 'Müsahibə hazırlığı', ico: '◐' },
+    { id: 'roadmap',      label: 'Karyera yol xəritəsi', ico: '◭' }
   ],
   company: [
     { group: 'İşə qəbul' },
@@ -299,7 +293,6 @@ function jobCard(job, report, opts = {}) {
   const dl = daysLeft(job.deadline);
   const applied = Store.isApplied(job.id);
   const savedOn = Store.state.saved.includes(Number(job.id));
-  const expired = dl < 0;
   return `<article class="job ${opts.top ? 'top' : ''}">
     <div class="job-head">
       <div class="brandbox${companyLogoClass(c.name)}">${companyMark(c.name)}</div>
@@ -333,7 +326,6 @@ function jobCard(job, report, opts = {}) {
       <button class="btn sm" data-act="job-detail" data-id="${job.id}">Ətraflı</button>
       ${applied
         ? `<span class="chip good">✓ Müraciət edilib</span>`
-        : expired ? '<span class="chip line">Müraciət müddəti bitib</span>'
         : `<button class="btn sm primary" data-act="apply" data-id="${job.id}">Müraciət et</button>`}
       <div class="spacer"></div>
       <button class="btn sm ghost" data-act="save" data-id="${job.id}">${savedOn ? '★ Seçilmişlərdə' : '☆ Yadda saxla'}</button>
@@ -358,7 +350,7 @@ function barRow(label, value, max, tone = '') {
  * ================================================================ */
 function viewStudentDashboard() {
   const s = Store.state.student;
-  const jobs = Store.allJobs().filter(j => j.status !== 'pending' && (!j.deadline || daysLeft(j.deadline) >= 0));
+  const jobs = Store.allJobs();
   const ranked = rankOpportunities(jobs, s);
   const comp = profileCompleteness(s);
   const gaps = skillGap(jobs, s, 5);
@@ -387,16 +379,10 @@ function viewStudentDashboard() {
 
   <div class="page-head">
     <div>
-      <h1>Karyera icmalın</h1>
+      <h1>Bu gün nə edək?</h1>
       <p>İxtisasına uyğun imkanlar, CV və müsahibə hazırlığı — hamısı bir yerdə.</p>
     </div>
     <button class="btn primary" data-act="go" data-view="jobs">Sənə uyğun imkanlar →</button>
-  </div>
-
-  <div class="student-shortcuts" aria-label="Sürətli keçidlər">
-    <button class="student-shortcut" data-act="go" data-view="jobs"><span class="shortcut-icon">◎</span><span><b>Vakansiyaları kəşf et</b><small>İxtisasına uyğun imkanlar</small></span><span aria-hidden="true">↗</span></button>
-    <button class="student-shortcut" data-act="go" data-view="cv"><span class="shortcut-icon">▤</span><span><b>CV-ni hazırla</b><small>CV qurucusu və analiz</small></span><span aria-hidden="true">↗</span></button>
-    <button class="student-shortcut" data-act="go" data-view="interview"><span class="shortcut-icon">◉</span><span><b>Müsahibəyə hazırlaş</b><small>Praktiki sınaq sualları</small></span><span aria-hidden="true">↗</span></button>
   </div>
 
   <div class="tiles">
@@ -486,7 +472,7 @@ function viewStudentDashboard() {
 function viewJobs() {
   const s = Store.state.student;
   const f = UI.jobFilter;
-  let ranked = rankOpportunities(Store.allJobs().filter(j => j.status !== 'pending' && (!j.deadline || daysLeft(j.deadline) >= 0)), s);
+  let ranked = rankOpportunities(Store.allJobs(), s);
 
   if (f.type !== 'Hamısı') ranked = ranked.filter(r => r.job.type === f.type);
   if (f.min > 0) ranked = ranked.filter(r => r.report.score >= f.min);
@@ -504,7 +490,7 @@ function viewJobs() {
   <div class="page-head">
     <div>
       <div class="eyebrow">Smart Jobs</div>
-      <h1>Vakansiyalar</h1>
+      <h1>Sənə uyğun imkanlar</h1>
       <p>Elanlar fakültən, ixtisasın və bacarıqlarına görə avtomatik sıralanır.</p>
     </div>
   </div>
@@ -513,7 +499,7 @@ function viewJobs() {
     <div class="row">
       <div class="searchbar">
         <span class="ico">⌕</span>
-        <input type="search" id="job-q" aria-label="Vakansiya axtarışı" placeholder="Vəzifə, şirkət, bacarıq…" value="${esc(f.q)}" data-act="filter-q">
+        <input type="search" id="job-q" placeholder="Vəzifə, şirkət, bacarıq…" value="${esc(f.q)}" data-act="filter-q">
       </div>
       <div class="field" style="width:170px">
         <label class="sr-only" for="job-min">Minimum uyğunluq</label>
@@ -522,8 +508,7 @@ function viewJobs() {
             ${v === 0 ? 'Bütün uyğunluqlar' : v + '%+ uyğunluq'}</option>`).join('')}
         </select>
       </div>
-      <button class="btn ${f.savedOnly ? 'primary' : ''}" data-act="filter-saved" aria-pressed="${f.savedOnly}">★ Seçilmişlər</button>
-      <button class="btn ghost" data-act="filter-reset" aria-label="Bütün vakansiya filtrlərini sıfırla">↺ Sıfırla</button>
+      <button class="btn ${f.savedOnly ? 'primary' : ''}" data-act="filter-saved">★ Seçilmişlər</button>
     </div>
     <div class="pills" style="margin-top:10px">
       ${types.map(t => `<button data-act="filter-type" data-type="${esc(t)}" aria-pressed="${f.type === t}">${esc(t)}</button>`).join('')}
@@ -531,7 +516,7 @@ function viewJobs() {
   </div>
 
   <div class="row" style="justify-content:space-between;margin-bottom:10px">
-    <span class="results-count"><b>${ranked.length}</b> aktiv imkan tapıldı</span>
+    <span class="eyebrow">${ranked.length} nəticə</span>
     <span class="meter-key">
       <span><i style="background:var(--seg-faculty)"></i>Fakültə</span>
       <span><i style="background:var(--seg-major)"></i>İxtisas</span>
@@ -559,11 +544,6 @@ function viewApplications() {
     </div>
   </div>
 
-  <div class="student-metrics-inline">
-    <div class="student-metric"><span>Ümumi müraciət</span><b>${apps.length}</b></div>
-    <div class="student-metric"><span>Müsahibə dəvətləri</span><b>${apps.filter(a => a.status?.includes('Müsahibə')).length}</b></div>
-    <div class="student-metric"><span>Saxlanmış elanlar</span><b>${Store.state.saved.length}</b></div>
-  </div>
   ${apps.length ? `<div class="table-wrap">
     <table>
       <thead><tr>
@@ -635,8 +615,8 @@ function viewProfile() {
   return `
   <div class="page-head">
     <div>
-      <div class="eyebrow">Hesab və məlumatlarım</div>
-      <h1>Profil və ayarlar</h1>
+      <div class="eyebrow">ADNSU Professional Profile</div>
+      <h1>Profil</h1>
       <p>Bakalavr, magistr və məzun məlumatlarınızı bir profildə saxlayın. Dəqiq profil daha düzgün vakansiya və şəbəkə tövsiyələri verir.</p>
     </div>
     <div class="card" style="padding:12px 16px;min-width:210px">
@@ -800,12 +780,12 @@ function viewCV() {
   return `
   <div class="page-head">
     <div>
-      <div class="eyebrow">Karyera alətləri</div>
-      <h1>AI CV Studio</h1>
+      <div class="eyebrow">CV Center</div>
+      <h1>CV Mərkəzi</h1>
       <p>CV yaradın, ATS uyğunluğunu yoxlayın və AI ilə xülasə, təcrübə bəndləri və vakansiyaya uyğun açar sözlər hazırlayın.</p>
     </div>
   </div>
-  <div class="pills no-print student-tool-tabs" role="group" aria-label="CV Studio alətləri" style="margin-bottom:16px">
+  <div class="pills no-print" style="margin-bottom:16px">
     ${tabs.map(([id, l]) => `<button data-act="cv-tab" data-tab="${id}" aria-pressed="${UI.cvTab === id}">${esc(l)}</button>`).join('')}
   </div>
   ${UI.cvTab === 'build' ? cvBuild()
@@ -1049,8 +1029,7 @@ function renderAIResult(result) {
 
 function cvCompare() {
   const s = Store.state.student;
-  const jobs = Store.allJobs().filter(j => j.status !== 'pending' && (!j.deadline || daysLeft(j.deadline) >= 0));
-  if (!jobs.length) return emptyState('Müqayisə üçün aktiv vakansiya yoxdur', 'Yeni elan yayımlandıqda CV-nizi müqayisə edə biləcəksiniz.', '<button class="btn sm" data-act="go" data-view="jobs">Vakansiyalara keç</button>');
+  const jobs = Store.allJobs().filter(j => j.status !== 'pending');
   const jobId = UI.compareJob || (rankOpportunities(jobs, s)[0] || {}).job?.id || jobs[0].id;
   const job = Store.jobById(jobId);
   const text = UI.cvText || cvToText(buildCVFromProfile(s));
@@ -1131,7 +1110,7 @@ function viewInterview() {
   if (iv && iv.done) return interviewResult(iv);
   if (iv) return interviewRun(iv);
 
-  const jobs = Store.allJobs().filter(j => j.status !== 'pending' && (!j.deadline || daysLeft(j.deadline) >= 0));
+  const jobs = Store.allJobs().filter(j => j.status !== 'pending');
   const companies = [...new Set(jobs.map(j => j.companyId))].map(id => companyOf(id)).filter(Boolean);
 
   return `
@@ -1139,8 +1118,8 @@ function viewInterview() {
     <div class="mascot-inline">
       ${mascot('thumbsup')}
       <div>
-      <div class="eyebrow">Karyera alətləri</div>
-      <h1>Müsahibəyə hazırlıq</h1>
+      <div class="eyebrow">Interview Prep</div>
+      <h1>Müsahibə simulyatoru</h1>
       <p>Şirkət, vəzifə və müsahibə tipini seçin — sistem sizin ixtisasınıza uyğun suallar verəcək,
          cavablarınızı isə beş ölçü üzrə qiymətləndirəcək.</p>
       </div>
@@ -1317,16 +1296,12 @@ function viewRoadmap() {
       ${mascot('walk')}
       <div>
         <div class="eyebrow">Career Roadmap · ${esc(s.major)}</div>
-        <h1>Karyera xəritəm</h1>
+        <h1>Karyera yol xəritəsi</h1>
         <p>Hədəf: <b>${esc(rm.goal)}</b>. Mərhələlər kursunuza görə işarələnib.</p>
       </div>
     </div>
   </div>
 
-  <div class="student-roadmap-progress" role="status">
-    <span>Hazırkı mərhələ</span><b>${stageIndex + 1} / ${rm.stages.length}</b>
-    <span class="student-progress-track"><i style="width:${Math.round(((stageIndex + 1) / rm.stages.length) * 100)}%"></i></span>
-  </div>
   <div class="grid side">
     <div class="card pad-lg">
       <div class="roadmap">
@@ -1384,7 +1359,6 @@ function viewRoadmap() {
 /* ----------------------------- Tədbirlər ----------------------------- */
 function viewEvents() {
   const regs = Store.state.eventRegistrations;
-  const sortedEvents = [...EVENTS].sort((a, b) => (Number(daysLeft(a.date) < 0) - Number(daysLeft(b.date) < 0)) || String(a.date).localeCompare(String(b.date)));
   return `
   <div class="page-head">
     <div>
@@ -1393,24 +1367,19 @@ function viewEvents() {
       <p>Karyera yarmarkaları, infosessiyalar, emalatxanalar və mock interview seansları.</p>
     </div>
   </div>
-  <div class="student-metrics-inline">
-    <div class="student-metric"><span>Qarşıdakı tədbirlər</span><b>${sortedEvents.filter(e => daysLeft(e.date) >= 0).length}</b></div>
-    <div class="student-metric"><span>Qeydiyyatlarım</span><b>${regs.length}</b></div>
-  </div>
-  <div class="grid c2 student-events">
-    ${sortedEvents.map(e => {
-      const past = daysLeft(e.date) < 0;
+  <div class="grid c2">
+    ${EVENTS.map(e => {
       const full = e.registered >= e.seats;
       const on = regs.includes(e.id);
       const d = new Date(e.date);
-      return `<div class="card event-card ${past ? 'event-past' : ''}">
+      return `<div class="card">
         <div class="row" style="align-items:flex-start;gap:14px">
           <div style="text-align:center;flex:none;background:var(--brand-soft);border-radius:var(--r-sm);padding:8px 12px;min-width:62px">
             <div class="num" style="font-size:22px;font-weight:700;color:var(--brand);line-height:1">${d.getDate()}</div>
             <div class="eyebrow" style="color:var(--brand)">${AZ_MONTHS[d.getMonth()]}</div>
           </div>
           <div style="flex:1;min-width:0">
-            <span class="chip mono line">${esc(e.type)}</span>${past ? '<span class="chip line">Başa çatıb</span>' : ''}
+            <span class="chip mono line">${esc(e.type)}</span>
             <h3 style="font-size:14.5px;margin:7px 0 4px">${esc(e.title)}</h3>
             <div style="color:var(--muted);font-size:12px">${esc(e.time)} · ${esc(e.place)}</div>
           </div>
@@ -1424,7 +1393,6 @@ function viewEvents() {
         </div>
         <div class="row" style="margin-top:14px">
           ${on ? '<span class="chip good">✓ Qeydiyyatdan keçmisiniz</span>'
-            : past ? '<span class="chip line">Qeydiyyat bağlıdır</span>'
             : full ? '<span class="chip bad">Yerlər dolub</span>'
             : `<button class="btn sm primary" data-act="event-reg" data-id="${e.id}">Qeydiyyatdan keç</button>`}
         </div>
@@ -1473,14 +1441,14 @@ function viewNetwork() {
 
   return `
   <div class="page-head">
-    <div><div class="eyebrow">İcma və imkanlar</div><h1>Şəbəkə</h1>
+    <div><div class="eyebrow">Network</div><h1>Peşəkar şəbəkə</h1>
       <p>ADNSU tələbələri, məzunları və tərəfdaş şirkətlərin paylaşımları.</p></div>
     <button class="btn" data-act="feed-reload">↻ Yenilə</button>
   </div>
 
   <div class="grid side">
     <div class="stack">
-      <div class="network-filters" role="group" aria-label="Şəbəkə filtrləri">
+      <div class="network-filters" aria-label="Şəbəkə filtrləri">
         ${[['all','Hamısı'],['faculty','Fakültəm'],['major','İxtisasım'],['project','Layihələr'],['startup','Startup'],['job','Vakansiyalar'],['event','Tədbirlər'],['achievement','Nailiyyətlər']]
           .map(([v,l]) => `<button data-act="feed-filter" data-filter="${v}" aria-pressed="${UI.feedFilter === v}">${l}</button>`).join('')}
       </div>
@@ -1588,7 +1556,7 @@ function viewBenefits() {
 
   return `
   <div class="page-head">
-    <div><div class="eyebrow">İcma və imkanlar</div><h1>Tələbə güzəştləri</h1>
+    <div><div class="eyebrow">Student benefits</div><h1>Tələbə güzəştləri</h1>
       <p>ADNSU tələbə statusunuzla teatr, kino, muzey və digər məkanlarda endirim.</p></div>
   </div>
 
@@ -1596,11 +1564,7 @@ function viewBenefits() {
     <span><b>Nümunə məlumat.</b> Məkan adları realdır, güzəşt şərtləri isə nümunədir —
     real istifadədən əvvəl hər partnyorla müqavilə bağlanmalıdır.</span></div>
 
-  <div class="student-metrics-inline">
-    <div class="student-metric"><span>Güzəşt sayı</span><b>${data.rows.length}</b></div>
-    <div class="student-metric"><span>Aktiv kodlarım</span><b>${myClaims.filter(c => !c.redeemed_at && new Date(c.expires_at) > new Date()).length}</b></div>
-  </div>
-  <div class="pills" role="group" aria-label="Güzəşt kateqoriyaları" style="margin-bottom:16px">
+  <div class="pills" style="margin-bottom:16px">
     ${cats.map(c => `<button data-act="benefit-cat" data-cat="${esc(c)}"
       aria-pressed="${UI.benefitCat === c}">${esc(c)}</button>`).join('')}
   </div>
@@ -2787,8 +2751,6 @@ const UI = {
   theme: null,
   booting: true,
   publicView: 'landing',
-  studentSidebarCollapsed: (() => { try { return localStorage.getItem('asoiu-student-rail-compact') === '1'; } catch (e) { return false; } })(),
-  studentMenuOpen: false,
   providers: {},
   userMenu: false,
   notificationsOpen: false,
@@ -2824,7 +2786,7 @@ function navCounts(role, id) {
   const s = Store.state;
   if (role === 'student') {
     if (id === 'applications') return s.applications.length || '';
-    if (id === 'jobs') return rankOpportunities(Store.allJobs().filter(j => j.status !== 'pending' && (!j.deadline || daysLeft(j.deadline) >= 0)), s.student, { min: 65 }).length || '';
+    if (id === 'jobs') return rankOpportunities(Store.allJobs(), s.student, { min: 65 }).length || '';
   }
   if (role === 'company') {
     if (id === 'vacancies') return ownJobs().length || '';
@@ -2871,8 +2833,7 @@ function render() {
   const pendingCo = role === 'company' && user.status === 'pending';
 
   root.innerHTML = `
-    <header class="topbar${role === 'student' ? ' student-topbar' : ''}">
-      ${role === 'student' ? `<button type="button" class="student-menu-trigger" data-act="student-menu" aria-label="Menyunu aç" aria-controls="student-navigation" aria-expanded="${UI.studentMenuOpen}">${studentNavIcon('menu')}</button>` : ''}
+    <header class="topbar">
       ${logoLockup()}
       <div class="topbar-spacer"></div>
       <button class="topbar-home" data-act="home" aria-label="Ana səhifəyə keç">
@@ -2901,24 +2862,17 @@ function render() {
       </div>
     </header>
 
-    <div class="shell${role === 'student' ? (' student-shell' + (UI.studentSidebarCollapsed ? ' is-collapsed' : '') + (UI.studentMenuOpen ? ' is-mobile-open' : '')) : ''}">
-      <nav class="rail${role === 'student' ? ' student-rail' : ''}" ${role === 'student' ? 'id="student-navigation"' : ''} aria-label="Bölmələr">
-        ${role === 'student' ? `<div class="student-rail-header">
-          <span class="student-rail-symbol" aria-hidden="true">${studentNavIcon('dashboard')}</span>
-          <span class="student-rail-identity"><b>Karyera menyusu</b><small>ADNSU tələbə kabineti</small></span>
-          <button type="button" class="student-rail-collapse" data-act="student-sidebar-collapse" aria-label="${UI.studentSidebarCollapsed ? 'Menyunu genişləndir' : 'Menyunu yığ'}" aria-expanded="${!UI.studentSidebarCollapsed}" title="${UI.studentSidebarCollapsed ? 'Menyunu genişləndir' : 'Menyunu yığ'}">${studentNavIcon('panel')}</button>
-          <button type="button" class="student-rail-close" data-act="student-menu-close" aria-label="Menyunu bağla">${studentNavIcon('close')}</button>
-        </div>` : ''}
+    <div class="shell">
+      <nav class="rail" aria-label="Bölmələr">
         ${NAV[role].map(item => item.group
-          ? `<div class="rail-group" title="${esc(item.group)}"><span>${esc(item.group)}</span></div>`
-          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" title="${esc(item.label)}" aria-label="${esc(item.label)}" ${view === item.id ? 'aria-current="page"' : ''}>
-              <span class="ico" aria-hidden="true">${role === 'student' ? studentNavIcon(item.id) : item.ico}</span><span class="nav-label">${esc(item.label)}</span>
+          ? `<div class="rail-group">${esc(item.group)}</div>`
+          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" ${view === item.id ? 'aria-current="page"' : ''}>
+              <span class="ico" aria-hidden="true">${item.ico}</span>${esc(item.label)}
               ${navCounts(role, item.id) ? `<span class="count">${navCounts(role, item.id)}</span>` : ''}
             </a>`).join('')}
       </nav>
-      ${role === 'student' ? '<button type="button" class="student-rail-backdrop" data-act="student-menu-close" aria-label="Menyunu bağla"></button>' : ''}
 
-      <main class="main${role === 'student' ? ` student-workspace student-view-${view}` : ''}" id="main">\n        ${role === 'student' ? `<nav class="student-crumb" aria-label="Səhifə yolu"><span>ADNSU Karyera</span><span class="crumb-divider" aria-hidden="true">/</span><strong>${esc(NAV.student.find(item => item.id === view)?.label || 'İcmal')}</strong></nav>` : ''}
+      <main class="main" id="main">
         ${pendingCo ? `<div class="note warn" style="margin-bottom:18px"><span class="m">!</span>
           <span><b>Hesabınız Karyera Mərkəzinin təsdiqini gözləyir.</b>
           Namizədləri görə və vakansiya hazırlaya bilərsiniz, lakin elanlar təsdiqdən
@@ -3079,14 +3033,6 @@ function setTheme(t) {
   try { localStorage.setItem('asoiu-theme', t || ''); } catch (e) { /* ignore */ }
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && UI.studentMenuOpen) {
-    UI.studentMenuOpen = false;
-    render();
-    document.querySelector('.student-menu-trigger')?.focus();
-  }
-});
-
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if (!t) return;
@@ -3096,27 +3042,6 @@ document.addEventListener('click', e => {
   const rerender = () => render();
 
   switch (act) {
-    case 'student-sidebar-collapse': {
-      e.preventDefault();
-      UI.studentSidebarCollapsed = !UI.studentSidebarCollapsed;
-      try { localStorage.setItem('asoiu-student-rail-compact', UI.studentSidebarCollapsed ? '1' : '0'); } catch (error) { /* storage may be disabled */ }
-      rerender();
-      break;
-    }
-    case 'student-menu': {
-      e.preventDefault();
-      UI.studentMenuOpen = !UI.studentMenuOpen;
-      rerender();
-      if (UI.studentMenuOpen) document.querySelector('.student-rail a[data-act="go"]')?.focus();
-      break;
-    }
-    case 'student-menu-close': {
-      e.preventDefault();
-      UI.studentMenuOpen = false;
-      rerender();
-      document.querySelector('.student-menu-trigger')?.focus();
-      break;
-    }
     case 'home':
       e.preventDefault();
       UI.publicView = 'landing';
@@ -3155,7 +3080,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'go': {
-      e.preventDefault(); UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null; UI.studentMenuOpen = false;
+      e.preventDefault(); UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null;
       S.view = t.dataset.view; Store.save(); rerender(); window.scrollTo(0, 0);
       /* Şəbəkə və güzəştlər serverdən gəlir — ilk açılışda yüklənir. */
       if (S.view === 'network'  && UI.feed === null)     loadFeed();
@@ -3421,7 +3346,6 @@ document.addEventListener('click', e => {
     case 'close-modal': closeModal(); break;
 
     /* Filtrlər */
-    case 'filter-reset': UI.jobFilter = { q: '', type: 'Hamısı', min: 0, savedOnly: false }; rerender(); break;
     case 'filter-type': UI.jobFilter.type = t.dataset.type; rerender(); break;
     case 'filter-saved': UI.jobFilter.savedOnly = !UI.jobFilter.savedOnly; rerender(); break;
 
