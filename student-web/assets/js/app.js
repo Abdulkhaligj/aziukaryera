@@ -3049,6 +3049,14 @@ function setTheme(t) {
   try { localStorage.setItem('asoiu-theme', t || ''); } catch (e) { /* ignore */ }
 }
 
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && UI.studentMenuOpen) {
+    UI.studentMenuOpen = false;
+    render();
+    document.querySelector('.student-menu-trigger')?.focus();
+  }
+});
+
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if (!t) return;
@@ -3058,6 +3066,27 @@ document.addEventListener('click', e => {
   const rerender = () => render();
 
   switch (act) {
+    case 'student-sidebar-collapse': {
+      e.preventDefault();
+      UI.studentSidebarCollapsed = !UI.studentSidebarCollapsed;
+      try { localStorage.setItem('asoiu-student-rail-compact', UI.studentSidebarCollapsed ? '1' : '0'); } catch (error) { /* storage may be disabled */ }
+      rerender();
+      break;
+    }
+    case 'student-menu': {
+      e.preventDefault();
+      UI.studentMenuOpen = !UI.studentMenuOpen;
+      rerender();
+      if (UI.studentMenuOpen) document.querySelector('.student-rail a[data-act="go"]')?.focus();
+      break;
+    }
+    case 'student-menu-close': {
+      e.preventDefault();
+      UI.studentMenuOpen = false;
+      rerender();
+      document.querySelector('.student-menu-trigger')?.focus();
+      break;
+    }
     case 'home':
       e.preventDefault();
       UI.publicView = 'landing';
@@ -3096,7 +3125,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'go': {
-      e.preventDefault(); UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null;
+      e.preventDefault(); UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null; UI.studentMenuOpen = false;
       S.view = t.dataset.view; Store.save(); rerender(); window.scrollTo(0, 0);
       /* Şəbəkə və güzəştlər serverdən gəlir — ilk açılışda yüklənir. */
       if (S.view === 'network'  && UI.feed === null)     loadFeed();
