@@ -7,13 +7,14 @@ import {
   PanelsTopLeft, ShieldCheck, ScrollText, Search, Plus, Bell, ChevronRight, Trophy,
   TrendingUp, UserCheck, Clock3, X, Save, Trash2, Menu, GraduationCap, KeyRound, LogOut,
   MessageSquareText, Flag, CreditCard, FileText, MessagesSquare, Sparkles, RotateCcw,
-  AlertTriangle, Copy, Check, Eye, LoaderCircle, Pencil, Megaphone
+  AlertTriangle, Copy, Check, Eye, LoaderCircle, Pencil, Megaphone, RefreshCw
 } from 'lucide-react';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 import { can, roleDescriptions, roleLabels } from '@/lib/permissions';
 import { logout } from '@/app/login/actions';
 import ImageField from '@/components/image-field';
 import Assistant from '@/components/assistant';
+import InstallHint from '@/components/install-hint';
 
 type Store = Record<ResourceKey, AdminRow[]>;
 type View = 'dashboard' | ResourceKey;
@@ -249,6 +250,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [formError, setFormError] = useState('');
   const [toast, setToast] = useState<{ tone: 'good' | 'bad'; text: string } | null>(initialNotice ? { tone: 'good', text: initialNotice } : null);
   const [secret, setSecret] = useState<Secret | null>(null);
@@ -290,6 +292,15 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     window.scrollTo({ top: 0 });
   }
   function openCreate(resource: ResourceKey) { setFormError(''); setActive(resource); setModal({ mode: 'create' }); }
+
+  /* Ana ekrandan açılan tətbiqdə brauzerin yeniləmə düyməsi yoxdur — topbar-dakı düymə bunu edir */
+  async function refreshView() {
+    if (active === 'dashboard') { window.location.reload(); return; }
+    setRefreshing(true);
+    try { await refreshResource(active as ResourceKey); setToast({ tone: 'good', text: 'Məlumat yeniləndi.' }); }
+    catch (caught) { setToast({ tone: 'bad', text: caught instanceof Error ? caught.message : 'Məlumat yenilənmədi' }); }
+    finally { setRefreshing(false); }
+  }
 
   async function refreshResource(resource: ResourceKey) {
     const response = await fetch(`/api/admin/${resource}`, { cache: 'no-store' });
@@ -426,6 +437,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
         <div className="topActions">
           <button className="aiButton hideMobile" onClick={() => setAssistantOpen(true)}><Sparkles size={18}/>AI köməkçi</button>
           {canCreate && <button className="primaryButton hideMobile" onClick={() => { setFormError(''); setModal({ mode: 'create' }); }}><Plus size={18}/>Yeni {singular[active as ResourceKey] || 'qeyd'}</button>}
+          <button className="iconButton standaloneOnly" aria-label="Yenilə" title="Yenilə" onClick={refreshView} disabled={refreshing}>{refreshing ? <LoaderCircle size={18} className="spin"/> : <RefreshCw size={18}/>}</button>
           <div className="userMenuWrap">
             <button className="profileButton" aria-label="Profil menyusu" aria-expanded={userMenu} onClick={() => setUserMenu(v => !v)}><span>{initialsOf(currentUser)}</span><div><b>{currentUser}</b><small>{roleLabels[currentRole]}</small></div></button>
             {userMenu && <div className="userMenu" role="menu">
@@ -438,6 +450,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       </header>
 
       <section className="content">
+        <InstallHint/>
         {active === 'dashboard' ? <>
           <div className="welcome"><div><span>Salam, {currentUser.split(' ')[0]}</span><h2>Bu gün nəyə baxmaq lazımdır?</h2><p>Gözləyən işlər aşağıdadır. Tədbir, elan və ya sayt mətnini AI köməkçiyə deyin, o hazırlasın.</p></div><button className="aiButton light" onClick={() => setAssistantOpen(true)}><Sparkles size={18}/>AI köməkçi ilə yarat</button></div>
 

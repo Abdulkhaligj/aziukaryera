@@ -566,3 +566,33 @@ h1, h2, h3, p { margin: 0; }
 .aiOptional { font-size: 12.5px; color: var(--muted); margin: 0; }
 .aiButton.hideMobile { display: none; }
 @media (min-width: 768px) { .aiButton.hideMobile { display: inline-flex; } }
+
+/* ---------------- Telefonda tətbiq kimi (ana ekrandan) ---------------- */
+/* iPhone 16px-dən kiçik yazılı sahəyə toxunanda səhifəni böyüdür — sahələr 16px */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px; }
+}
+button, a, label, summary { touch-action: manipulation; }
+
+/* Yeniləmə düyməsi yalnız ana ekrandan açılanda görünür (brauzerdə öz düyməsi var) */
+.standaloneOnly { display: none; }
+@media (display-mode: standalone) { .standaloneOnly { display: grid; place-items: center; } }
+.isStandalone .standaloneOnly { display: grid; place-items: center; }
+@media (display-mode: standalone) {
+  html, body { overscroll-behavior-y: none; }
+  .sidebar, .bottomNav, .topbar { -webkit-user-select: none; user-select: none; }
+}
+.isStandalone body { overscroll-behavior-y: none; }
+
+.installHint { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 12px 12px 12px 14px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line)); box-shadow: var(--shadow); }
+.installHint > img { width: 44px; height: 44px; border-radius: 11px; flex: none; }
+.installText { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.installText > b { font-size: 14px; }
+.installText p { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.installText p svg { vertical-align: -2px; color: var(--blue); }
+.installHint .primaryButton { flex: none; }
+@media (max-width: 420px) {
+  .installHint { flex-wrap: wrap; }
+  .installHint .primaryButton { order: 3; width: 100%; justify-content: center; }
+}
