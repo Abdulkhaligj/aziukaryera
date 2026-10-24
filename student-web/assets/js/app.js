@@ -112,7 +112,9 @@ const COMPANY_PLANS = [
 ];
 
 function currentCompanyPlan() {
-  return Store.state && Store.state.subscription && (Store.state.subscription.plan_id || Store.state.subscription.plans?.id || Store.state.subscription.plans?.slug) || 'free';
+  const subscription = Store.state && Store.state.subscription;
+  if (!subscription || (subscription.status && subscription.status !== 'active')) return 'free';
+  return subscription.plans?.slug || subscription.plan_slug || subscription.plan_id || 'free';
 }
 
 function companyCanUse(feature) {
