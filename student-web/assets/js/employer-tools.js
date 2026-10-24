@@ -35,11 +35,16 @@ const EmployerTools = {
     this.ui.busy = true;
     this.ui.error = '';
     const isCalendar = section === 'calendar';
-    const result = Store.mode === 'supabase'
-      ? await (isCalendar ? Backend.employerListInterviews() : Backend.employerListPartnerships())
-      : { ok: true, rows: isCalendar
-        ? (Store.state.demoInterviewSlots || [])
-        : (Store.state.demoPartnershipRequests || []) };
+    let result;
+    try {
+      result = Store.mode === 'supabase'
+        ? await (isCalendar ? Backend.employerListInterviews() : Backend.employerListPartnerships())
+        : { ok: true, rows: isCalendar
+          ? (Store.state.demoInterviewSlots || [])
+          : (Store.state.demoPartnershipRequests || []) };
+    } catch (error) {
+      result = { ok:false, error:String(error?.message || 'Bağlantı xətası') };
+    }
     this.ui.busy = false;
     if (!result.ok) this.ui.error = result.error || 'Məlumatları yükləmək mümkün olmadı.';
     else {
@@ -131,6 +136,7 @@ const EMP_INTERVIEW_STATUS = {
 };
 
 function viewEmployerTalentPool() {
+  EmployerTools.resetSession();
   if (!companyCanUse('candidate_search')) return '<div class="page-head"><div><h1>Talent Pool</h1><p>Namizəd bazasında qabaqcıl axtarış üçün aktiv Pro və ya Business paketi tələb olunur.</p></div></div>' +
     emptyState('Namizəd bazasına giriş bağlıdır','Paketlərə baxaraq namizəd axtarışını aktivləşdirə bilərsiniz.','<button class="btn primary" data-act="go" data-view="subscription">Paketlərə bax</button>');
   const f=EmployerTools.ui;
@@ -187,6 +193,7 @@ function viewEmployerTalentPool() {
 }
 
 function viewEmployerComparison() {
+  EmployerTools.resetSession();
   const apps=EmployerTools.applications();
   const selected=EmployerTools.ui.compare;
   const own=apps.filter(a=>selected.includes(String(a.id))).slice(0,3);
@@ -222,6 +229,7 @@ function viewEmployerComparison() {
 }
 
 function viewEmployerCalendar() {
+  EmployerTools.resetSession();
   const em=EmployerTools;
   const y=Math.floor(em.ui.month/12),m=em.ui.month%12;
   const monthStart=new Date(Date.UTC(y,m,1));
@@ -282,6 +290,7 @@ function viewEmployerCalendar() {
 }
 
 function viewEmployerPartnerships() {
+  EmployerTools.resetSession();
   const em=EmployerTools, co=Store.state.company||{};
   const rows=em.partnerships.filter(r=>String(r.company_id)===String(co.id));
   return '<div class="page-head"><div><div class="eyebrow">ADNSU · sənaye əməkdaşlığı</div><h1>Universitetlə əməkdaşlıq</h1>'+
@@ -309,6 +318,7 @@ function viewEmployerPartnerships() {
 }
 
 function viewEmployerAdminPartnerships() {
+  EmployerTools.resetSession();
   const em=EmployerTools, rows=em.partnerships;
   return '<div class="page-head"><div><div class="eyebrow">Karyera Mərkəzi · əməkdaşlıq</div><h1>Şirkət əməkdaşlıq sorğuları</h1>'+
     '<p>Şirkətlərin göndərdiyi təklifləri qiymətləndirin və statuslarını yeniləyin.</p></div>'+
