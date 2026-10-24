@@ -71,6 +71,15 @@ const multiFields = ['faculty_ids', 'major_ids'];
 
 const initialsOf = (value: string) => value.split(/\s+/).filter(Boolean).map(x => x[0]).join('').slice(0, 2).toUpperCase() || '•';
 
+/* Profil şəkli və ya loqo; link açılmasa (vaxtı bitib, silinib) baş hərflər qalır */
+function RowAvatar({ row, className }: { row: AdminRow; className: string }) {
+  const [broken, setBroken] = useState(false);
+  const show = !!row.avatar && !broken;
+  return <span className={`${className}${show && row.avatarKind === 'logo' ? ' isLogo' : ''}`}>
+    {show ? <img src={row.avatar} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)}/> : initialsOf(row.title)}
+  </span>;
+}
+
 function StatusPill({ status }: { status: Status }) { return <span className={`status status-${status.toLowerCase()}`}>{status}</span>; }
 
 function Stat({ label, value, note, icon: Icon, tone, onClick }: { label: string; value: string; note: string; icon: React.ComponentType<{ size?: number }>; tone: string; onClick?: () => void }) {
@@ -478,7 +487,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
 
           <div className="dashboardGrid">
             <section className="panel"><div className="panelHead"><div><h3>Son müraciətlər</h3><p>Ən yeni 6 müraciət</p></div><button className="linkButton" onClick={() => go('applications')}>Hamısı<ChevronRight size={16}/></button></div>
-              <div className="compactRows">{data.applications.slice(0, 6).map(row => <button className="compactRow" key={row.id} onClick={() => { setActive('applications'); setFormError(''); setModal({ mode: 'edit', row }); }}><span className="avatarCircle">{initialsOf(row.title)}</span><span className="who"><b>{row.title}</b><small>{row.subtitle}</small></span><StatusPill status={row.status}/></button>)}
+              <div className="compactRows">{data.applications.slice(0, 6).map(row => <button className="compactRow" key={row.id} onClick={() => { setActive('applications'); setFormError(''); setModal({ mode: 'edit', row }); }}><RowAvatar row={row} className="avatarCircle"/><span className="who"><b>{row.title}</b><small>{row.subtitle}</small></span><StatusPill status={row.status}/></button>)}
                 {data.applications.length === 0 && <p className="emptyLine">Hələ müraciət yoxdur.</p>}</div>
             </section>
             <section className="panel"><div className="panelHead"><div><h3>Tez əlavə et</h3><p>İcazəniz olan əməliyyatlar</p></div></div>
@@ -502,7 +511,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
             <div className="dataTable">
               <div className="tableHeader"><span>Ad və məlumat</span><span>Status</span><span>Əlavə məlumat</span><span>Tarix</span><span/></div>
               {filtered.map(row => <button type="button" className="tableRow" key={row.id} onClick={() => { setFormError(''); setModal({ mode: 'edit', row }); }}>
-                <span className="mainCell"><span className="resourceIcon">{initialsOf(row.title)}</span><span><b>{row.title}</b><small>{row.subtitle}</small></span></span>
+                <span className="mainCell"><RowAvatar row={row} className="resourceIcon"/><span><b>{row.title}</b><small>{row.subtitle}</small></span></span>
                 <StatusPill status={row.status}/>
                 <span className="metaCell">{row.meta}</span>
                 <time>{row.updatedAt}</time>
@@ -526,7 +535,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
 
     {modal && resource && <div className="modalBackdrop" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setModal(null); }}>
       <form className="modal" onSubmit={saveRow} noValidate={false}>
-        <div className="modalHead"><div><h2>{modal.mode === 'create' ? `Yeni ${singular[resource] || 'qeyd'}` : canEdit ? 'Redaktə' : 'Ətraflı'}</h2><p>{titles[resource]}</p></div><button type="button" className="iconButton" aria-label="Pəncərəni bağla" onClick={() => setModal(null)} disabled={busy}><X size={20}/></button></div>
+        <div className="modalHead"><div className="modalWho">{modal.mode === 'edit' && modal.row?.avatar && <RowAvatar row={modal.row} className="modalPhoto"/>}<div><h2>{modal.mode === 'create' ? `Yeni ${singular[resource] || 'qeyd'}` : canEdit ? 'Redaktə' : 'Ətraflı'}</h2><p>{modal.mode === 'edit' && modal.row ? `${titles[resource]} · ${modal.row.title}` : titles[resource]}</p></div></div><button type="button" className="iconButton" aria-label="Pəncərəni bağla" onClick={() => setModal(null)} disabled={busy}><X size={20}/></button></div>
         <div className="modalBody">
           {(modal.mode === 'create' ? canCreate : canEdit)
             ? <EditorFields resource={resource} row={modal.row} data={data} lookups={lookups} mode={modal.mode} self={editingSelf}/>

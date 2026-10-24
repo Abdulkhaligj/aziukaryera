@@ -87,6 +87,20 @@ function bakuLocal(value?: string | null) {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
 
+/* Profil şəkilləri şəxsi "avatars" bucket-indədir. Admin üçün yalnız AI yoxlamasından
+   keçmiş şəklin (avatar_path) qısa müddətli imzalı linki yaradılır. */
+async function signAvatars(context: AdminContext, paths: unknown[]): Promise<Record<string, string>> {
+  const list = [...new Set(paths.filter((p): p is string => typeof p === 'string' && p.length > 0))];
+  if (!list.length) return {};
+  const { data, error } = await context.supabase.storage.from('avatars').createSignedUrls(list, 6 * 3600);
+  if (error) return {};
+  const out: Record<string, string> = {};
+  (data || []).forEach(item => { if (item.path && item.signedUrl && !item.error) out[item.path] = item.signedUrl; });
+  return out;
+}
+const logoOf = (url: unknown) => typeof url === 'string' && /^https:\/\//i.test(url) ? url : undefined;
+const photo = (pics: Record<string, string>, path: unknown) => (typeof path === 'string' && pics[path]) || undefined;
+
 export async function loadResource(context: AdminContext, resource: ResourceKey, lookups?: Lookups): Promise<AdminRow[]> {
   const { supabase } = context;
   const label = labelMaps(lookups);
@@ -106,6 +120,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     return (data || []).map((row: any) => ({
       id: row.id, title: row.name, subtitle: row.sector || 'Şirkət', status: accountStatus(row.status),
       meta: row.website || row.email || 'Əlaqə məlumatı yoxdur', updatedAt: dateLabel(row.created_at),
+      avatar: logoOf(row.logo_url), avatarKind: 'logo' as const,
       fields: { email: row.email, phone: row.phone, website: row.website, about: row.about, status: row.status, verified: row.verified, company_size: row.company_size, address: row.address, logo_url: row.logo_url, contact: row.contact, contact_position: row.contact_position, contact_email: row.contact_email, contact_phone: row.contact_phone }
     }));
   }
@@ -123,44 +138,52 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.title, subtitle: row.benefit_partners?.name || 'Tərəfdaş', status: row.active ? 'Aktiv' : 'Bitib',
+      avatar: logoOf(row.benefit_partners?.logo_url), avatarKind: 'logo' as const,
       meta: `${row.discount_label || 'Güzəşt'} · ${row.valid_to ? dateLabel(row.valid_to) : 'müddətsiz'}`, updatedAt: dateLabel(row.created_at),
       fields: { partner_id: row.partner_id, partner_name: row.benefit_partners?.name, partner_logo_url: row.benefit_partners?.logo_url, description: row.description, discount_label: row.discount_label, valid_from: row.valid_from, valid_to: row.valid_to, active: row.active }
     }));
   }
   if (resource === 'applications') {
-    const { data, error } = await supabase.from('applications').select('id,status,note,created_at,profiles!applications_student_id_fkey(full_name),jobs(title)').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('applications').select('id,status,note,created_at,profiles!applications_student_id_fkey(full_name,avatar_path),jobs(title)').order('created_at', { ascending: false });
     if (error) throw error;
+    const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     return (data || []).map((row: any) => ({
       id: row.id, title: row.profiles?.full_name || 'Tələbə', subtitle: row.jobs?.title || 'Vakansiya', status: applicationStatus(row.status),
+      avatar: photo(pics, row.profiles?.avatar_path), avatarKind: 'photo' as const,
       meta: row.note || 'Qeyd yoxdur', updatedAt: dateLabel(row.created_at), fields: { status: row.status, note: row.note }
     }));
   }
   if (resource === 'students') {
-    const { data, error } = await supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,updated_at').eq('role', 'student').eq('account_status', 'student').order('updated_at', { ascending: false });
+    const { data, error } = await supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,avatar_path,updated_at').eq('role', 'student').eq('account_status', 'student').order('updated_at', { ascending: false });
     if (error) throw error;
+    const pics = await signAvatars(context, (data || []).map((row: any) => row.avatar_path));
     return (data || []).map((row: any) => ({
       id: row.id, title: row.full_name || 'Tələbə', subtitle: `${row.course || '—'}. kurs · ${label.major(row.major_id) || 'İxtisas qeyd edilməyib'}`,
+      avatar: photo(pics, row.avatar_path), avatarKind: 'photo' as const,
       status: accountStatus(row.status), meta: row.gpa ? `ÜOMG: ${row.gpa}` : (row.email || 'Profil məlumatı'), updatedAt: dateLabel(row.updated_at),
       fields: { full_name: row.full_name, email: row.email, personal_email: row.personal_email, phone: row.phone, city: row.city, faculty_id: row.faculty_id, major_id: row.major_id, course: row.course, gpa: row.gpa, status: row.status, account_status: row.account_status, alumni_verified: row.alumni_verified }
     }));
   }
   if (resource === 'master_students' || resource === 'alumni') {
     const alumni = resource === 'alumni';
-    let query = supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,updated_at');
+    let query = supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,avatar_path,updated_at');
     query = alumni ? query.eq('role', 'graduate') : query.eq('role', 'student').eq('account_status', 'master_student');
     const { data, error } = await query.order('updated_at', { ascending: false });
     if (error) throw error;
+    const pics = await signAvatars(context, (data || []).map((row: any) => row.avatar_path));
     return (data || []).map((row: any) => ({
       id: row.id, title: row.full_name || (alumni ? 'Məzun' : 'Magistr'),
+      avatar: photo(pics, row.avatar_path), avatarKind: 'photo' as const,
       subtitle: `${label.major(row.major_id) || 'İxtisas qeyd edilməyib'} · ${row.email || ''}`,
       status: accountStatus(row.status), meta: alumni ? (row.alumni_verified ? 'Təsdiqlənmiş məzun' : 'Təsdiq gözləyir') : `${row.course || '—'}. kurs`,
       updatedAt: dateLabel(row.updated_at), fields: { full_name: row.full_name, email: row.email, personal_email: row.personal_email, phone: row.phone, city: row.city, faculty_id: row.faculty_id, major_id: row.major_id, course: row.course, gpa: row.gpa, status: row.status, account_status: row.account_status, alumni_verified: row.alumni_verified }
     }));
   }
   if (resource === 'network') {
-    const { data, error } = await supabase.from('posts').select('id,body,kind,tags,moderation_status,created_at,profiles!posts_author_id_fkey(full_name)').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('posts').select('id,body,kind,tags,moderation_status,created_at,profiles!posts_author_id_fkey(full_name,avatar_path)').order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'İstifadəçi', subtitle: row.body, status: row.moderation_status === 'visible' ? 'Aktiv' : row.moderation_status === 'hidden' ? 'Bitib' : 'Yoxlamada', meta: `${row.kind || 'general'} · ${(row.tags || []).map((x: string) => `#${x}`).join(' ')}`, updatedAt: dateLabel(row.created_at), fields: { moderation_status: row.moderation_status, kind: row.kind } }));
+    const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
+    return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'İstifadəçi', subtitle: row.body, avatar: photo(pics, row.profiles?.avatar_path), avatarKind: 'photo' as const, status: row.moderation_status === 'visible' ? 'Aktiv' : row.moderation_status === 'hidden' ? 'Bitib' : 'Yoxlamada', meta: `${row.kind || 'general'} · ${(row.tags || []).map((x: string) => `#${x}`).join(' ')}`, updatedAt: dateLabel(row.created_at), fields: { moderation_status: row.moderation_status, kind: row.kind } }));
   }
   if (resource === 'reports') {
     const { data, error } = await supabase.from('reports').select('id,target_type,target_id,reason,details,status,created_at,profiles!reports_reporter_id_fkey(full_name)').order('created_at', { ascending: false });
@@ -239,16 +262,19 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.company_name, subtitle: `${row.year} · ${row.nomination}`,
+      avatar: logoOf(row.logo_url), avatarKind: 'logo' as const,
       status: row.published ? 'Aktiv' : 'Qaralama', meta: `${tierLabel[row.tier] || row.tier}${row.citation ? ` · ${row.citation}` : ''}`,
       updatedAt: dateLabel(row.updated_at || row.created_at),
       fields: { year: row.year, nomination: row.nomination, tier: row.tier, company_id: row.company_id, company_name: row.company_name, logo_url: row.logo_url, citation: row.citation, published: row.published }
     }));
   }
   if (resource === 'admins') {
-    const { data, error } = await supabase.from('profiles').select('id,full_name,email,status,admin_role,updated_at').eq('role', 'admin').order('updated_at', { ascending: false });
+    const { data, error } = await supabase.from('profiles').select('id,full_name,email,status,admin_role,avatar_path,updated_at').eq('role', 'admin').order('updated_at', { ascending: false });
     if (error) throw error;
+    const pics = await signAvatars(context, (data || []).map((row: any) => row.avatar_path));
     return (data || []).map((row: any) => ({
       id: row.id, title: row.full_name || 'Əməkdaş', subtitle: row.email || 'Administrator', status: accountStatus(row.status),
+      avatar: photo(pics, row.avatar_path), avatarKind: 'photo' as const,
       meta: row.admin_role || 'İdarəetmə hüquqları', updatedAt: dateLabel(row.updated_at), fields: { full_name: row.full_name, email: row.email, status: row.status, admin_role: row.admin_role || 'reviewer' }
     }));
   }

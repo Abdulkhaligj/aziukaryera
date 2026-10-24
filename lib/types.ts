@@ -14,6 +14,9 @@ export type AdminRow = {
   meta: string;
   updatedAt: string;
   fields?: Record<string, string | number | boolean | null>;
+  /* Siyahıda göstəriləcək şəkil: profil şəkli (imzalı link) və ya şirkət loqosu */
+  avatar?: string;
+  avatarKind?: 'photo' | 'logo';
 };
 
 export type AdminRole = 'super_admin' | 'manager' | 'editor' | 'reviewer';
