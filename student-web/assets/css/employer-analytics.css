@@ -1,0 +1,170 @@
+/* Şirkət kabineti: analitika, qalan kabinetlərə təsir etməyən adlandırma */
+.em-analytics-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.em-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 21px 22px;
+  min-width: 0;
+}
+.em-metric > span {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.em-metric > strong {
+  color: var(--brand);
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 34px);
+  line-height: 1.12;
+  font-variant-numeric: tabular-nums;
+}
+.em-metric > small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.em-recruitment-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.em-panel {
+  padding: 23px;
+  min-width: 0;
+}
+.em-panel h2 {
+  font-size: 17px;
+  margin: 6px 0 0;
+}
+.em-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.em-panel-head p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+.em-panel-head .btn { flex: 0 0 auto; }
+.em-funnel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 26px;
+  row-gap: 17px;
+  margin-top: 25px;
+}
+.em-stage-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-2);
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+.em-stage-label b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.em-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.em-track > span {
+  display: block;
+  height: 100%;
+  background: var(--brand-2);
+  border-radius: inherit;
+  transition: width .25s ease;
+}
+.em-side-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.em-side-row b {
+  font-size: 14px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.em-profile-track { margin-top: 14px; }
+.em-side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.em-empty {
+  color: var(--muted);
+  padding: 35px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+.em-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.em-skill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.em-skill b { color: var(--ink); font-size: 12px; }
+.em-upgrade {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px;
+}
+.em-upgrade b { font-size: 14px; }
+.em-upgrade p {
+  font-size: 12px;
+  margin: 5px 0 0;
+  color: var(--ink-2);
+}
+.em-data-note {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin: 20px 0 0;
+}
+@media (max-width: 1100px) {
+  .em-analytics-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .em-recruitment-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .em-analytics-summary { gap: 10px; }
+  .em-metric { padding: 14px; }
+  .em-metric > strong { font-size: 26px; }
+  .em-funnel { grid-template-columns: 1fr; }
+  .em-panel { padding: 17px; }
+  .em-panel-head { flex-direction: column; }
+  .em-upgrade { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .em-track > span { transition: none; }
+}
