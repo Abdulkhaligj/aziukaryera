@@ -112,7 +112,9 @@ const COMPANY_PLANS = [
 ];
 
 function currentCompanyPlan() {
-  return Store.state && Store.state.subscription && (Store.state.subscription.plan_id || Store.state.subscription.plans?.id || Store.state.subscription.plans?.slug) || 'free';
+  const subscription = Store.state && Store.state.subscription;
+  if (!subscription || (subscription.status && subscription.status !== 'active')) return 'free';
+  return subscription.plans?.slug || subscription.plan_slug || subscription.plan_id || 'free';
 }
 
 function companyCanUse(feature) {
@@ -234,11 +236,15 @@ const NAV = {
     { id: 'vacancies',  label: 'Vakansiyalarım',   ico: '▤' },
     { id: 'post',       label: 'Vakansiya yarat',  ico: '＋' },
     { id: 'applications', label: 'Müraciətlər',    ico: '▥' },
+    { id: 'analytics', label: 'HR Analitika',     ico: '◭' },
     { group: 'Namizədlər' },
     { id: 'candidates', label: 'Namizəd uyğunluğu', ico: '◎' },
-    { id: 'search',     label: 'Namizəd axtarışı',  ico: '⌕' },
+    { id: 'search',     label: 'Geniş Talent Pool',  ico: '⌕' },
+    { id: 'compare',    label: 'CV müqayisəsi',     ico: '▤' },
     { id: 'invites',    label: 'Müsahibə dəvətləri', ico: '◐' },
+    { id: 'calendar',   label: 'Müsahibə təqvimi',  ico: '◷' },
     { group: 'Şirkət' },
+    { id: 'partnerships', label: 'ADNSU əməkdaşlığı', ico: '◇' },
     { id: 'profile',    label: 'Şirkət profili',    ico: '☰' },
     { id: 'subscription', label: 'Paket və limitlər', ico: '◇' }
   ],
@@ -248,6 +254,7 @@ const NAV = {
     { id: 'approvals', label: 'Elan təsdiqi',    ico: '✓' },
     { id: 'students',  label: 'Tələbələr',       ico: '☰' },
     { id: 'companies', label: 'Şirkətlər',       ico: '▤' },
+    { id: 'partnerships-admin', label: 'Əməkdaşlıq sorğuları', ico: '◇' },
     { id: 'events',    label: 'Tədbirlər',       ico: '◷' },
     { id: 'redeem',    label: 'QR təsdiqi',      ico: '✓' },
     { group: 'Hesabatlar' },
@@ -1663,7 +1670,7 @@ function ownInvites() {
 function viewCompanyDashboard() {
   const jobs = ownJobs();
   const co = Store.state.company;
-  const pool = STUDENT_POOL;
+  const pool = companyCanUse('candidate_search') ? STUDENT_POOL : [];
   const best = jobs.map(j => ({ job: j, top: rankCandidates(pool, j)[0] })).filter(x => x.top);
   const avg = best.length ? Math.round(best.reduce((s, x) => s + x.top.report.score, 0) / best.length) : 0;
   const myApps = Store.state.applications.filter(a => {
@@ -1675,9 +1682,12 @@ function viewCompanyDashboard() {
     <div>
       <div class="eyebrow">Şirkət kabineti</div>
       <h1>${esc(co.name)}</h1>
-      <p>${esc(co.sector)} · ${jobs.length} elan · ADNSU tələbə bazasına çıxış</p>
+      <p>${esc(co.sector)} · ${jobs.length} elan · ${companyCanUse('candidate_search') ? 'Talent Pool aktivdir' : 'Əsas HR kabineti'}</p>
     </div>
-    <button class="btn primary" data-act="go" data-view="post">＋ Vakansiya yarat</button>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn" data-act="go" data-view="analytics">◭ HR Analitika</button>
+      <button class="btn primary" data-act="go" data-view="post">＋ Vakansiya yarat</button>
+    </div>
   </div>
 
   <div class="tiles">
@@ -1689,7 +1699,7 @@ function viewCompanyDashboard() {
     <div class="tile"><span class="k">Orta uyğunluq</span><span class="v">${avg}%</span>
       <span class="s">elan üzrə ən yaxşı namizəd</span></div>
     <div class="tile"><span class="k">Müraciətlər</span><span class="v">${myApps.length}</span>
-      <span class="s">${Store.state.invites.length} dəvət göndərilib</span></div>
+      <span class="s">${ownInvites().length} dəvət göndərilib</span></div>
   </div>
 
   <div class="section">
@@ -1714,8 +1724,10 @@ function viewCompanyDashboard() {
             <div style="width:170px;flex:none">${meterHTML(top.report)}</div>
           </div>
         </div>
-      </div>`).join('') || emptyState('Hələ elanınız yoxdur', 'İlk vakansiyanı yaradın.',
-        '<button class="btn sm primary" data-act="go" data-view="post">Vakansiya yarat</button>')}
+      </div>`).join('') || (jobs.length
+        ? emptyState('Uyğun namizəd siyahısı görünmür', companyCanUse('candidate_search') ? 'Hazırda elanlarınıza uyğun namizəd tapılmayıb.' : 'Talent Pool üçün Pro və ya Business paketini seçin.', '<button class="btn sm" data-act="go" data-view="subscription">Paketlərə bax</button>')
+        : emptyState('Hələ elanınız yoxdur', 'İlk vakansiyanı yaradın.',
+          '<button class="btn sm primary" data-act="go" data-view="post">Vakansiya yarat</button>'))}
     </div>
   </div>`;
 }
@@ -2729,13 +2741,16 @@ const VIEWS = {
   },
   company: {
     dashboard: viewCompanyDashboard, vacancies: viewVacancies, post: viewPost,
-    applications: viewCompanyApplications, candidates: viewCandidates, search: viewSearch, invites: viewInvites, profile: viewCompanyProfile,
-    subscription: viewSubscription
+    applications: viewCompanyApplications, candidates: viewCandidates, search: viewEmployerTalentPool,
+    compare: viewEmployerComparison, calendar: viewEmployerCalendar,
+    partnerships: viewEmployerPartnerships, invites: viewInvites, profile: viewCompanyProfile,
+    subscription: viewSubscription, analytics: viewEmployerAnalytics
   },
   admin: {
     dashboard: viewAdminDashboard, approvals: viewApprovals, students: viewAdminStudents,
     companies: viewAdminCompanies, events: viewAdminEvents, analytics: viewAnalytics,
-    reports: viewReports, profile: viewAdminAccount, redeem: viewRedeem
+    reports: viewReports, profile: viewAdminAccount, redeem: viewRedeem,
+    'partnerships-admin': viewEmployerAdminPartnerships
   }
 };
 
@@ -3085,6 +3100,7 @@ document.addEventListener('click', e => {
       /* Şəbəkə və güzəştlər serverdən gəlir — ilk açılışda yüklənir. */
       if (S.view === 'network'  && UI.feed === null)     loadFeed();
       if (S.view === 'benefits' && UI.benefits === null) loadBenefits();
+      EmployerTools.afterNavigate(S.view);
       break;
     }
     case 'theme': {
@@ -3843,6 +3859,7 @@ document.addEventListener('submit', e => {
       UI.cvText = '';
       UI.publicView = 'app';
       render();
+      EmployerTools.afterNavigate(Store.state.view);
       window.scrollTo(0, 0);
       toast(act === 'login-form' ? `Xoş gəldiniz, ${name}` : 'Hesabınız yaradıldı');
       if (Store.mode === 'supabase') startNotificationUpdates();
@@ -4073,5 +4090,6 @@ async function probeBackend() {
 
   UI.booting = false;
   render();
+  if (Auth.isSignedIn()) EmployerTools.afterNavigate(Store.state.view);
   if (online && Auth.isSignedIn()) startNotificationUpdates();
 })();
