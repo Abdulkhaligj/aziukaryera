@@ -31,3 +31,21 @@ Mərhələlər:
 ## Komanda və namizəd bazası
 
 Recruiter sayı paket limitinə bağlıdır. FREE paket yalnız öz müraciətçilərini görür. PRO və BUSINESS paketləri aktiv `candidate_search` hüququ olduqda geniş namizəd axtarışından istifadə edir.
+
+
+## HR analitika (yeni)
+
+Şirkət kabinetinin sol menyusundakı **HR Analitika** səhifəsindən bu göstəricilərə baxın:
+
+- bütün müraciətlərin sayı və son 30 gündə gələn müraciətlər;
+- müsahibə mərhələsində olan və işə qəbul olunmuş namizədlər;
+- müraciətlərin hazırkı mərhələlər üzrə bölgüsü (hər müraciət yalnız bir dəfə sayılır);
+- vakansiya üzrə müraciət, müsahibə və işə qəbul sayı;
+- şirkət profilinin tamamlanması, yayımlanan və təsdiq gözləyən vakansiyalar;
+- Pro və Business planlarında şirkətin **öz vakansiyalarında** tələb etdiyi ən çox təkrarlanan bacarıqlar.
+
+**Məlumat mənbəyi:** hazırkı autentifikasiya sessiyasında şirkətin giriş hüququ olan vakansiyalar və müraciətlər. Bu səhifə heç bir yeni şəxsi məlumat bazası yaratmır və digər şirkətlərin müraciətlərini göstərmir. Rəqəmlər real müraciətlərdən hesablanır; müraciət yoxdursa, sıfır və izahlı boş vəziyyət görünür.
+
+**Vacib:** mərhələlər qrafiki tarixi konversiya funnel-i deyil, müraciətlərin hazırkı statuslarına görə bölgüsüdür. Göstəricilər yalnız hesabınızın məlumatları yükləndiyi an üçün keçərlidir.
+
+Paket hüququna görə namizəd axtarışı yalnız aktiv Pro və Business abunəliklərində açılır. Ödəniş və abunə təsdiqi hələ də mövcud admin/Supabase mexanizmləri tərəfindən həyata keçirilir.
