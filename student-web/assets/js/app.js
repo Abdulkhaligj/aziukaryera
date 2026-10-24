@@ -239,9 +239,12 @@ const NAV = {
     { id: 'analytics', label: 'HR Analitika',     ico: '◭' },
     { group: 'Namizədlər' },
     { id: 'candidates', label: 'Namizəd uyğunluğu', ico: '◎' },
-    { id: 'search',     label: 'Namizəd axtarışı',  ico: '⌕' },
+    { id: 'search',     label: 'Geniş Talent Pool',  ico: '⌕' },
+    { id: 'compare',    label: 'CV müqayisəsi',     ico: '▤' },
     { id: 'invites',    label: 'Müsahibə dəvətləri', ico: '◐' },
+    { id: 'calendar',   label: 'Müsahibə təqvimi',  ico: '◷' },
     { group: 'Şirkət' },
+    { id: 'partnerships', label: 'ADNSU əməkdaşlığı', ico: '◇' },
     { id: 'profile',    label: 'Şirkət profili',    ico: '☰' },
     { id: 'subscription', label: 'Paket və limitlər', ico: '◇' }
   ],
@@ -251,6 +254,7 @@ const NAV = {
     { id: 'approvals', label: 'Elan təsdiqi',    ico: '✓' },
     { id: 'students',  label: 'Tələbələr',       ico: '☰' },
     { id: 'companies', label: 'Şirkətlər',       ico: '▤' },
+    { id: 'partnerships-admin', label: 'Əməkdaşlıq sorğuları', ico: '◇' },
     { id: 'events',    label: 'Tədbirlər',       ico: '◷' },
     { id: 'redeem',    label: 'QR təsdiqi',      ico: '✓' },
     { group: 'Hesabatlar' },
@@ -2737,13 +2741,16 @@ const VIEWS = {
   },
   company: {
     dashboard: viewCompanyDashboard, vacancies: viewVacancies, post: viewPost,
-    applications: viewCompanyApplications, candidates: viewCandidates, search: viewSearch, invites: viewInvites, profile: viewCompanyProfile,
+    applications: viewCompanyApplications, candidates: viewCandidates, search: viewEmployerTalentPool,
+    compare: viewEmployerComparison, calendar: viewEmployerCalendar,
+    partnerships: viewEmployerPartnerships, invites: viewInvites, profile: viewCompanyProfile,
     subscription: viewSubscription, analytics: viewEmployerAnalytics
   },
   admin: {
     dashboard: viewAdminDashboard, approvals: viewApprovals, students: viewAdminStudents,
     companies: viewAdminCompanies, events: viewAdminEvents, analytics: viewAnalytics,
-    reports: viewReports, profile: viewAdminAccount, redeem: viewRedeem
+    reports: viewReports, profile: viewAdminAccount, redeem: viewRedeem,
+    'partnerships-admin': viewEmployerAdminPartnerships
   }
 };
 
@@ -3093,6 +3100,7 @@ document.addEventListener('click', e => {
       /* Şəbəkə və güzəştlər serverdən gəlir — ilk açılışda yüklənir. */
       if (S.view === 'network'  && UI.feed === null)     loadFeed();
       if (S.view === 'benefits' && UI.benefits === null) loadBenefits();
+      EmployerTools.afterNavigate(S.view);
       break;
     }
     case 'theme': {
