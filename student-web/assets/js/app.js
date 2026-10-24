@@ -3859,6 +3859,7 @@ document.addEventListener('submit', e => {
       UI.cvText = '';
       UI.publicView = 'app';
       render();
+      EmployerTools.afterNavigate(Store.state.view);
       window.scrollTo(0, 0);
       toast(act === 'login-form' ? `Xoş gəldiniz, ${name}` : 'Hesabınız yaradıldı');
       if (Store.mode === 'supabase') startNotificationUpdates();
@@ -4089,5 +4090,6 @@ async function probeBackend() {
 
   UI.booting = false;
   render();
+  if (Auth.isSignedIn()) EmployerTools.afterNavigate(Store.state.view);
   if (online && Auth.isSignedIn()) startNotificationUpdates();
 })();
