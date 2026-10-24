@@ -1,10 +1,11 @@
-const CACHE_NAME = 'adnsu-career-shell-20261016b';
+const CACHE_NAME = 'adnsu-career-shell-mentor-20261022';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
   '/assets/css/styles.css?v=20261016b',
   '/assets/css/landing.css?v=20261016b',
+  '/assets/css/mentor.css?v=20261022m2',
   '/assets/js/config.js?v=20261016a',
   '/assets/js/data.js?v=20261016a',
   '/assets/js/match.js?v=20261016a',
@@ -16,6 +17,7 @@ const APP_SHELL = [
   '/assets/js/auth.js?v=20261016a',
   '/assets/js/landing.js?v=20261016a',
   '/assets/js/app.js?v=20261016a',
+  '/assets/js/mentor.js?v=20261022m2',
   '/assets/js/pwa.js?v=20261016a',
   '/assets/icons/app-icon-192.png',
   '/assets/icons/app-icon-512.png',
