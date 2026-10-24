@@ -201,6 +201,8 @@ create trigger company_interview_slots_notify
 revoke all on function public.company_employer_record_guard() from public,anon,authenticated;
 revoke all on function public.notify_company_interview_slot() from public,anon,authenticated;
 
+revoke all on public.company_interview_slots from public,anon,authenticated;
+revoke all on public.company_partnership_requests from public,anon,authenticated;
 grant select,insert,update on public.company_interview_slots to authenticated;
 grant select,insert,update on public.company_partnership_requests to authenticated;
 
