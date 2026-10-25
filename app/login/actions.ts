@@ -15,9 +15,10 @@ export async function login(formData: FormData) {
       : 'E-poçt və ya şifrə yanlışdır.';
     redirect('/login?error=' + encodeURIComponent(message) + '&email=' + encodeURIComponent(email));
   }
-  /* Admin rolu olmayan hesab bu panelə girə bilməz */
+  /* Reject every non-admin role, including forged/unknown role labels. */
+  const allowedAdminRoles = ['super_admin', 'manager', 'editor', 'reviewer'] as const;
   const role = data.user?.app_metadata?.admin_role;
-  if (!role) {
+  if (!allowedAdminRoles.includes(role)) {
     await supabase.auth.signOut();
     redirect('/login?error=' + encodeURIComponent('Bu hesabın admin paneldə səlahiyyəti yoxdur.'));
   }
