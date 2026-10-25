@@ -20,10 +20,14 @@ export async function reviewPartnership(formData: FormData): Promise<void> {
     redirect('/admin/partnerships?result=invalid');
   }
 
-  const { error } = await ctx.supabase.from('company_partnership_requests')
+  // UPDATE can affect zero rows under RLS without returning an error.
+  // Verify the exact row was updated before showing a success notice.
+  const { data, error } = await ctx.supabase.from('company_partnership_requests')
     .update({ status, admin_note: adminNote })
-    .eq('id', id);
-  if (error) {
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (error || !data) {
     redirect('/admin/partnerships?result=error');
   }
   revalidatePath('/admin/partnerships');
