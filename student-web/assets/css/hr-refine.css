@@ -1,0 +1,16 @@
+/* ADNSU Karyera HR refinement. Uses existing colors/spacing. */
+.hr-ux-panel{margin:22px 0 16px;padding:22px 24px;background:var(--panel,#fff);color:var(--ink,#1c2741);border:1px solid var(--line,#dfe6f2);border-radius:20px;box-shadow:0 8px 26px rgba(24,49,98,.035)}
+.hr-ux-heading h2{font-size:18px;line-height:1.3;letter-spacing:-.02em;margin:0 0 6px;font-weight:750}
+.hr-ux-heading p{font-size:13px;color:var(--muted,#67738b);line-height:1.6;max-width:810px;margin:0 0 18px}
+.hr-ux-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.hr-ux-stat{border:1px solid var(--line,#e0e7f3);background:var(--surface,#f8faff);border-radius:15px;padding:17px 16px;min-width:0;display:flex;flex-direction:column;align-items:flex-start}
+.hr-ux-stat>span{font-size:12px;color:var(--muted,#64718b);font-weight:650;line-height:1.5}
+.hr-ux-stat>strong{font-size:29px;line-height:1.3;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--blue,#173ca0);margin:5px 0}
+.hr-ux-stat>small{font-size:11px;color:var(--muted,#65708a);line-height:1.4}
+.hr-ux-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:17px}
+.hr-ux-actions>.btn{font-size:12px;font-weight:650;min-height:37px;border-radius:12px}
+.hr-ux-note{background:var(--surface,#f6f8fe);border:1px solid var(--line,#e0e7f3);border-radius:12px;padding:15px;font-size:12px;line-height:1.7;color:var(--muted,#4e5e78);margin-top:16px}
+.rail a[data-view="invites"] .ico,.rail a[data-view="hr-analytics"] .ico,.rail a[data-view="partnerships"] .ico,.rail a[data-view="calendar"] .ico,.rail a[data-view="talent-pool"] .ico,.rail a[data-view="compare"] .ico{display:inline-flex;align-items:center;justify-content:center}
+.rail a[data-view] .ico>svg{flex-shrink:0}
+@media(max-width:780px){.hr-ux-panel{padding:18px}.hr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.hr-ux-stat>strong{font-size:25px}}
+@media(max-width:390px){.hr-ux-stats{grid-template-columns:1fr 1fr;gap:8px}.hr-ux-stat{padding:12px}.hr-ux-panel{padding:13px;border-radius:14px}}
