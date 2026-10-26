@@ -1,0 +1,271 @@
+/*!
+ * ADNSU Career – bidirectional interview requests (students -> employers).
+ * Additive SPA extension: does not overwrite original app.js, HR calendar, CV,
+ * vacancies, applications or company portal design. Server RLS/RPC enforce roles.
+ */
+(() => {
+  'use strict';
+  if (typeof NAV === 'undefined' || typeof VIEWS === 'undefined' ||
+      typeof Backend === 'undefined' || typeof Store === 'undefined' ||
+      typeof Auth === 'undefined') return;
+
+  const client = {
+    rows: [],
+    loaded: false,
+    loading: false,
+    saving: false,
+    error: '',
+    identity: '',
+    calendarApplication: null,
+    reset() {
+      const current=String(Store.state?.session?.userId || Auth.currentUser()?.id || '');
+      if (current===this.identity) return;
+      this.identity=current;
+      this.rows=[]; this.loaded=false; this.loading=false; this.saving=false;
+      this.error=''; this.calendarApplication=null;
+    },
+    async load(force=false) {
+      this.reset();
+      if (this.loading || (!force && this.loaded)) return;
+      if (Store.mode !== 'supabase' || !Backend.init()) {
+        this.error='Serverə bağlı hesab tələb olunur. Demo rejimində sorğu göndərilmir.';
+        this.loaded=true; this.repaint(); return;
+      }
+      this.loading=true; this.error=''; this.repaint();
+      try {
+        const {data,error}=await Backend.sb.from('interview_requests')
+          .select('id,application_id,student_id,company_id,status,message,reply_note,scheduled_slot_id,created_at,updated_at')
+          .order('created_at',{ascending:false}).limit(200);
+        if (error) throw error;
+        this.rows=data||[]; this.loaded=true;
+      } catch(error) {
+        this.error=Backend.translate?.(error.message)||error.message||'Sorğular yüklənmədi.';
+      } finally { this.loading=false; this.repaint(); }
+    },
+    repaint() {
+      const view=Store.state?.view;
+      if (['interview-requests','interview-inbox'].includes(view) && typeof render==='function') render();
+    },
+    async rpc(name,fields) {
+      if (this.saving || Store.mode!=='supabase' || !Backend.init()) return;
+      this.saving=true; this.error=''; this.repaint();
+      try {
+        const {error}=await Backend.sb.rpc(name,fields);
+        if(error) throw error;
+        if(typeof toast==='function') toast('Müsahibə sorğusu yeniləndi');
+        this.loaded=false;
+        this.saving=false;
+        await this.load(true);
+        if (typeof Backend.notificationsFeed==='function') {
+          const note=await Backend.notificationsFeed();
+          if(note.ok && Array.isArray(note.rows)) {
+            Store.state.notifications=note.rows;
+            this.repaint();
+          }
+        }
+      } catch(error) {
+        this.error=Backend.translate?.(error.message)||error.message||'Əməliyyat tamamlanmadı.';
+        if(typeof toast==='function') toast(this.error);
+      } finally { this.saving=false; this.repaint(); }
+    },
+    ownedApplications() {
+      const role=Auth.currentUser()?.role;
+      const applications=Store.state?.applications||[];
+      if(role==='student') return applications.filter(a=>a.id && a.studentId===Store.state?.session?.userId);
+      if(role==='company') {
+        const jobs=new Set((typeof Store.companyJobs==='function'?Store.companyJobs():[]).map(j=>String(j.id)));
+        return applications.filter(a=>a.id && jobs.has(String(a.jobId)));
+      }
+      return [];
+    }
+  };
+
+  const escapeHTML = input => typeof esc==='function'?esc(String(input??'')):String(input??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const E=escapeHTML;
+  const statuses={
+    pending:['Cavab gözlənilir','warn'],
+    accepted:['Qəbul edildi','good'],
+    declined:['İmtina edildi','bad'],
+    scheduled:['Görüş təyin olundu','good'],
+    cancelled:['Ləğv edilib','line']
+  };
+  const chip = status => {
+    const [label,tone]=statuses[status]||[status||'—','line'];
+    return '<span class="chip '+tone+'">'+E(label)+'</span>';
+  };
+  const heading=(label,title,caption)=>'<div class="page-head"><div><div class="eyebrow">'+label+'</div><h1>'+title+'</h1><p>'+caption+'</p></div><button type="button" class="btn" data-ir-refresh="1" aria-label="Sorğuları yenilə">Yenilə</button></div>';
+  const note=()=>{
+    if(client.error) return '<div class="note warn" role="alert">'+E(client.error)+'</div>';
+    if(client.loading) return '<div class="note">Məlumatlar yüklənir…</div>';
+    if(Store.mode!=='supabase')return '<div class="note warn">Müsahibə sorğuları yalnız giriş edilmiş real hesabla işləyir.</div>';
+    return '';
+  };
+  const jobName=a=>E(Store.jobById(a?.jobId)?.title||a?.jobTitle||'Vakansiya');
+  const companyName=a=>{
+    const job=Store.jobById(a?.jobId);
+    return E(job && typeof companyOf==='function' ? companyOf(job.companyId)?.name : 'Şirkət');
+  };
+  const displayDate=iso=>iso?new Date(iso).toLocaleString('az-AZ',{timeZone:'Asia/Baku',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  const summary=()=>{
+    const keys=['pending','accepted','scheduled','declined'];
+    return '<div class="ir-metrics">'+keys.map(k=>'<div class="card ir-tile"><span>'+E(statuses[k][0])+'</span><b>'+client.rows.filter(x=>x.status===k).length+'</b></div>').join('')+'</div>';
+  };
+
+  function studentView() {
+    client.reset();
+    const applications=client.ownedApplications();
+    const byApp=new Map(client.rows.map(row=>[String(row.application_id),row]));
+    return heading('Tələbə · Karyera','Müsahibə sorğularım','Müraciət etdiyiniz vakansiyalar üçün şirkətdən müsahibə istəyə bilərsiniz.')+note()+summary()+
+      (!applications.length?'<div class="card ir-panel"><h2>Aktiv müraciət yoxdur</h2><p>Əvvəl vakansiyaya müraciət edin.</p><button class="btn primary" data-act="go" data-view="jobs">Vakansiyalara bax</button></div>':
+        '<div class="ir-list">'+applications.map(a=>{
+          const existing=byApp.get(String(a.id));
+          const canRequest=!existing||['declined','cancelled'].includes(existing.status);
+          return '<article class="card ir-panel">'+
+            '<div class="ir-top"><div><div class="eyebrow">'+companyName(a)+'</div><h2>'+jobName(a)+'</h2>'+
+            '<p>Vakansiya üzrə müraciət · '+E(a.status||'')+'</p></div>'+
+            (existing?chip(existing.status):'<span class="chip line">Sorğu göndərilməyib</span>')+'</div>'+
+            (existing?.reply_note?'<p class="ir-reply"><b>Şirkətin cavabı:</b> '+E(existing.reply_note)+'</p>':'')+
+            (existing?.status==='scheduled'?'<p class="ir-success">Görüş vaxtı təyin olunub. Müraciətlərim və bildirişlər bölməsinə baxın.</p>':'')+
+            (canRequest && Store.mode==='supabase'?'<form data-ir-form="student" class="ir-form">'+
+              '<input type="hidden" name="application_id" value="'+E(a.id)+'">'+
+              '<label for="ir-'+E(a.id)+'">Şirkətə mesaj (istəyə bağlı)</label>'+
+              '<textarea id="ir-'+E(a.id)+'" name="message" maxlength="1000" rows="3" placeholder="Bu vəzifə üzrə müsahibədə iştirak etmək istərdim."></textarea>'+
+              '<button type="submit" class="btn primary"'+(client.saving?' disabled':'')+'>Müsahibə sorğusu göndər</button></form>':'')+
+            (existing && ['pending','accepted'].includes(existing.status)?'<div class="ir-actions"><button type="button" class="btn sm danger" data-ir-cancel="'+E(existing.id)+'"'+(client.saving?' disabled':'')+'>Sorğunu geri götür</button></div>':'')+
+            '</article>';
+        }).join('')+'</div>');
+  }
+
+  function companyView() {
+    client.reset();
+    const owned=new Map(client.ownedApplications().map(a=>[String(a.id),a]));
+    const companyId=Store.state?.company?.id;
+    const rows=client.rows.filter(row=>String(row.company_id)===String(companyId) && owned.has(String(row.application_id)));
+    const stats=()=>{
+      const keys=['pending','accepted','scheduled','declined'];
+      return '<div class="ir-metrics">'+keys.map(k=>'<div class="card ir-tile"><span>'+E(statuses[k][0])+'</span><b>'+rows.filter(x=>x.status===k).length+'</b></div>').join('')+'</div>';
+    };
+    return heading('Şirkət · HR kabineti','Müsahibə sorğuları','Tələbələrin göndərdiyi sorğuları nəzərdən keçirin, qəbul edin və görüş vaxtı planlaşdırın.')+
+      note()+stats()+
+      (!rows.length?'<div class="card ir-panel"><h2>Hələ müsahibə sorğusu yoxdur</h2><p>Tələbələr vakansiyalarınıza müraciət edib müsahibə istədikdə sorğular burada görünəcək.</p><button type="button" class="btn sm" data-act="go" data-view="applications">Müraciətlərə bax</button></div>':
+      '<div class="ir-list">'+rows.map(row=>{
+        const a=owned.get(String(row.application_id));
+        const s=(typeof STUDENT_POOL!=='undefined'&&STUDENT_POOL.find(x=>String(x.id)===String(row.student_id)))||{};
+        const name=s.name||'Namizəd';
+        return '<article class="card ir-panel">'+
+          '<div class="ir-top"><div><div class="eyebrow">Tələbə müraciəti · '+E(displayDate(row.created_at))+'</div>'+
+          '<h2>'+E(name)+'</h2><p>'+jobName(a)+'</p></div>'+chip(row.status)+'</div>'+
+          (row.message?'<blockquote class="ir-student-message">'+E(row.message)+'</blockquote>':'')+
+          (row.reply_note?'<p class="ir-reply"><b>HR qeydi:</b> '+E(row.reply_note)+'</p>':'')+
+          (row.status==='pending'?'<form class="ir-form" data-ir-form="respond">'+
+            '<input type="hidden" name="request_id" value="'+E(row.id)+'">'+
+            '<label>Namizədə cavab (istəyə bağlı)</label><textarea name="reply_note" maxlength="1000" rows="2" placeholder="Namizədə qısa məlumat"></textarea>'+
+            '<div class="ir-actions"><button type="submit" name="decision" value="accepted" class="btn primary"'+(client.saving?' disabled':'')+'>Sorğunu qəbul et</button>'+
+            '<button type="submit" name="decision" value="declined" class="btn danger"'+(client.saving?' disabled':'')+'>İmtina et</button></div></form>':'')+
+          (row.status==='accepted'?'<div class="ir-actions"><button type="button" class="btn primary" data-ir-calendar="'+E(row.application_id)+'">Təqvimdə vaxt təyin et</button></div>':'')+
+          (row.status==='scheduled'?'<p class="ir-success">Müsahibə planlaşdırılıb; tələbəyə bildiriş göndərilib.</p>':'')+
+          '</article>';
+      }).join('')+'</div>');
+  }
+
+  function addNav(role,anchor,id,label,ico) {
+    if(!NAV[role] || NAV[role].some(x=>x.id===id))return;
+    const index=NAV[role].findIndex(x=>x.id===anchor);
+    NAV[role].splice(index<0?NAV[role].length:index+1,0,{id,label,ico});
+  }
+  addNav('student','applications','interview-requests','Müsahibə sorğularım','◷');
+  addNav('company','invites','interview-inbox','Müsahibə sorğuları','✉');
+  VIEWS.student['interview-requests']=studentView;
+  VIEWS.company['interview-inbox']=companyView;
+
+  // Make new flow discoverable from the existing pages without rewriting them.
+  if(typeof VIEWS.student.applications==='function') {
+    const old=VIEWS.student.applications;
+    VIEWS.student.applications=function(){
+      return old()+ '<div class="ir-inline-promo"><div><strong>Şirkətdən müsahibə istəyin</strong><p>Müraciət etdiyiniz vakansiya üzrə müsahibə sorğusu göndərə bilərsiniz.</p></div>'+
+        '<button type="button" class="btn sm primary" data-act="go" data-view="interview-requests">Sorğularım</button></div>';
+    };
+  }
+  if(typeof VIEWS.company.invites==='function') {
+    const old=VIEWS.company.invites;
+    VIEWS.company.invites=function(){
+      return old()+ '<div class="ir-inline-promo"><div><strong>Tələbələrdən gələn sorğular</strong><p>Tələbənin təşəbbüsü ilə göndərilən görüş istəklərinə baxın.</p></div>'+
+      '<button type="button" class="btn sm primary" data-act="go" data-view="interview-inbox">Sorğuları aç</button></div>';
+    };
+  }
+
+  // Existing calendar schedules interviews by application_id. Prefill selected
+  // request's application without touching its form handler or sending extra data.
+  if(typeof VIEWS.company.calendar==='function'){
+    const old=VIEWS.company.calendar;
+    VIEWS.company.calendar=function(){
+      let html=old();
+      const id=client.calendarApplication;
+      if(id && /^[0-9a-f-]{36}$/i.test(id)) {
+        html=html.replace('value="'+id+'"','value="'+id+'" selected');
+      }
+      return html;
+    };
+  }
+
+  const menuIcons={
+    'interview-requests':'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+    'interview-inbox':'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="m2 8 10 6 10-6"/><path d="M16 3l2-2 2 2"/>'
+  };
+  function drawIcons(){
+    const root=document.getElementById('root'); if(!root)return;
+    root.querySelectorAll('.rail a[data-view]').forEach(link=>{
+      const name=link.dataset.view,slot=link.querySelector('.ico');
+      if(!slot||!menuIcons[name]||slot.dataset.irIcon===name)return;
+      slot.innerHTML='<svg class="adnsu-svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+menuIcons[name]+'</svg>';
+      slot.dataset.irIcon=name;slot.dataset.svgIcon=name;
+    });
+  }
+  const root=document.getElementById('root');
+  if(root){new MutationObserver(drawIcons).observe(root,{childList:true});drawIcons();}
+
+  document.addEventListener('click',async event=>{
+    const nav=event.target.closest('[data-act="go"][data-view]');
+    if(nav && ['interview-requests','interview-inbox'].includes(nav.dataset.view)){
+      Promise.resolve().then(()=>client.load(true));
+    }
+    if(event.target.closest('[data-ir-refresh]')){client.load(true);return;}
+    const cancel=event.target.closest('[data-ir-cancel]');
+    if(cancel){
+      if(!window.confirm('Müsahibə sorğusunu geri götürmək istəyirsiniz?'))return;
+      await client.rpc('cancel_interview_request',{p_request_id:cancel.dataset.irCancel});
+      return;
+    }
+    const calendar=event.target.closest('[data-ir-calendar]');
+    if(calendar){
+      const appId=String(calendar.dataset.irCalendar||'');
+      if(!client.ownedApplications().some(a=>String(a.id)===appId))return;
+      client.calendarApplication=appId;
+      Store.state.view='calendar';Store.save();render();window.scrollTo(0,0);
+      if(typeof EmployerTools!=='undefined')EmployerTools.afterNavigate('calendar');
+    }
+  });
+
+  // Use the native submitter to distinguish accept/decline on a single form.
+  document.addEventListener('submit',async event=>{
+    const form=event.target.closest('[data-ir-form]');
+    if(!form)return;
+    event.preventDefault();
+    if(client.saving)return;
+    const data=new FormData(form),val=name=>String(data.get(name)||'').trim();
+    if(form.dataset.irForm==='student'){
+      const applicationId=val('application_id');
+      if(!client.ownedApplications().some(a=>String(a.id)===applicationId))return;
+      await client.rpc('create_interview_request',{p_application_id:applicationId,p_message:val('message')});
+    } else if(form.dataset.irForm==='respond'){
+      const choice=event.submitter?.value;
+      if(!['accepted','declined'].includes(choice))return;
+      await client.rpc('respond_interview_request',{
+        p_request_id:val('request_id'),p_decision:choice,p_reply_note:val('reply_note')
+      });
+    }
+  });
+  window.addEventListener('load',()=>setTimeout(()=>{
+    if(['interview-requests','interview-inbox'].includes(Store.state?.view))client.load(true);
+  },1700),{once:true});
+})();
