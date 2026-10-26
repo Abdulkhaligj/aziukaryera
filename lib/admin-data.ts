@@ -191,7 +191,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     return (data || []).map((row: any) => ({ id: row.id, title: row.reason, subtitle: `${row.target_type} · ${row.profiles?.full_name || 'İstifadəçi'}`, status: row.status === 'resolved' || row.status === 'dismissed' ? 'Bitib' : row.status === 'reviewing' ? 'Yoxlamada' : 'Aktiv', meta: row.details || String(row.target_id), updatedAt: dateLabel(row.created_at), fields: { status: row.status } }));
   }
   if (resource === 'subscriptions') {
-    const { data, error } = await supabase.from('subscriptions').select('id,plan_id,status,requested_at,starts_at,ends_at,companies(name),plans(name,monthly_price)').order('requested_at', { ascending: false });
+    const { data, error } = await supabase.from('subscriptions').select('id,plan_id,status,requested_at,starts_at,ends_at,companies(name),plans!subscriptions_plan_id_fkey(name,monthly_price)').order('requested_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.companies?.name || 'Şirkət', subtitle: `${row.plans?.name || row.plan_id} · ${row.plans?.monthly_price ?? 0} AZN/ay`, status: row.status === 'active' ? 'Aktiv' : row.status === 'pending' ? 'Yoxlamada' : 'Bitib', meta: row.ends_at ? `Bitmə: ${dateLabel(row.ends_at)}` : 'Aylıq paket', updatedAt: dateLabel(row.requested_at), fields: { plan_id: row.plan_id, status: row.status } }));
   }
