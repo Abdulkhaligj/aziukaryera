@@ -147,9 +147,49 @@
     return E(job && typeof companyOf==='function' ? companyOf(job.companyId)?.name : 'Şirkət');
   };
   const displayDate=iso=>iso?new Date(iso).toLocaleString('az-AZ',{timeZone:'Asia/Baku',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  const slotsFor=applicationId=>client.slots.filter(slot=>String(slot.application_id)===String(applicationId));
+  const hasScheduled=slots=>slots.some(slot=>slot.status==='scheduled');
+  const effectiveStatus=(request,slots)=>hasScheduled(slots)?'scheduled':(request?.status||null);
+  const appointmentDetails=slots=>{
+    if(!slots.length)return '';
+    const mode={on_site:'Əyani',online:'Onlayn',phone:'Telefon'};
+    const labels={scheduled:'Planlaşdırılıb',completed:'Tamamlanıb',cancelled:'Ləğv edilib'};
+    return '<section class="ir-appointments" aria-label="Görüş məlumatları">'+
+      '<h3>Görüş məlumatları <small>('+slots.length+' görüş)</small></h3>'+
+      slots.slice().sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at)).map((slot,i)=>{
+        let secureLink='';
+        try {
+          const url=new URL(slot.meeting_url||'');
+          if(url.protocol==='https:')secureLink='<a class="ir-meeting-link" href="'+E(url.href)+'" target="_blank" rel="noopener noreferrer">Görüş linkini aç ↗</a>';
+        }catch(_error){/* Do not render invalid or unsafe links. */}
+        const details=[
+          ['Tarix və saat',displayDate(slot.starts_at)],
+          ['Müddət',String(slot.duration_minutes||45)+' dəqiqə'],
+          ['Format',mode[slot.meeting_mode]||slot.meeting_mode||'—'],
+          ['Məkan',slot.location||'Göstərilməyib'],
+          ['Status',labels[slot.status]||slot.status||'—']
+        ];
+        return '<article class="ir-appointment">'+
+          '<div class="ir-appointment-head"><strong>Görüş '+(slots.length-i)+'</strong><span class="chip '+(slot.status==='scheduled'?'good':'line')+'">'+E(labels[slot.status]||slot.status||'—')+'</span></div>'+
+          '<dl class="ir-details">'+details.map(([label,value])=>'<div><dt>'+E(label)+'</dt><dd>'+E(value)+'</dd></div>').join('')+'</dl>'+
+          (slot.meeting_mode==='online' && secureLink?'<div class="ir-slot-link">'+secureLink+'</div>':'')+
+          (slot.meeting_mode==='online'&&!secureLink?'<div class="ir-help">Onlayn görüş linki hələ daxil edilməyib.</div>':'')+
+          (slot.notes?'<div class="ir-notes"><b>Görüş qeydi:</b> '+E(slot.notes)+'</div>':'')+
+          '</article>';
+      }).join('')+'</section>';
+  };
   const summary=()=>{
     const keys=['pending','accepted','scheduled','declined'];
-    return '<div class="ir-metrics">'+keys.map(k=>'<div class="card ir-tile"><span>'+E(statuses[k][0])+'</span><b>'+client.rows.filter(x=>x.status===k).length+'</b></div>').join('')+'</div>';
+    const current=client.rows.map(r=>({...r,status:effectiveStatus(r,slotsFor(r.application_id))}));
+    // Also count appointments initiated directly by companies, with no request.
+    const requests=new Set(current.map(r=>String(r.application_id)));
+    client.slots.filter(s=>!requests.has(String(s.application_id))).forEach(s=>{
+      if(!requests.has(String(s.application_id))) {
+        requests.add(String(s.application_id));
+        current.push({status:'scheduled'});
+      }
+    });
+    return '<div class="ir-metrics">'+keys.map(k=>'<div class="card ir-tile"><span>'+E(statuses[k][0])+'</span><b>'+current.filter(x=>x.status===k).length+'</b></div>').join('')+'</div>';
   };
 
   function studentView() {
@@ -160,13 +200,16 @@
       (!applications.length?'<div class="card ir-panel"><h2>Aktiv müraciət yoxdur</h2><p>Əvvəl vakansiyaya müraciət edin.</p><button class="btn primary" data-act="go" data-view="jobs">Vakansiyalara bax</button></div>':
         '<div class="ir-list">'+applications.map(a=>{
           const existing=byApp.get(String(a.id));
-          const canRequest=!existing||['declined','cancelled'].includes(existing.status);
+          const appointments=slotsFor(a.id);
+          const currentStatus=effectiveStatus(existing,appointments);
+          const canRequest=(!existing||['declined','cancelled'].includes(existing.status))&&!hasScheduled(appointments);
           return '<article class="card ir-panel">'+
             '<div class="ir-top"><div><div class="eyebrow">'+companyName(a)+'</div><h2>'+jobName(a)+'</h2>'+
             '<p>Vakansiya üzrə müraciət · '+E(a.status||'')+'</p></div>'+
-            (existing?chip(existing.status):'<span class="chip line">Sorğu göndərilməyib</span>')+'</div>'+
+            (currentStatus?chip(currentStatus):'<span class="chip line">Sorğu göndərilməyib</span>')+'</div>'+
             (existing?.reply_note?'<p class="ir-reply"><b>Şirkətin cavabı:</b> '+E(existing.reply_note)+'</p>':'')+
-            (existing?.status==='scheduled'?'<p class="ir-success">Görüş vaxtı təyin olunub. Müraciətlərim və bildirişlər bölməsinə baxın.</p>':'')+
+            appointmentDetails(appointments)+
+            (currentStatus==='scheduled'?'<p class="ir-success">Təyin edilmiş görüşlərin tam məlumatları yuxarıda göstərilib.</p>':'')+
             (canRequest && Store.mode==='supabase'?'<form data-ir-form="student" class="ir-form">'+
               '<input type="hidden" name="application_id" value="'+E(a.id)+'">'+
               '<label for="ir-'+E(a.id)+'">Şirkətə mesaj (istəyə bağlı)</label>'+
@@ -181,32 +224,63 @@
     client.reset();
     const owned=new Map(client.ownedApplications().map(a=>[String(a.id),a]));
     const companyId=Store.state?.company?.id;
-    const rows=client.rows.filter(row=>String(row.company_id)===String(companyId) && owned.has(String(row.application_id)));
+    // A calendar entry can be created without a student-originated request.
+    // Show those meetings too, while relying on the server's SELECT RLS.
+    const byApp=new Map(client.rows
+      .filter(row=>String(row.company_id)===String(companyId))
+      .map(row=>[String(row.application_id),row]));
+    client.slots.forEach(slot=>{
+      const key=String(slot.application_id),a=owned.get(key);
+      if(a&&!byApp.has(key)) {
+        byApp.set(key,{id:null,application_id:slot.application_id,
+          student_id:a.studentId,company_id:companyId,status:'scheduled',
+          message:'',reply_note:'',created_at:slot.created_at});
+      }
+    });
+    const rows=[...byApp.values()].sort((a,b)=>
+      new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0));
     const stats=()=>{
       const keys=['pending','accepted','scheduled','declined'];
-      return '<div class="ir-metrics">'+keys.map(k=>'<div class="card ir-tile"><span>'+E(statuses[k][0])+'</span><b>'+rows.filter(x=>x.status===k).length+'</b></div>').join('')+'</div>';
+      return '<div class="ir-metrics">'+keys.map(k=>
+        '<div class="card ir-tile"><span>'+E(statuses[k][0])+'</span><b>'+
+        rows.filter(row=>effectiveStatus(row,slotsFor(row.application_id))===k).length+
+        '</b></div>').join('')+'</div>';
     };
-    return heading('Şirkət · HR kabineti','Müsahibə sorğuları','Tələbələrin göndərdiyi sorğuları nəzərdən keçirin, qəbul edin və görüş vaxtı planlaşdırın.')+
+    return heading('Şirkət · HR kabineti','Müsahibə sorğuları və görüşlər',
+      'Namizəd sorğularını cavablandırın və təqvimdə planlaşdırılmış bütün görüşlərin məlumatlarına baxın.')+
       note()+stats()+
-      (!rows.length?'<div class="card ir-panel"><h2>Hələ müsahibə sorğusu yoxdur</h2><p>Tələbələr vakansiyalarınıza müraciət edib müsahibə istədikdə sorğular burada görünəcək.</p><button type="button" class="btn sm" data-act="go" data-view="applications">Müraciətlərə bax</button></div>':
-      '<div class="ir-list">'+rows.map(row=>{
-        const a=owned.get(String(row.application_id));
-        const s=(typeof STUDENT_POOL!=='undefined'&&STUDENT_POOL.find(x=>String(x.id)===String(row.student_id)))||{};
-        const name=s.name||'Namizəd';
-        return '<article class="card ir-panel">'+
-          '<div class="ir-top"><div><div class="eyebrow">Tələbə müraciəti · '+E(displayDate(row.created_at))+'</div>'+
-          '<h2>'+E(name)+'</h2><p>'+jobName(a)+'</p></div>'+chip(row.status)+'</div>'+
-          (row.message?'<blockquote class="ir-student-message">'+E(row.message)+'</blockquote>':'')+
-          (row.reply_note?'<p class="ir-reply"><b>HR qeydi:</b> '+E(row.reply_note)+'</p>':'')+
-          (row.status==='pending'?'<form class="ir-form" data-ir-form="respond">'+
-            '<input type="hidden" name="request_id" value="'+E(row.id)+'">'+
-            '<label>Namizədə cavab (istəyə bağlı)</label><textarea name="reply_note" maxlength="1000" rows="2" placeholder="Namizədə qısa məlumat"></textarea>'+
-            '<div class="ir-actions"><button type="submit" name="decision" value="accepted" class="btn primary"'+(client.saving?' disabled':'')+'>Sorğunu qəbul et</button>'+
-            '<button type="submit" name="decision" value="declined" class="btn danger"'+(client.saving?' disabled':'')+'>İmtina et</button></div></form>':'')+
-          (row.status==='accepted'?'<div class="ir-actions"><button type="button" class="btn primary" data-ir-calendar="'+E(row.application_id)+'">Təqvimdə vaxt təyin et</button></div>':'')+
-          (row.status==='scheduled'?'<p class="ir-success">Müsahibə planlaşdırılıb; tələbəyə bildiriş göndərilib.</p>':'')+
-          '</article>';
-      }).join('')+'</div>');
+      (!rows.length?'<div class="card ir-panel"><h2>Hələ müsahibə sorğusu və ya görüş yoxdur</h2>'+
+        '<p>Şirkətə göndərilən sorğular və təqvimdə yaradılan görüşlər burada görünəcək.</p>'+
+        '<button type="button" class="btn sm" data-act="go" data-view="calendar">Müsahibə təqvimi</button></div>':
+        '<div class="ir-list">'+rows.map(row=>{
+          const a=owned.get(String(row.application_id));
+          const student=(typeof STUDENT_POOL!=='undefined'&&STUDENT_POOL.find(x=>
+            String(x.id)===String(row.student_id)))||{};
+          const name=client.names[String(row.student_id)]||student.name||'Namizəd';
+          const appointments=slotsFor(row.application_id);
+          const currentStatus=effectiveStatus(row,appointments);
+          return '<article class="card ir-panel">'+
+            '<div class="ir-top"><div><div class="eyebrow">Namizəd · '+
+              E(displayDate(row.created_at))+'</div>'+
+              '<h2>'+E(name)+'</h2><p>'+jobName(a)+'</p></div>'+
+              chip(currentStatus)+'</div>'+
+            (row.message?'<blockquote class="ir-student-message">'+E(row.message)+'</blockquote>':'')+
+            (row.reply_note?'<p class="ir-reply"><b>HR qeydi:</b> '+E(row.reply_note)+'</p>':'')+
+            appointmentDetails(appointments)+
+            (row.id && row.status==='pending' && !hasScheduled(appointments)?
+              '<form class="ir-form" data-ir-form="respond">'+
+              '<input type="hidden" name="request_id" value="'+E(row.id)+'">'+
+              '<label>Namizədə cavab (istəyə bağlı)</label>'+
+              '<textarea name="reply_note" maxlength="1000" rows="2" placeholder="Namizədə qısa məlumat"></textarea>'+
+              '<div class="ir-actions"><button type="submit" name="decision" value="accepted" class="btn primary"'+(client.saving?' disabled':'')+'>Sorğunu qəbul et</button>'+
+              '<button type="submit" name="decision" value="declined" class="btn danger"'+(client.saving?' disabled':'')+'>İmtina et</button></div></form>':'')+
+            (currentStatus==='accepted'?
+              '<div class="ir-actions"><button type="button" class="btn primary" data-ir-calendar="'+
+              E(row.application_id)+'">Təqvimdə vaxt təyin et</button></div>':'')+
+            (currentStatus==='scheduled'?
+              '<div class="ir-actions"><button type="button" class="btn sm" data-act="go" data-view="calendar">Təqvimə keç</button></div>':'')+
+            '</article>';
+        }).join('')+'</div>');
   }
 
   function addNav(role,anchor,id,label,ico) {
