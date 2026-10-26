@@ -292,7 +292,7 @@ const Backend = {
       this.sb.from('invites').select('*'),
       this.sb.from('events').select('*').order('starts_at'),
       this.sb.from('event_registrations').select('event_id'),
-      this.sb.from('subscriptions').select('*, plans(*)').maybeSingle(),
+      this.sb.from('subscriptions').select('*, plans:plans!subscriptions_plan_id_fkey(*)').maybeSingle(),
       this.sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(100),
       this.sb.from('broadcast_notifications').select('*').order('created_at', { ascending: false }).limit(100),
       this.sb.from('broadcast_notification_reads').select('broadcast_id,read_at')
