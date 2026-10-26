@@ -21,3 +21,20 @@
 .ir-inline-promo p{font-size:12px;color:var(--muted,#68758e);line-height:1.5;margin:6px 0 0}
 .rail a[data-view="interview-requests"] .ico,.rail a[data-view="interview-inbox"] .ico{display:inline-flex;align-items:center;justify-content:center}
 @media(max-width:720px){.ir-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ir-panel{padding:16px}.ir-inline-promo{flex-direction:column;align-items:flex-start;padding:15px}}
+
+/* Every booked interview is visible as its own details card. */
+.ir-appointments{margin:16px 0;display:grid;gap:12px}
+.ir-appointments>h3{font-size:15px;font-weight:800;margin:4px 0 0;letter-spacing:-.015em}
+.ir-appointments>h3 small{font-size:12px;font-weight:600;color:var(--muted,#66738a)}
+.ir-appointment{border:1px solid var(--line,#dce4f0);border-radius:15px;background:var(--surface,#f8faff);padding:16px}
+.ir-appointment-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:12px}
+.ir-appointment-head strong{font-size:14px}
+.ir-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0}
+.ir-details>div{min-width:0}
+.ir-details dt{font-size:11px;color:var(--muted,#66738a);font-weight:650;margin-bottom:4px}
+.ir-details dd{font-size:13px;font-weight:700;color:var(--ink,#253047);margin:0;overflow-wrap:anywhere}
+.ir-slot-link{margin-top:14px}
+.ir-meeting-link{color:var(--blue,#2845a9);font-size:13px;text-decoration:underline;font-weight:750}
+.ir-help{font-size:12px;color:var(--muted,#68758e);margin-top:12px}
+.ir-notes{margin-top:14px;font-size:12px;line-height:1.6;background:rgba(48,78,170,.055);border:1px solid var(--line,#e0e6f2);border-radius:10px;padding:12px;overflow-wrap:anywhere}
+@media(max-width:480px){.ir-appointment{padding:13px}.ir-details{grid-template-columns:1fr 1fr;gap:10px}.ir-details dd{font-size:12px}}
