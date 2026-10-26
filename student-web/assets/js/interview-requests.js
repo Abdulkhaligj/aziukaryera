@@ -71,7 +71,7 @@
     ownedApplications() {
       const role=Auth.currentUser()?.role;
       const applications=Store.state?.applications||[];
-      if(role==='student') return applications.filter(a=>a.id && a.studentId===Store.state?.session?.userId);
+      if(role==='student') return applications.filter(a=>a.id && String(a.studentId)===String(Store.state?.session?.userId||Auth.currentUser()?.id));
       if(role==='company') {
         const jobs=new Set((typeof Store.companyJobs==='function'?Store.companyJobs():[]).map(j=>String(j.id)));
         return applications.filter(a=>a.id && jobs.has(String(a.jobId)));
@@ -228,6 +228,11 @@
     const nav=event.target.closest('[data-act="go"][data-view]');
     if(nav && ['interview-requests','interview-inbox'].includes(nav.dataset.view)){
       Promise.resolve().then(()=>client.load(true));
+    }
+    if(event.target.closest('[data-act="notification-open"]')){
+      Promise.resolve().then(()=>{
+        if(['interview-requests','interview-inbox'].includes(Store.state?.view))client.load(true);
+      });
     }
     if(event.target.closest('[data-ir-refresh]')){client.load(true);return;}
     const cancel=event.target.closest('[data-ir-cancel]');
