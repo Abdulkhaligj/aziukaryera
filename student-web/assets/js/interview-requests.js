@@ -11,6 +11,9 @@
 
   const client = {
     rows: [],
+    slots: [],
+    dbApplications: [],
+    names: {},
     loaded: false,
     loading: false,
     saving: false,
@@ -21,7 +24,8 @@
       const current=String(Store.state?.session?.userId || Auth.currentUser()?.id || '');
       if (current===this.identity) return;
       this.identity=current;
-      this.rows=[]; this.loaded=false; this.loading=false; this.saving=false;
+      this.rows=[]; this.slots=[]; this.dbApplications=[]; this.names={};
+      this.loaded=false; this.loading=false; this.saving=false;
       this.error=''; this.calendarApplication=null;
     },
     async load(force=false) {
@@ -33,11 +37,37 @@
       }
       this.loading=true; this.error=''; this.repaint();
       try {
-        const {data,error}=await Backend.sb.from('interview_requests')
-          .select('id,application_id,student_id,company_id,status,message,reply_note,scheduled_slot_id,created_at,updated_at')
-          .order('created_at',{ascending:false}).limit(200);
-        if (error) throw error;
-        this.rows=data||[]; this.loaded=true;
+        // Read both data sources. Company-created interviews may not have had a
+        // student-originated request; RLS protects all three queries.
+        const [requests,slots,applications]=await Promise.all([
+          Backend.sb.from('interview_requests')
+            .select('id,application_id,student_id,company_id,status,message,reply_note,scheduled_slot_id,created_at,updated_at')
+            .order('created_at',{ascending:false}).limit(200),
+          Backend.sb.from('company_interview_slots')
+            .select('id,application_id,starts_at,duration_minutes,meeting_mode,location,meeting_url,notes,status,created_at')
+            .order('starts_at',{ascending:false}).limit(250),
+          Backend.sb.from('applications')
+            .select('id,job_id,student_id,status,created_at')
+            .order('created_at',{ascending:false}).limit(250)
+        ]);
+        if(requests.error)throw requests.error;
+        if(slots.error)throw slots.error;
+        if(applications.error)throw applications.error;
+        const latestApplications=applications.data||[];
+        const names={};
+        if(Auth.currentUser()?.role==='company') {
+          const ids=[...new Set(latestApplications.map(a=>a.student_id).filter(Boolean))];
+          if(ids.length) {
+            const profiles=await Backend.sb.from('profiles').select('id,full_name').in('id',ids.slice(0,200));
+            if(profiles.error)throw profiles.error;
+            (profiles.data||[]).forEach(profile=>{names[String(profile.id)]=profile.full_name||'Namizəd';});
+          }
+        }
+        this.rows=requests.data||[];
+        this.slots=slots.data||[];
+        this.dbApplications=latestApplications;
+        this.names=names;
+        this.loaded=true;
       } catch(error) {
         this.error=Backend.translate?.(error.message)||error.message||'Sorğular yüklənmədi.';
       } finally { this.loading=false; this.repaint(); }
@@ -70,11 +100,22 @@
     },
     ownedApplications() {
       const role=Auth.currentUser()?.role;
-      const applications=Store.state?.applications||[];
-      if(role==='student') return applications.filter(a=>a.id && String(a.studentId)===String(Store.state?.session?.userId||Auth.currentUser()?.id));
+      const uid=String(Store.state?.session?.userId||Auth.currentUser()?.id||'');
+      const cached=Store.state?.applications||[];
+      // DB/RLS is authoritative after loading; stale cached application lists
+      // must never hide appointments created after the last app bootstrap.
+      const live=this.dbApplications.map(row=>{
+        const local=cached.find(a=>String(a.id)===String(row.id))||{};
+        return {...local,id:row.id,jobId:row.job_id,studentId:row.student_id,
+          status:local.status||row.status,at:local.at||row.created_at};
+      });
+      const available=this.loaded ? live : cached;
+      if(role==='student')return available.filter(a=>a.id && String(a.studentId)===uid);
       if(role==='company') {
-        const jobs=new Set((typeof Store.companyJobs==='function'?Store.companyJobs():[]).map(j=>String(j.id)));
-        return applications.filter(a=>a.id && jobs.has(String(a.jobId)));
+        const ownedJobs=new Set((typeof Store.companyJobs==='function'?Store.companyJobs():[])
+          .map(j=>String(j.id)));
+        return available.filter(a=>a.id && (this.loaded ||
+          ownedJobs.has(String(a.jobId))));
       }
       return [];
     }
