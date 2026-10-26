@@ -1,0 +1,23 @@
+/* Additive interview requests – uses existing ADNSU styles */
+.ir-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0 22px}
+.ir-tile{min-width:0;padding:18px 20px;border-radius:17px;display:flex;flex-direction:column;gap:7px}
+.ir-tile span{font-size:12px;color:var(--muted,#68758e);font-weight:650}
+.ir-tile b{font-size:29px;font-weight:800;color:var(--blue,#2545a4);font-variant-numeric:tabular-nums}
+.ir-list{display:grid;gap:14px;margin:18px 0}
+.ir-panel{padding:22px 24px;border-radius:19px}
+.ir-panel h2{font-size:18px;letter-spacing:-.02em;margin:7px 0}
+.ir-panel p{font-size:13px;line-height:1.6;color:var(--muted,#68758e);margin:6px 0 10px}
+.ir-top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.ir-top .chip{white-space:nowrap}
+.ir-form{margin:17px 0 0;display:grid;gap:11px}
+.ir-form label{font-size:12px;font-weight:700;color:var(--muted,#4b5c7c)}
+.ir-form textarea{background:var(--surface,#fff);color:inherit;border:1px solid var(--line,#dce4f0);border-radius:13px;width:100%;font:inherit;font-size:13px;padding:12px;resize:vertical;min-height:70px}
+.ir-form button{justify-self:start}
+.ir-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:13px}
+.ir-reply,.ir-student-message{border-left:3px solid #3558bc;padding:12px 14px;background:rgba(74,110,208,.06);border-radius:0 12px 12px 0;color:inherit;font-size:13px;line-height:1.6}
+.ir-success{padding:12px 14px;border-radius:12px;background:rgba(25,145,95,.08);border:1px solid rgba(25,145,95,.2)}
+.ir-inline-promo{display:flex;gap:18px;justify-content:space-between;align-items:center;margin:20px 0;padding:20px 23px;border:1px solid var(--line,#dce4f0);background:var(--panel,#fff);border-radius:16px}
+.ir-inline-promo strong{font-size:15px}
+.ir-inline-promo p{font-size:12px;color:var(--muted,#68758e);line-height:1.5;margin:6px 0 0}
+.rail a[data-view="interview-requests"] .ico,.rail a[data-view="interview-inbox"] .ico{display:inline-flex;align-items:center;justify-content:center}
+@media(max-width:720px){.ir-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ir-panel{padding:16px}.ir-inline-promo{flex-direction:column;align-items:flex-start;padding:15px}}
