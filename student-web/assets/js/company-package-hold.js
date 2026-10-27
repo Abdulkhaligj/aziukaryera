@@ -1,49 +1,61 @@
 /*!
- * ADNSU Karyera — temporary company-package rollout hold (27 Oct 2026).
- * Presentation only: subscriptions, billing, plan entitlements, RLS and data
- * remain unchanged. To re-enable all UI, remove this script include.
+ * ADNSU Karyera — temporary package marketing hold.
+ * Hides company price/package selection ONLY. Candidate search, Talent Pool,
+ * candidate comparison, HR analysis, interviews and other modules stay open.
+ * Pilot search shows only profiles already authorized by Supabase RLS.
+ * No database, subscription, payment, or security-policy changes.
+ * To restore package UI later, remove this script from index.html.
  */
 (() => {
   'use strict';
-
   if (typeof NAV === 'undefined' || typeof VIEWS === 'undefined' || !VIEWS.company) return;
 
-  // Pro-only recruiting pages and package comparisons are not publicly
-  // available during the current pilot. Regular HR workflow stays visible.
-  const held = new Set(['subscription', 'candidates', 'search', 'talent-pool', 'compare']);
+  // Leave every recruiting tool in place — only remove the package screen.
+  NAV.company = NAV.company.filter(item => item.id !== 'subscription');
+  VIEWS.company.subscription = () => `<div class="page-head">
+    <h1>Şirkət kabineti</h1>
+    <p>Vakansiya, müraciət, Talent Pool və müsahibə alətlərinə yan menyudan keçə bilərsiniz.</p>
+    <button class="btn primary" data-act="go" data-view="dashboard">Ana səhifəyə qayıt</button>
+  </div>`;
 
-  NAV.company = NAV.company.filter(item => !held.has(item.id));
+  // Temporary pilot access: active, signed-in employers may use search and
+  // Talent Pool screens. This is UI-only: Supabase RLS still limits students
+  // to company applicants or records this employer is entitled to see.
+  // AI ranking and all other paid-feature checks remain server-controlled.
+  if (typeof companyCanUse === 'function') {
+    const originalCanUse = companyCanUse;
+    companyCanUse = function (feature) {
+      if (feature !== 'candidate_search') return originalCanUse(feature);
+      const user = typeof Auth !== 'undefined' && Auth.currentUser();
+      return !!(user && user.role === 'company' && user.status === 'active' &&
+        Store.mode === 'supabase' && Store.state?.company);
+    };
+  }
 
-  const notice = () => `<section class="card pad-lg" style="max-width:680px;margin:28px auto">
-    <div class="eyebrow">ADNSU Karyera</div>
-    <h1 style="margin:12px 0">Yeni imkanlar hazırlanır</h1>
-    <p>Əlavə şirkət alətləri pilot mərhələsindən sonra təqdim ediləcək.
-    Vakansiyalarınızı, müraciətlərinizi və müsahibələrinizi əvvəlki kimi idarə edə bilərsiniz.</p>
-    <button type="button" class="btn primary" data-act="go" data-view="dashboard" style="margin-top:16px">Şirkət kabinetinə qayıt</button>
-  </section>`;
-
-  // An old bookmarked screen or saved route cannot accidentally expose pricing.
-  for (const id of held) VIEWS.company[id] = notice;
+  // Browser-saved link to a package page should return to normal company home.
   if (typeof Store !== 'undefined' && Store.state &&
-      Store.state.session && held.has(Store.state.view)) {
+      Store.state.session && Store.state.view === 'subscription') {
     Store.state.view = 'dashboard';
   }
 
-  // Remove the package marketing callout from the otherwise useful basic HR
-  // analytics. This is not an access-control mechanism or billing change.
-  const css = document.createElement('style');
-  css.id = 'company-package-hold';
-  css.textContent = `
+  const style = document.createElement('style');
+  style.id = 'adnsu-hide-company-packages';
+  style.textContent = `
     .em-upgrade,
-    [data-view="subscription"][data-act="go"],
-    [data-act="plan-select"] { display:none !important; }
+    .registration-plans,
+    .field:has(> .registration-plans),
+    [data-act="plan-select"],
+    [data-act="go"][data-view="subscription"],
+    [data-act="auth-plan"] {
+      display: none !important;
+    }
   `;
-  document.head.appendChild(css);
+  document.head.appendChild(style);
 
-  // In case a cached/legacy screen contains a link, route it safely.
-  document.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-act="go"][data-view="subscription"]');
-    if (!button) return;
+  // Guard legacy package links without affecting any other buttons.
+  document.addEventListener('click', event => {
+    const btn = event.target.closest?.('[data-act="go"][data-view="subscription"]');
+    if (!btn) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (typeof Auth !== 'undefined' && Auth.role() === 'company') {
