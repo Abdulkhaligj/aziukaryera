@@ -1,0 +1,284 @@
+/*
+ * ADNSU / ASOIU Career — safe student-only visual enhancement
+ * Presentational CSS only. Does NOT modify AI, uploads, profile-photo handling,
+ * application data, authentication, Supabase, events or any JavaScript.
+ * Include after the currently deployed styles.css, ONLY after verifying the
+ * live source files are synchronized to avoid re-deploying stale app.js.
+ */
+@supports selector(.shell:has(.rail a[data-view="cv"])) {
+  .shell:has(.rail a[data-view="cv"]) {
+    --career-radius: 16px;
+    --career-shadow: 0 3px 10px rgba(14,39,90,.025), 0 16px 36px -30px rgba(14,39,90,.26);
+  }
+  .shell:has(.rail a[data-view="cv"]) .main {
+    padding: 28px clamp(18px, 2.5vw, 38px) 76px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .rail {
+    padding-inline: 12px;
+    gap: 5px;
+    scrollbar-width: thin;
+  }
+  .shell:has(.rail a[data-view="cv"]) .rail-group {
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 750;
+    letter-spacing: .08em;
+    padding: 18px 12px 8px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .rail a {
+    min-height: 43px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    font-size: 13.5px;
+    font-weight: 600;
+    gap: 12px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .rail a:hover {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+  .shell:has(.rail a[data-view="cv"]) .rail a[aria-current="page"] {
+    box-shadow: inset 3px 0 0 var(--brand);
+    font-weight: 750;
+  }
+  .shell:has(.rail a[data-view="cv"]) .rail .ico {
+    width: 20px;
+    font-size: 17px;
+    text-align: center;
+  }
+  .shell:has(.rail a[data-view="cv"]) .page-head {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--career-radius);
+    padding: clamp(18px, 2.2vw, 28px);
+    margin-bottom: 20px;
+    align-items: center;
+    box-shadow: var(--career-shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .shell:has(.rail a[data-view="cv"]) .page-head:before {
+    content: "";
+    position: absolute;
+    width: 4px;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    background: var(--brand);
+    border-radius: 0 4px 4px 0;
+  }
+  .shell:has(.rail a[data-view="cv"]) .page-head h1 {
+    font-size: clamp(24px, 2.4vw, 34px);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1.16;
+  }
+  .shell:has(.rail a[data-view="cv"]) .page-head p {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 70ch;
+    margin-top: 10px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .page-head .eyebrow {
+    font-family: var(--font-sans);
+    color: var(--brand);
+    font-weight: 750;
+    font-size: 11px;
+    letter-spacing: .08em;
+  }
+  .shell:has(.rail a[data-view="cv"]) .card,
+  .shell:has(.rail a[data-view="cv"]) .job,
+  .shell:has(.rail a[data-view="cv"]) .tile,
+  .shell:has(.rail a[data-view="cv"]) .q-card,
+  .shell:has(.rail a[data-view="cv"]) .post,
+  .shell:has(.rail a[data-view="cv"]) .table-wrap {
+    border-radius: var(--career-radius);
+    box-shadow: var(--career-shadow);
+    border-color: var(--line);
+  }
+  .shell:has(.rail a[data-view="cv"]) .card {
+    padding: clamp(18px, 2vw, 24px);
+  }
+  .shell:has(.rail a[data-view="cv"]) .card.pad-lg {
+    padding: clamp(21px, 2.2vw, 29px);
+  }
+  .shell:has(.rail a[data-view="cv"]) .grid { gap: 17px; }
+  .shell:has(.rail a[data-view="cv"]) .grid.side {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 315px);
+    align-items: start;
+    gap: 20px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .tiles {
+    gap: 14px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .tile {
+    padding: 18px 19px;
+    min-height: 110px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .tile .k {
+    font: 750 11px/1.4 var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: .055em;
+  }
+  .shell:has(.rail a[data-view="cv"]) .tile .v {
+    font-size: clamp(27px, 2.7vw, 35px);
+    font-weight: 800;
+  }
+  .shell:has(.rail a[data-view="cv"]) .tile .s {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .shell:has(.rail a[data-view="cv"]) .welcome {
+    border-radius: 19px;
+    padding: clamp(23px, 2.6vw, 33px);
+    background: linear-gradient(120deg, #071d72, #173cb9 65%, #3456db);
+  }
+  .shell:has(.rail a[data-view="cv"]) .welcome h2 {
+    font-size: clamp(23px, 2.2vw, 30px);
+    line-height: 1.2;
+  }
+  .shell:has(.rail a[data-view="cv"]) .section-head {
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .shell:has(.rail a[data-view="cv"]) .section-head h2 {
+    font-size: 19px;
+    font-weight: 750;
+  }
+  .shell:has(.rail a[data-view="cv"]) .btn {
+    border-radius: 10px;
+    min-height: 39px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .shell:has(.rail a[data-view="cv"]) .btn.sm {
+    min-height: 35px;
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .btn:focus-visible,
+  .shell:has(.rail a[data-view="cv"]) .rail a:focus-visible,
+  .shell:has(.rail a[data-view="cv"]) .pills button:focus-visible {
+    outline: 3px solid var(--brand-ring);
+    outline-offset: 2px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .pills {
+    gap: 8px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .pills button,
+  .shell:has(.rail a[data-view="cv"]) .network-filters button {
+    min-height: 36px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 650;
+  }
+  .shell:has(.rail a[data-view="cv"]) .pills button[aria-pressed="true"],
+  .shell:has(.rail a[data-view="cv"]) .network-filters button[aria-pressed="true"] {
+    border-color: var(--brand);
+    color: var(--brand);
+    background: var(--brand-soft);
+  }
+  .shell:has(.rail a[data-view="cv"]) .field > label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-2);
+  }
+  .shell:has(.rail a[data-view="cv"]) input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+  .shell:has(.rail a[data-view="cv"]) select,
+  .shell:has(.rail a[data-view="cv"]) textarea {
+    border-radius: 10px;
+    font-size: 13.5px;
+    padding: 10px 12px;
+    max-width: 100%;
+  }
+  .shell:has(.rail a[data-view="cv"]) .job {
+    padding: clamp(18px, 2vw, 24px);
+    gap: 15px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .job:hover {
+    border-color: var(--brand-ring);
+    box-shadow: 0 8px 26px rgba(0,28,128,.075);
+  }
+  .shell:has(.rail a[data-view="cv"]) .job-title h3 {
+    font-size: clamp(15px,1.3vw,18px);
+    font-weight: 750;
+  }
+  .shell:has(.rail a[data-view="cv"]) .job-meta {
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .shell:has(.rail a[data-view="cv"]) .job-foot {
+    padding-top: 15px;
+  }
+  .shell:has(.rail a[data-view="cv"]) table th {
+    font: 750 11px/1.4 var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: .055em;
+  }
+  .shell:has(.rail a[data-view="cv"]) table th,
+  .shell:has(.rail a[data-view="cv"]) table td {
+    padding: 14px 16px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .q-card {
+    padding: clamp(18px,2vw,25px);
+  }
+  .shell:has(.rail a[data-view="cv"]) .q-head h3 {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .shell:has(.rail a[data-view="cv"]) .post {
+    padding: 19px;
+    gap: 13px;
+  }
+  .shell:has(.rail a[data-view="cv"]) .post-body {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .shell:has(.rail a[data-view="cv"]) .benefit-off {
+    font-size: 24px;
+    font-weight: 800;
+  }
+  .shell:has(.rail a[data-view="cv"]) .empty {
+    border: 1px dashed var(--line-2);
+    border-radius: var(--career-radius);
+    padding: 30px 18px;
+  }
+  /* CV output is intentionally kept neutral for printable documents. */
+  .shell:has(.rail a[data-view="cv"]) .cvsheet {
+    box-shadow: var(--career-shadow);
+    border-radius: 13px;
+  }
+  @media (max-width: 1200px) {
+    .shell:has(.rail a[data-view="cv"]) .grid.side { grid-template-columns: minmax(0, 1fr); }
+    .shell:has(.rail a[data-view="cv"]) .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .shell:has(.rail a[data-view="cv"]) .grid.c3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 650px) {
+    .shell:has(.rail a[data-view="cv"]) .main { padding: 18px 14px 55px; }
+    .shell:has(.rail a[data-view="cv"]) .page-head { padding: 20px; }
+    .shell:has(.rail a[data-view="cv"]) .page-head h1 { font-size: 25px; }
+    .shell:has(.rail a[data-view="cv"]) .grid.c2,
+    .shell:has(.rail a[data-view="cv"]) .grid.c3,
+    .shell:has(.rail a[data-view="cv"]) .tiles { grid-template-columns: minmax(0, 1fr); }
+    .shell:has(.rail a[data-view="cv"]) .job-head { flex-wrap: wrap; }
+    .shell:has(.rail a[data-view="cv"]) .job-match { width: 100%; }
+    .shell:has(.rail a[data-view="cv"]) .page-head > .btn { width: 100%; }
+    .shell:has(.rail a[data-view="cv"]) input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+    .shell:has(.rail a[data-view="cv"]) select,
+    .shell:has(.rail a[data-view="cv"]) textarea { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shell:has(.rail a[data-view="cv"]) .job,
+    .shell:has(.rail a[data-view="cv"]) .btn {
+      transition: none;
+      transform: none !important;
+    }
+  }
+  @media print {
+    .shell:has(.rail a[data-view="cv"]) .main { padding: 0; }
+    .shell:has(.rail a[data-view="cv"]) .page-head { border: 0; box-shadow: none; }
+    .shell:has(.rail a[data-view="cv"]) .cvsheet { box-shadow: none; border: 0; }
+  }
+}
