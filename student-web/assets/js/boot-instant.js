@@ -1,69 +1,82 @@
 /*!
- * ADNSU Career: nonblocking session recovery and landing.
- * Avoids gating the whole page on external auth, providers or slow requests.
+ * ADNSU Karyera | Login-safe background startup.
+ * Works on top of the LAST deployed build: no change to app.js, AIDA,
+ * company HR, Talent Pool, interview screens, plan hiding, or Supabase RLS.
  */
 (() => {
   'use strict';
-  if (typeof Backend === 'undefined' || typeof Auth === 'undefined' ||
+  if (typeof Auth === 'undefined' || typeof Backend === 'undefined' ||
       typeof Landing === 'undefined' || typeof Store === 'undefined') return;
 
-  const providers = Backend.providers.bind(Backend);
-  Backend.providers = function () {
-    void Promise.resolve().then(providers).then(data => {
-      if (typeof UI === 'undefined') return;
-      UI.providers = data || {};
-      if (UI.publicView === 'auth' && !UI.auth.busy) render();
-    }).catch(error => console.warn('[ADNSU] OAuth settings:', error?.message));
+  let userStartedAuth = false;
+  let restoreStarted = false;
+  const userAction = event => {
+    const target = event.target;
+    if (target?.closest?.('[data-lp^="auth"], [data-act="auth-open"], [data-act="login-form"], [data-act="register-form"], [data-act="logout"], .auth-form, #li-email, #li-password')) {
+      userStartedAuth = true;
+    }
+  };
+  document.addEventListener('pointerdown', userAction, true);
+  document.addEventListener('click', userAction, true);
+  document.addEventListener('focusin', userAction, true);
+  document.addEventListener('submit', userAction, true);
+
+  const shouldNotRestore = () => userStartedAuth ||
+    (typeof UI !== 'undefined' && (UI.publicView !== 'landing' || UI.auth.busy));
+
+  // Do not start a simultaneous getSession() while the user is typing or
+  // clicking Login. Supabase's storage locks can stall signInWithPassword.
+  Auth.restoreRemote = () => Promise.resolve(false);
+
+  const oldProviders = Backend.providers.bind(Backend);
+  Backend.providers = () => {
+    setTimeout(() => {
+      if (userStartedAuth) return;
+      Promise.resolve().then(oldProviders).then(data => {
+        if (typeof UI !== 'undefined') UI.providers = data || {};
+      }).catch(error => console.warn('[ADNSU] OAuth settings:', error?.message || error));
+    }, 900);
     return Promise.resolve({});
   };
 
-  const landing = Landing.load.bind(Landing);
-  Landing.load = function () {
+  const oldLandingLoad = Landing.load.bind(Landing);
+  Landing.load = () => {
     Landing.data ||= { jobs: [], companies: [], events: [], benefits: [], awards: [], ads: [] };
-    void Promise.resolve().then(landing).then(() => {
-      if (typeof UI !== 'undefined' && UI.publicView === 'landing' &&
-          !Auth.isSignedIn()) render();
-    }).catch(error => console.warn('[ADNSU] Landing:', error?.message));
+    setTimeout(() => {
+      if (userStartedAuth || (typeof UI !== 'undefined' && UI.publicView !== 'landing')) return;
+      Promise.resolve().then(oldLandingLoad).then(() => {
+        if (typeof UI !== 'undefined' && UI.publicView === 'landing' &&
+            !Auth.isSignedIn()) render();
+      }).catch(error => console.warn('[ADNSU] Landing:', error?.message || error));
+    }, 650);
     return Promise.resolve();
   };
 
-  let userInteracted = false;
-  document.addEventListener('click', event => {
-    if (event.target?.closest?.('[data-lp^="auth"], [data-act="auth-open"], [data-act="logout"]'))
-      userInteracted = true;
-  }, true);
-  document.addEventListener('submit', event => {
-    if (event.target?.matches?.('[data-act="login-form"], [data-act="register-form"]'))
-      userInteracted = true;
-  }, true);
-
-  // A background recovery is allowed to activate the user only after
-  // legitimate Supabase Auth and RLS data reads have succeeded.
-  Auth.restoreRemote = function () {
-    if (Store.mode !== 'supabase') return Promise.resolve(false);
-    Store.state.session = null;
-    Store.bind();
+  // Restore a pre-existing REAL session only if user has not chosen
+  // to log in manually. A successful login must never be overwritten.
+  setTimeout(() => {
+    if (restoreStarted || shouldNotRestore() ||
+        typeof Store === 'undefined' || Store.mode !== 'supabase') return;
+    restoreStarted = true;
     void (async () => {
       try {
         const session = await Backend.getSession();
-        if (!session || userInteracted || UI.auth.busy) return;
-        const data = await Backend.loadAll();
-        if (!data.ok || userInteracted || UI.auth.busy ||
-            UI.publicView !== 'landing') return;
-        Store.hydrate(data);
+        if (!session || shouldNotRestore()) return;
+        const payload = await Backend.loadAll();
+        if (!payload?.ok || shouldNotRestore()) return;
+        Store.hydrate(payload);
         UI.publicView = 'app';
         UI.booting = false;
         render();
         if (typeof startNotificationUpdates === 'function') startNotificationUpdates();
       } catch (error) {
-        console.warn('[ADNSU] Session recovery:', error?.message || error);
+        console.warn('[ADNSU] Sessiya bərpası:', error?.message || error);
       }
     })();
-    return Promise.resolve(false);
-  };
+  }, 1800);
 
-  // The original startup may still be waiting for the initial connection
-  // probe. Do not block navigation on the full-screen loading indicator.
+  // The existing main app probes Supabase before showing the first screen.
+  // Display the public page promptly, without selecting local/demo auth.
   setTimeout(() => {
     if (typeof UI === 'undefined' || !UI.booting) return;
     if (typeof USE_SUPABASE !== 'undefined' && USE_SUPABASE) {
@@ -75,7 +88,7 @@
     UI.booting = false;
     UI.publicView = 'landing';
     try { render(); } catch (error) {
-      console.error('[ADNSU] Fast startup render:', error);
+      console.error('[ADNSU] Açılış ekranı:', error);
     }
   }, 250);
 })();
