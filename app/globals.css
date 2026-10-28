@@ -603,3 +603,32 @@ button, a, label, summary { touch-action: manipulation; }
   .installHint { flex-wrap: wrap; }
   .installHint .primaryButton { order: 3; width: 100%; justify-content: center; }
 }
+
+/* Approval-only internal note history and button, no other admin form changes */
+.approvalNotes {
+  display: grid; gap: 12px; padding: 16px; margin-top: 8px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius); min-width: 0;
+}
+.approvalNotesHead { display: grid; gap: 4px; }
+.approvalNotesHead strong { font-size: 14px; color: var(--ink); }
+.approvalNotesHead small { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.approvalNotesList { display: grid; gap: 8px; max-height: 240px; overflow-y: auto; }
+.approvalNotesList article {
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: var(--radius-sm); padding: 12px;
+}
+.approvalNotesList article > div {
+  display: flex; justify-content: space-between; flex-wrap: wrap;
+  gap: 8px; align-items: baseline; font-size: 12px;
+}
+.approvalNotesList article time { color: var(--muted); font-size: 11px; }
+.approvalNotesList article p { margin-top: 7px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.approvalNoteEditor { display: grid; gap: 12px; }
+.approvalNoteControls { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.approvalNoteControls small { color: var(--muted); font-size: 11px; margin-right: auto; }
+.modalActions .secondaryButton:disabled { opacity: .6; }
+@media (max-width: 600px) {
+  .approvalNotes { padding: 12px; }
+  .approvalNoteControls button { min-width: 0; }
+}
