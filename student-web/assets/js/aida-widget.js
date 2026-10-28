@@ -4,7 +4,6 @@
 (() => {
   'use strict';
   if (document.getElementById('aida-assistant')) return;
-  const icon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="13" rx="4"/><path d="M12 3v3M8 12h.01M16 12h.01M9 16h6"/></svg>';
   const cross = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg>';
   const sendIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="m22 2-7 20-4-9-9-4zM22 2 11 13"/></svg>';
   const host = document.createElement('aside');
@@ -13,10 +12,10 @@
   host.setAttribute('aria-label', 'AIDA karyera köməkçisi');
   host.innerHTML = [
     '<button type="button" class="aida-launch" aria-expanded="false" aria-controls="aida-panel" aria-label="AIDA AI köməkçisini aç">',
-       '<span class="aida-launch-symbol">',icon,'</span><span class="aida-launch-copy"><b>AIDA</b><small>AI köməkçi</small></span>',
+       '<span class="aida-launch-copy"><b>AIDA</b></span>',
     '</button>',
     '<section id="aida-panel" class="aida-panel" role="dialog" aria-label="AIDA — AI karyera köməkçisi" hidden>',
-      '<header class="aida-header"><span class="aida-avatar">',icon,'</span>',
+      '<header class="aida-header"><span class="aida-avatar" aria-hidden="true">A</span>',
         '<div><strong>AIDA</strong><small>ADNSU Karyera · AI köməkçi</small></div>',
         '<button class="aida-close" type="button" aria-label="AIDA çatını bağla">',cross,'</button>',
       '</header>',

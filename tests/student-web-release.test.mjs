@@ -23,7 +23,7 @@ test('public landing omits employer pricing without removing vacancy or events r
   assert.doesNotMatch(landing, /class="plan-grid"/);
   assert.match(landing, /id="lp-events"/);
   assert.match(landing, /id="lp-jobs"/);
-  assert.match(index, /landing\.js\?v=20261028c/);
+  assert.match(index, /landing\.js\?v=20261028d/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
   assert.match(hold, /\.field:has\(\[data-act="auth-plan"\]\)/);
 });
@@ -76,9 +76,9 @@ test('AIDA chat and polished icons load on all public/authenticated screens', ()
   // Compile real browser scripts so that malformed quotes do not reach production.
   new Script(chat);
   new Script(icons);
-  assert.match(index, /aida-widget\.js\?v=20261028a/);
+  assert.match(index, /aida-widget\.js\?v=20261028d/);
   assert.match(index, /ui-icons\.js\?v=20261028a/);
-  assert.match(index, /ux-polish\.css\?v=20261028a/);
+  assert.match(index, /ux-polish\.css\?v=20261028d/);
   assert.match(chat, /functions\.invoke\('aida-chat'/);
   assert.match(chat, /body: \{message:text,history\}/);
   assert.match(chat, /bubble\.textContent = value/);
@@ -88,7 +88,11 @@ test('AIDA chat and polished icons load on all public/authenticated screens', ()
   assert.match(icons, /MutationObserver\(draw\)/);
   assert.match(icons, /notification-bell/);
   assert.match(icons, /account-choice-icon/);
-  assert.match(landing, /data-aida-open/);
+  assert.doesNotMatch(landing, /aida-hero-cta|data-aida-open/);
+  assert.doesNotMatch(chat, /aida-launch-symbol|const icon =/);
+  assert.match(chat, /aida-avatar" aria-hidden="true">A/);
+  assert.match(chat, /<b>AIDA<\/b>/);
+  assert.doesNotMatch(css, /aida-launch-symbol/);
   assert.doesNotMatch(landing, /Şablonlu qurucu təqdim edilən kodla/);
   assert.match(css, /prefers-reduced-motion/);
 });
