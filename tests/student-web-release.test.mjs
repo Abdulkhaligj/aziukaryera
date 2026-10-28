@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
+import { runInNewContext, Script } from 'node:vm';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
@@ -65,4 +65,30 @@ test('company packages are hidden but active Talent Pool access remains', () => 
   assert.equal(context.companyCanUse('candidate_search'), true);
   assert.equal(context.companyCanUse('admin'), false);
   assert.match(appended[0].textContent, /registration-plans/);
+});
+
+test('AIDA chat and polished icons load on all public/authenticated screens', () => {
+  const index = read('student-web/index.html');
+  const chat = read('student-web/assets/js/aida-widget.js');
+  const icons = read('student-web/assets/js/ui-icons.js');
+  const css = read('student-web/assets/css/ux-polish.css');
+  const landing = read('student-web/assets/js/landing.js');
+  // Compile real browser scripts so that malformed quotes do not reach production.
+  new Script(chat);
+  new Script(icons);
+  assert.match(index, /aida-widget\.js\?v=20261028a/);
+  assert.match(index, /ui-icons\.js\?v=20261028a/);
+  assert.match(index, /ux-polish\.css\?v=20261028a/);
+  assert.match(chat, /functions\.invoke\('aida-chat'/);
+  assert.match(chat, /body: \{message:text,history\}/);
+  assert.match(chat, /bubble\.textContent = value/);
+  assert.match(chat, /messages\.slice\(-10\)/);
+  assert.doesNotMatch(chat, /localStorage|sessionStorage|service_role|GEMINI_API_KEY/);
+  assert.match(chat, /aida-launch/);
+  assert.match(icons, /MutationObserver\(draw\)/);
+  assert.match(icons, /notification-bell/);
+  assert.match(icons, /account-choice-icon/);
+  assert.match(landing, /data-aida-open/);
+  assert.doesNotMatch(landing, /Şablonlu qurucu təqdim edilən kodla/);
+  assert.match(css, /prefers-reduced-motion/);
 });
