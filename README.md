@@ -58,6 +58,7 @@ pnpm dev
 - [Tələbə təlimatı](docs/STUDENT_GUIDE.md)
 - [Funksiyalar](docs/FEATURES.md)
 - [Test siyahısı](docs/TEST_CHECKLIST.md)
+- [İT şöbəsi üçün təhvil sənədi](docs/IT-HANDOVER.md)
 
 ## Keyfiyyət yoxlaması
 
