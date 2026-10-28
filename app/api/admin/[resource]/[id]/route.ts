@@ -26,6 +26,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   const body = await request.json() as Record<string, unknown>;
 
+  // Təsdiq səhifəsi yalnız statusu dəyişir. Formanın bütün vakansiya
+  // sütunlarını yenidən yazmaq bu əməliyyatı uğursuz edirdi.
+  if (key === 'pending_jobs' && body.__action === 'approval_status') {
+    const status = text(body.status);
+    const allowed = new Set(['draft', 'pending', 'pending_approval', 'changes_requested',
+      'approved', 'published', 'rejected', 'expired', 'archived']);
+    if (!allowed.has(status)) return NextResponse.json({ error: 'Yanlış təsdiq statusu.' }, { status: 400 });
+    const reason = text(body.changes_requested).slice(0, 2000);
+    if ((status === 'rejected' || status === 'changes_requested') && !reason)
+      return NextResponse.json({ error: 'Rədd və ya düzəliş üçün səbəbi yazın.' }, { status: 400 });
+    const update: Record<string, unknown> = {
+      status,
+      changes_requested: status === 'rejected' || status === 'changes_requested' ? reason : null,
+      rejection_reason: status === 'rejected' ? reason : null
+    };
+    if (status === 'approved' || status === 'published') {
+      update.approved_by = context.userId;
+      update.approved_at = new Date().toISOString();
+    }
+    const { data, error } = await context.supabase.from('jobs')
+      .update(update).eq('id', id).select('id,status').maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (!data) return NextResponse.json({ error: 'Vakansiya tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
+    await writeAudit(context, 'pending_jobs', id, 'update', 'Vakansiyanın təsdiq statusu dəyişdirildi');
+    return NextResponse.json({ ok: true, status: data.status });
+  }
+
   if (people.has(key)) {
     /* "Şifrəni sıfırla": yeni müvəqqəti şifrə qaytarılır (yalnız hesab yaratmaq hüququ olanlar) */
     const action = body.__action === 'reset_password' ? 'reset_password' : 'update';
