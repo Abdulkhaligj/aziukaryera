@@ -13,7 +13,7 @@ import type { AdminRole, ResourceKey } from '@/lib/types';
 export type Action = 'create' | 'edit' | 'delete';
 
 const content = new Set<ResourceKey>(['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'content']);
-const moderation = new Set<ResourceKey>(['applications', 'network', 'reports']);
+const moderation = new Set<ResourceKey>(['applications', 'network', 'reports', 'mentor_requests']);
 const people = new Set<ResourceKey>(['students', 'master_students', 'alumni']);
 const commerce = new Set<ResourceKey>(['subscriptions', 'plans', 'payments', 'ads']);
 const records = new Set<ResourceKey>(['cv_analytics', 'interview_analytics', 'ai_usage', 'notifications']);

@@ -34,6 +34,7 @@ export const demoData: Record<ResourceKey, AdminRow[]> = {
   ],
   master_students: [],
   alumni: [],
+  mentor_requests: [],
   network: [],
   reports: [],
   moderation_logs: [],

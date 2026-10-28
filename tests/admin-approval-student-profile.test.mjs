@@ -33,7 +33,7 @@ test('student profile has real avatar file upload backed by private moderation',
   assert.match(js,/me\.role === 'student'/);
   assert.doesNotMatch(js,/localStorage|service_role|supabaseKey/);
   assert.match(css,/\.student-photo-card/);
-  assert.match(index,/student-profile-enhancements\.js\?v=20261028a/);
+  assert.match(index,/student-profile-enhancements\.js\?v=20261028m/);
 });
 
 test('mentor support is present within student dashboard and profile',()=>{

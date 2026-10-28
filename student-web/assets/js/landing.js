@@ -397,7 +397,7 @@ const Landing = {
         <p>CV-ni təkmilləşdirmək, müsahibəyə hazırlaşmaq, təcrübə və ilk iş üçün yol xəritəsi qurmaq istəyirsən? ADNSU Karyera Mərkəzinə mentor dəstəyi üçün müraciət edə bilərsən.</p>
         <div class="lp-mentor-tags"><span>CV və LinkedIn</span><span>Müsahibə hazırlığı</span><span>Karyera planı</span><span>İş və təcrübə</span></div>
       </div>
-      <a class="b b-primary b-lg lp-mentor-button" href="mailto:career@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">Mentor dəstəyi üçün yaz</a>
+      <button type="button" class="b b-primary b-lg lp-mentor-button" data-lp="auth">Mentora müraciət et</button> <a class="lp-mentor-mail" href="mailto:career@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">və ya e-poçtla yaz</a>
     </div>
   </div></section>
 

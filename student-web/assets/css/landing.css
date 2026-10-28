@@ -516,3 +516,4 @@
   .lp-award-medal { flex-basis: 48px; width: 48px; height: 48px; }
   .lp-award-logo { width: 62px; }
 }
+.lp-mentor-mail { margin-left: 12px; font-size: 13.5px; color: var(--brand, #001c80); text-decoration: underline; text-underline-offset: 3px; }

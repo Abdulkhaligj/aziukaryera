@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Building2, BriefcaseBusiness, CalendarDays, Gift, FileCheck2, Users, LayoutDashboard,
   PanelsTopLeft, ShieldCheck, ScrollText, Search, Plus, Bell, ChevronRight, Trophy,
-  TrendingUp, UserCheck, Clock3, X, Save, Trash2, Menu, GraduationCap, KeyRound, LogOut,
+  TrendingUp, UserCheck, Clock3, X, Save, Trash2, Menu, GraduationCap, KeyRound, LogOut, HandHeart,
   MessageSquareText, Flag, CreditCard, FileText, MessagesSquare, Sparkles, RotateCcw,
   AlertTriangle, Copy, Check, Eye, LoaderCircle, Pencil, Megaphone, RefreshCw
 } from 'lucide-react';
@@ -32,6 +32,7 @@ const nav: NavItem[] = [
   { key: 'applications', label: 'Müraciətlər', icon: FileCheck2, group: 'İnsanlar' },
   { key: 'students', label: 'Tələbələr', icon: Users, group: 'İnsanlar' },
   { key: 'master_students', label: 'Magistrlər', icon: GraduationCap, group: 'İnsanlar' },
+  { key: 'mentor_requests', label: 'Mentor müraciətləri', icon: HandHeart, group: 'İnsanlar' },
   { key: 'alumni', label: 'Məzunlar', icon: UserCheck, group: 'İnsanlar' },
   { key: 'network', label: 'Şəbəkə paylaşımları', icon: MessageSquareText, group: 'İcma və nəzarət' },
   { key: 'reports', label: 'Şikayətlər', icon: Flag, group: 'İcma və nəzarət' },
@@ -54,7 +55,7 @@ const bottomNav: View[] = ['dashboard', 'pending_jobs', 'applications'];
 const titles: Record<ResourceKey, string> = {
   jobs: 'Vakansiyalar', pending_jobs: 'Təsdiq gözləyən vakansiyalar', companies: 'Şirkətlər', events: 'Tədbirlər',
   benefits: 'Tələbə güzəştləri', awards: 'Awards', ads: 'Reklamlar', applications: 'Müraciətlər', students: 'Tələbələr',
-  master_students: 'Magistrlər', alumni: 'Məzunlar', network: 'Şəbəkə paylaşımları', reports: 'Şikayətlər',
+  master_students: 'Magistrlər', alumni: 'Məzunlar', mentor_requests: 'Mentor müraciətləri', network: 'Şəbəkə paylaşımları', reports: 'Şikayətlər',
   moderation_logs: 'Moderasiya tarixçəsi', plans: 'Paketlər və limitlər', subscriptions: 'Abunəliklər',
   payments: 'Ödənişlər', cv_analytics: 'CV analitikası', interview_analytics: 'Müsahibə analitikası',
   ai_usage: 'AI istifadəsi', notifications: 'Bildirişlər', content: 'Sayt məzmunu',
@@ -226,6 +227,13 @@ function EditorFields({ resource, row, data, lookups, mode, self = false }: { re
     <div className="readBlock"><span>{row?.title}</span><p>{row?.subtitle}</p></div>
     <label className="field">Moderasiya statusu<select name="moderation_status" defaultValue={String(f.moderation_status || 'visible')}><option value="visible">Görünür</option><option value="pending">AI yoxlamasına yenidən göndər</option><option value="hidden">Gizlədilib</option></select></label>
   </>;
+  if (resource === 'mentor_requests') return <>
+    <div className="readBlock"><span>{row?.title}{f.email ? ` · ${f.email}` : ''}</span><p><b>{String(f.topic || '')}</b></p><p>{String(f.details || '')}</p>
+      <small>{[f.format === 'online' ? 'Onlayn' : f.format === 'in_person' ? 'Əyani' : 'Format fərqi yoxdur', f.preferred_time ? `Uyğun vaxt: ${f.preferred_time}` : ''].filter(Boolean).join(' · ')}</small></div>
+    <label className="field">Status<select name="status" defaultValue={String(f.status || 'pending')}><option value="pending">Yeni müraciət</option><option value="in_review">Baxılır</option><option value="matched">Mentor təyin edilib</option><option value="completed">Tamamlanıb</option><option value="cancelled">Bağlanıb</option></select></label>
+    <label className="field">Mentorun adı<input name="mentor_name" maxLength={120} defaultValue={String(f.mentor_name || '')} placeholder="Məsələn: Dr. Aysel Həsənova"/></label>
+    <label className="field">Tələbəyə qeyd<textarea name="admin_note" maxLength={1200} defaultValue={String(f.admin_note || '')} placeholder="Görüş vaxtı, yer və ya növbəti addım — tələbə bunu öz kabinetində görür"/></label>
+  </>;
   if (resource === 'reports') return <>
     <div className="readBlock"><span>{row?.subtitle}</span><p>{row?.title}{row?.meta ? ` — ${row.meta}` : ''}</p></div>
     <label className="field">Şikayət statusu<select name="status" defaultValue={String(f.status || 'open')}><option value="open">Açıq</option><option value="reviewing">Yoxlanılır</option><option value="resolved">Həll edildi</option><option value="dismissed">Əsassızdır</option></select></label>
@@ -331,11 +339,12 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     jobs: data.pending_jobs.length,
     companies: data.companies.filter(x => x.status === 'Yoxlamada').length,
     reports: data.reports.filter(x => x.status !== 'Bitib').length,
+    mentor: data.mentor_requests.filter(x => x.fields?.status === 'pending').length,
     payments: data.payments.filter(x => x.status === 'Yoxlamada').length,
     posts: data.network.filter(x => x.status === 'Yoxlamada').length,
     alumni: data.alumni.filter(x => x.status === 'Yoxlamada').length
   };
-  const badge = (key: View) => key === 'pending_jobs' ? attention.jobs : key === 'reports' ? attention.reports : key === 'companies' ? attention.companies : key === 'payments' ? attention.payments : 0;
+  const badge = (key: View) => key === 'pending_jobs' ? attention.jobs : key === 'reports' ? attention.reports : key === 'mentor_requests' ? attention.mentor : key === 'companies' ? attention.companies : key === 'payments' ? attention.payments : 0;
   const planPrice = new Map(data.plans.map(plan => [plan.id, Number(plan.fields?.monthly_price || 0)]));
   const monthlyRevenue = data.subscriptions.filter(x => x.status === 'Aktiv').reduce((sum, s) => sum + (planPrice.get(String(s.fields?.plan_id || 'free')) || 0), 0);
   const visibleNav = nav.filter(item => item.key !== 'admins' || currentRole === 'super_admin');
@@ -539,6 +548,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
               { label: 'Təsdiq gözləyən elan', n: attention.jobs, view: 'pending_jobs' as View, icon: Clock3 },
               { label: 'Təsdiq gözləyən şirkət', n: attention.companies, view: 'companies' as View, icon: Building2 },
               { label: 'Açıq şikayət', n: attention.reports, view: 'reports' as View, icon: Flag },
+              { label: 'Yeni mentor müraciəti', n: attention.mentor, view: 'mentor_requests' as View, icon: HandHeart },
               { label: 'Gözləyən ödəniş', n: attention.payments, view: 'payments' as View, icon: CreditCard },
               { label: 'AI yoxlamasında paylaşım', n: attention.posts, view: 'network' as View, icon: MessageSquareText },
               { label: 'Təsdiq gözləyən məzun', n: attention.alumni, view: 'alumni' as View, icon: UserCheck }

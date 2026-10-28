@@ -110,6 +110,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
     payload = { year: number(body.year, new Date().getFullYear()), nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: text(body.logo_url) || null, citation: text(body.citation) || null, published: body.published === true || body.published === 'true' || body.published === 'on' };
   }
+  else if (resource === 'mentor_requests') {
+    table = 'mentor_requests';
+    const state = text(body.status);
+    if (!['pending', 'in_review', 'matched', 'completed', 'cancelled'].includes(state)) return NextResponse.json({ error: 'Yanlış status' }, { status: 400 });
+    const mentorName = text(body.mentor_name).slice(0, 120);
+    if (state === 'matched' && !mentorName) return NextResponse.json({ error: 'Mentor təyin etmək üçün mentorun adını yazın' }, { status: 400 });
+    payload = { status: state, mentor_name: mentorName || null, admin_note: text(body.admin_note).slice(0, 1200) || null };
+  }
   else if (resource === 'reports') { table = 'reports'; payload = { status: text(body.status), reviewed_by: context.userId, reviewed_at: new Date().toISOString() }; }
   else if (resource === 'subscriptions') { table = 'subscriptions'; payload = { plan_id: text(body.plan_id), status: text(body.status), approved_by: text(body.status) === 'active' ? context.userId : null }; }
   else if (resource === 'payments') { table = 'payments'; payload = { status: text(body.status), paid_at: text(body.status) === 'paid' ? new Date().toISOString() : null }; }

@@ -1,0 +1,65 @@
+/* Mentor dəstəyi — mövcud ADNSU palitrası, ayrıca stil. */
+.mentor-page{display:grid;gap:19px;min-width:0;max-width:1400px}
+.mentor-hero{padding:clamp(23px,3vw,40px);border-radius:18px;color:#fff;background:linear-gradient(115deg,#071d70,#1641bb 70%,#3962dc);position:relative;overflow:hidden}
+.mentor-hero .eyebrow{color:#c5d7ff;font-size:11px;text-transform:uppercase;letter-spacing:.09em;font-weight:700}
+.mentor-hero h1{font-size:clamp(26px,3vw,39px);color:#fff;letter-spacing:-.04em;margin:11px 0}
+.mentor-hero p{color:#dee7ff;line-height:1.75;max-width:720px;margin:0;font-size:14px}
+.mentor-hero-chip{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.17);padding:8px 12px;border-radius:9px;margin-top:20px;font-size:12px;font-weight:650}
+.mentor-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:7px}
+.mentor-heading h2{font-size:20px;font-weight:800;letter-spacing:-.02em;margin:0}
+.mentor-heading p{font-size:12.5px;color:var(--muted);margin:5px 0 0}
+.mentor-types{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.mentor-type{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:8px;min-height:140px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.mentor-type:hover{background:var(--brand-soft);border-color:var(--brand-ring);transform:translateY(-2px)}
+.mentor-ico{display:grid;place-items:center;width:39px;height:39px;border-radius:10px;color:var(--brand);background:var(--brand-soft);font-size:20px}
+.mentor-type b{font-size:13.5px;font-weight:800}
+.mentor-type small{color:var(--muted);font-size:12px;line-height:1.55}
+.mentor-two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(245px,305px);align-items:start;gap:16px}
+.mentor-page .card{padding:22px;border-radius:15px}
+.mentor-form-box>h2{font-size:19px;margin:0 0 5px}
+.mentor-form-box>p{color:var(--muted);font-size:12.5px;margin:0 0 21px}
+.mentor-form{display:grid;gap:17px}
+.mentor-form .field,.mentor-admin-controls .field{display:grid;gap:7px}
+.mentor-form label,.mentor-admin-controls label{font-size:12.5px;font-weight:750;color:var(--ink)}
+.mentor-page input,.mentor-page textarea,.mentor-page select{width:100%;max-width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--line-2);border-radius:9px;background:var(--surface);color:var(--ink);font-size:13.5px}
+.mentor-page textarea{min-height:110px;line-height:1.6;resize:vertical}
+.mentor-page button:focus-visible,.mentor-page input:focus-visible,.mentor-page select:focus-visible,.mentor-page textarea:focus-visible{outline:3px solid var(--brand-ring);outline-offset:2px}
+.mentor-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.mentor-actions{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding-top:17px;border-top:1px solid var(--line)}
+.mentor-actions small{font-size:11.5px;color:var(--muted);flex:1;min-width:180px}
+.mentor-aside{display:grid;gap:14px}
+.mentor-aside h3{font-size:16px;margin:0 0 15px}
+.mentor-aside ol{list-style:none;padding:0;margin:0;counter-reset:mentor}
+.mentor-aside li{counter-increment:mentor;position:relative;padding:0 0 17px 43px;min-height:53px}
+.mentor-aside li:before{content:counter(mentor);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:8px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:800}
+.mentor-aside li b{display:block;font-size:12.5px}
+.mentor-aside li small{display:block;font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:4px}
+.mentor-tip{background:var(--brand-soft)}
+.mentor-tip b{color:var(--brand);font-size:12.5px}
+.mentor-tip p{font-size:12px;color:var(--ink-2);line-height:1.7;margin:7px 0 0}
+.mentor-list{display:grid;gap:13px}
+.mentor-request{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:21px}
+.mentor-card-head{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:11px}
+.mentor-tag,.mentor-badge{display:inline-block;padding:5px 9px;border-radius:8px;font-weight:700;font-size:11px;background:var(--surface-2);color:var(--ink-2)}
+.mentor-badge-pending{color:#8e6000;background:#fff0c9}
+.mentor-badge-in_review{color:#1b62b7;background:#e8f2ff}
+.mentor-badge-matched,.mentor-badge-completed{color:#147348;background:#e7f8ee}
+.mentor-badge-cancelled{color:#a05858;background:#f9eeee}
+.mentor-request h3{font-size:16px;font-weight:800;overflow-wrap:anywhere;margin:0 0 8px}
+.mentor-request>p{font-size:13px;white-space:pre-wrap;line-height:1.7;overflow-wrap:anywhere;color:var(--ink-2);margin:0 0 13px}
+.mentor-meta{display:flex;gap:10px 19px;flex-wrap:wrap;color:var(--muted);font-size:11.5px}
+.mentor-assigned{padding:10px 13px;border-radius:9px;background:var(--brand-soft);font-size:12px;color:var(--ink-2);margin-top:12px}
+.mentor-assigned b{color:var(--brand)}
+.mentor-admin-controls{display:grid;gap:14px;padding-top:16px;margin-top:18px;border-top:1px solid var(--line)}
+.mentor-admin-controls textarea{min-height:74px}
+.mentor-admin-controls>.btn{justify-self:start}
+.mentor-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.mentor-summary>div{display:grid;gap:5px;padding:17px;background:var(--surface);border:1px solid var(--line);border-radius:13px}
+.mentor-summary span{color:var(--ink-2);font-size:12px}
+.mentor-summary b{color:var(--brand);font-size:29px;line-height:1.2}
+.mentor-empty,.mentor-note{border:1px dashed var(--line-2);border-radius:13px;background:var(--surface);padding:25px;display:grid;gap:6px;text-align:center;color:var(--muted)}
+.mentor-empty b{color:var(--ink)}
+@media(max-width:1180px){.mentor-types{grid-template-columns:repeat(3,minmax(0,1fr))}.mentor-two-col{grid-template-columns:1fr}}
+@media(max-width:720px){.mentor-types{grid-template-columns:repeat(2,minmax(0,1fr))}.mentor-grid2,.mentor-summary{grid-template-columns:1fr}.mentor-page .card{padding:18px}}
+@media(max-width:450px){.mentor-types{grid-template-columns:1fr}.mentor-type{min-height:100px}.mentor-actions>.btn{width:100%}.mentor-page input,.mentor-page select,.mentor-page textarea{font-size:16px}}
+@media(prefers-reduced-motion:reduce){.mentor-type{transition:none}.mentor-type:hover{transform:none}}

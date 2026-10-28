@@ -1,7 +1,7 @@
 export type Status = 'Aktiv' | 'Qaralama' | 'Bitib' | 'Yoxlamada';
 export type ResourceKey =
   | 'jobs' | 'pending_jobs' | 'companies' | 'events' | 'benefits' | 'awards' | 'ads' | 'applications'
-  | 'students' | 'master_students' | 'alumni'
+  | 'students' | 'master_students' | 'alumni' | 'mentor_requests'
   | 'network' | 'reports' | 'moderation_logs' | 'subscriptions' | 'plans' | 'payments'
   | 'cv_analytics' | 'interview_analytics' | 'ai_usage'
   | 'notifications' | 'content' | 'admins' | 'audit_logs';

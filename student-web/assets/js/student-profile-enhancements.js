@@ -42,8 +42,12 @@
       '<h2>Mentor dəstəyi</h2>',
       '<p>CV və LinkedIn, müsahibə hazırlığı, iş və təcrübə axtarışı, şəxsi karyera planı.</p>',
       '</div>',
-      '<a class="btn primary student-mentor-button" href="mailto:career@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">',
-      'Mentora müraciət et</a>'
+      /* Mentor dəstəyi səhifəsi varsa ora keçir (müraciət formu + AI mentor), yoxdursa e-poçt */
+      (typeof VIEWS !== 'undefined' && VIEWS.student && VIEWS.student.mentor
+        ? '<button type="button" class="btn primary student-mentor-button" data-act="go" data-view="mentor">'
+        : '<a class="btn primary student-mentor-button" href="mailto:career@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">'),
+      'Mentora müraciət et',
+      (typeof VIEWS !== 'undefined' && VIEWS.student && VIEWS.student.mentor ? '</button>' : '</a>')
     ].join('');
     return el;
   }

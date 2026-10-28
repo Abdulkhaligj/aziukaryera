@@ -13,7 +13,7 @@ export type AdminContext = {
   mustChangePassword: boolean;
 };
 
-export const resourceKeys: ResourceKey[] = ['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'ads', 'applications', 'students', 'master_students', 'alumni', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs'];
+export const resourceKeys: ResourceKey[] = ['jobs', 'pending_jobs', 'companies', 'events', 'benefits', 'awards', 'ads', 'applications', 'students', 'master_students', 'alumni', 'mentor_requests', 'network', 'reports', 'moderation_logs', 'subscriptions', 'plans', 'payments', 'cv_analytics', 'interview_analytics', 'ai_usage', 'notifications', 'content', 'admins', 'audit_logs'];
 
 const adminRoles: AdminRole[] = ['super_admin', 'manager', 'editor', 'reviewer'];
 
@@ -98,6 +98,8 @@ async function signAvatars(context: AdminContext, paths: unknown[]): Promise<Rec
   (data || []).forEach(item => { if (item.path && item.signedUrl && !item.error) out[item.path] = item.signedUrl; });
   return out;
 }
+export const mentorCategory: Record<string, string> = { karyera: 'Karyera istiqaməti', cv: 'CV və portfolio', 'müsahibə': 'Müsahibə hazırlığı', texniki: 'Texniki bacarıqlar', startap: 'Startap və layihələr', magistr: 'Magistr və təhsil', 'şəbəkələşmə': 'Şəbəkələşmə' };
+export const mentorStatus: Record<string, string> = { pending: 'Yeni müraciət', in_review: 'Baxılır', matched: 'Mentor təyin edilib', completed: 'Tamamlanıb', cancelled: 'Bağlanıb' };
 const logoOf = (url: unknown) => typeof url === 'string' && /^https:\/\//i.test(url) ? url : undefined;
 const photo = (pics: Record<string, string>, path: unknown) => (typeof path === 'string' && pics[path]) || undefined;
 
@@ -184,6 +186,18 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'İstifadəçi', subtitle: row.body, avatar: photo(pics, row.profiles?.avatar_path), avatarKind: 'photo' as const, status: row.moderation_status === 'visible' ? 'Aktiv' : row.moderation_status === 'hidden' ? 'Bitib' : 'Yoxlamada', meta: `${row.kind || 'general'} · ${(row.tags || []).map((x: string) => `#${x}`).join(' ')}`, updatedAt: dateLabel(row.created_at), fields: { moderation_status: row.moderation_status, kind: row.kind } }));
+  }
+  if (resource === 'mentor_requests') {
+    const { data, error } = await supabase.from('mentor_requests').select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at,profiles(full_name,email,avatar_path)').order('created_at', { ascending: false });
+    if (error) throw error;
+    const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
+    const states: Record<string, Status> = { pending: 'Yoxlamada', in_review: 'Yoxlamada', matched: 'Aktiv', completed: 'Bitib', cancelled: 'Bitib' };
+    return (data || []).map((row: any) => ({
+      id: row.id, title: row.profiles?.full_name || 'Tələbə', subtitle: `${mentorCategory[row.category] || row.category || 'Mentor'} · ${row.topic || ''}`,
+      status: states[row.status] || 'Yoxlamada', meta: row.mentor_name ? `Mentor: ${row.mentor_name}` : (mentorStatus[row.status] || row.status || 'Yeni müraciət'),
+      updatedAt: dateLabel(row.created_at), avatar: photo(pics, row.profiles?.avatar_path), avatarKind: 'photo' as const,
+      fields: { status: row.status, mentor_name: row.mentor_name, admin_note: row.admin_note, category: row.category, topic: row.topic, details: row.details, format: row.format, preferred_time: row.preferred_time, email: row.profiles?.email || '' }
+    }));
   }
   if (resource === 'reports') {
     const { data, error } = await supabase.from('reports').select('id,target_type,target_id,reason,details,status,created_at,profiles!reports_reporter_id_fkey(full_name)').order('created_at', { ascending: false });
