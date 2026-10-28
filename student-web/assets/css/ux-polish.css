@@ -83,7 +83,7 @@
 .aida-suggestions button:hover { border-color: var(--aida-blue); }
 .aida-suggestions .aida-link { background: var(--brand-soft, #e6eaff); }
 .aida-form { padding: 11px 11px 7px; border-top: 1px solid var(--line, #e0e7f2); display: flex; align-items: flex-end; gap: 8px; }
-.aida-form textarea { flex: 1; min-width: 0; min-height: 41px; max-height: 110px; resize: vertical; padding: 11px 12px; border: 1px solid var(--line, #dce4f1); background: var(--surface-2, #f9fbff); color: var(--ink, #17213e); border-radius: 12px; font: 12.5px/1.45 inherit; }
+.aida-form textarea { flex: 1; min-width: 0; min-height: 41px; max-height: 110px; resize: vertical; padding: 11px 12px; border: 1px solid var(--line, #dce4f1); background: var(--surface-2, #f9fbff); color: var(--ink, #17213e); border-radius: 12px; font-size: 12.5px; line-height: 1.45; font-family: inherit; }
 .aida-send { flex: none; width: 42px; height: 42px; border-radius: 12px; border: 0; display: grid; place-items: center; background: var(--aida-blue); color: #fff; }
 .aida-send:hover { filter: brightness(1.09); }
 .aida-send:disabled { opacity: .55; cursor: wait; }
