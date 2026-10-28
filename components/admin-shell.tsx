@@ -243,6 +243,7 @@ function ReadOnlyDetails({ row }: { row: AdminRow }) {
 }
 
 type Secret = { title: string; email: string; password: string };
+type ApprovalNote = { id: string; title: string; actor_name: string | null; created_at: string };
 
 export default function AdminShell({ initialData, initialErrors, lookups, notice: initialNotice, currentUser, currentEmail, currentRole, currentUserId }: {
   initialData: Store; initialErrors: Partial<Record<ResourceKey, string>>; lookups: Lookups; notice?: string;
@@ -266,6 +267,11 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
   const [copied, setCopied] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetPhrase, setResetPhrase] = useState('');
+  const [approvalNotes, setApprovalNotes] = useState<ApprovalNote[]>([]);
+  const [approvalNoteOpen, setApprovalNoteOpen] = useState(false);
+  const [approvalNoteText, setApprovalNoteText] = useState('');
+  const [approvalNoteError, setApprovalNoteError] = useState('');
+  const [approvalNoteBusy, setApprovalNoteBusy] = useState(false);
 
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4200); return () => clearTimeout(t); }, [toast]);
   /* Açıq pəncərə və ya menyu varkən arxa fon sürüşməsin (telefon) */
@@ -275,6 +281,25 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   }, [busy]);
 
+  useEffect(() => {
+    if (active !== 'pending_jobs' || modal?.mode !== 'edit' || !modal.row?.id) {
+      setApprovalNotes([]); setApprovalNoteOpen(false); setApprovalNoteText(''); setApprovalNoteError('');
+      return;
+    }
+    let cancelled = false;
+    const jobId = modal.row.id;
+    setApprovalNotes([]); setApprovalNoteOpen(false); setApprovalNoteText(''); setApprovalNoteError('');
+    fetch(`/api/admin/approval-notes?job_id=${encodeURIComponent(jobId)}`, { cache: 'no-store' })
+      .then(async response => {
+        const payload = await response.json();
+        if (response.status === 401) { window.location.href = '/login'; return { notes: [] }; }
+        if (!response.ok) throw new Error(payload.error || 'Qeydlər yüklənmədi');
+        return payload;
+      })
+      .then(payload => { if (!cancelled) setApprovalNotes(payload.notes || []); })
+      .catch(error => { if (!cancelled) setApprovalNoteError(error instanceof Error ? error.message : 'Qeydlər yüklənmədi'); });
+    return () => { cancelled = true; };
+  }, [active, modal?.mode, modal?.row?.id]);
   const current = active === 'dashboard' ? [] : data[active];
   const counts = useMemo(() => Object.fromEntries(statuses.map(s => [s, current.filter(r => r.status === s).length])) as Record<Status, number>, [current]);
   const filtered = useMemo(() => {
@@ -351,6 +376,32 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     finally { setBusy(false); }
   }
 
+  async function recordApprovalNote() {
+    if (active !== 'pending_jobs' || !modal?.row?.id || !can(currentRole, 'edit', 'pending_jobs')) return;
+    const note = approvalNoteText.trim();
+    if (!note || note.length > 1200) {
+      setApprovalNoteError('Qeyd 1–1200 simvol arasında olmalıdır.');
+      return;
+    }
+    setApprovalNoteBusy(true); setApprovalNoteError('');
+    try {
+      const response = await fetch('/api/admin/approval-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: modal.row.id, note })
+      });
+      const result = await response.json();
+      if (response.status === 401) { window.location.href = '/login'; return; }
+      if (!response.ok) throw new Error(result.error || 'Qeyd saxlanılmadı');
+      setApprovalNotes(previous => [result.note as ApprovalNote, ...previous]);
+      setApprovalNoteText(''); setApprovalNoteOpen(false);
+      setToast({ tone: 'good', text: 'Daxili qeyd yadda saxlanıldı.' });
+    } catch (caught) {
+      setApprovalNoteError(caught instanceof Error ? caught.message : 'Qeyd yadda saxlanılmadı');
+    } finally {
+      setApprovalNoteBusy(false);
+    }
+  }
   async function removeRow(row: AdminRow) {
     if (active === 'dashboard') return;
     if (!window.confirm(`“${row.title}” qeydi silinsin? Bu əməliyyat geri qaytarılmır.`)) return;
@@ -541,7 +592,27 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
             ? <EditorFields resource={resource} row={modal.row} data={data} lookups={lookups} mode={modal.mode} self={editingSelf}/>
             : modal.row && <ReadOnlyDetails row={modal.row}/>}
           {resource === 'admins' && modal.mode === 'edit' && modal.row && !editingSelf && <div className="noticeBox subtle"><KeyRound size={16}/> Əməkdaş şifrəni unudubsa, “Şifrəni sıfırla” ilə yeni müvəqqəti şifrə verin.</div>}
-          {formError && <div className="errorBox" role="alert">{formError}</div>}
+          {resource === 'pending_jobs' && modal.mode === 'edit' && modal.row && <section className="approvalNotes" aria-label="Təsdiq üzrə daxili qeydlər">
+            <div className="approvalNotesHead"><strong>Daxili qeydlər</strong><small>Yalnız admin panelində görünür; şirkətə göndərilmir.</small></div>
+            {approvalNotes.length > 0 && <div className="approvalNotesList">
+              {approvalNotes.map(note => <article key={note.id}>
+                <div><b>{note.actor_name || 'Admin'}</b><time>{new Date(note.created_at).toLocaleString('az-AZ', { timeZone: 'Asia/Baku' })}</time></div>
+                <p>{note.title}</p>
+              </article>)}
+            </div>}
+            {approvalNoteOpen && canEdit && <div className="approvalNoteEditor">
+              <label className="field">Qeydin mətni<textarea value={approvalNoteText} onChange={event => setApprovalNoteText(event.target.value)} maxLength={1200} rows={3} placeholder="Təsdiqlə bağlı daxili qeydi yazın…"/></label>
+              <div className="approvalNoteControls">
+                <small>{approvalNoteText.length}/1200</small>
+                <button type="button" className="secondaryButton" onClick={() => { setApprovalNoteOpen(false); setApprovalNoteError(''); }} disabled={approvalNoteBusy}>Ləğv et</button>
+                <button type="button" className="primaryButton" onClick={recordApprovalNote} disabled={approvalNoteBusy || !approvalNoteText.trim()}>
+                  {approvalNoteBusy ? <LoaderCircle size={16} className="spin"/> : <Save size={16}/>}
+                  {approvalNoteBusy ? 'Saxlanılır…' : 'Qeydi saxla'}
+                </button>
+              </div>
+            </div>}
+            {approvalNoteError && <div className="errorBox" role="alert">{approvalNoteError}</div>}
+          </section>}          {formError && <div className="errorBox" role="alert">{formError}</div>}
         </div>
         <div className="modalActions">
           {modal.mode === 'edit' && canDelete && modal.row && !editingSelf && <button type="button" className="dangerButton" onClick={() => modal.row && removeRow(modal.row)} disabled={busy}><Trash2 size={17}/>Sil</button>}
@@ -549,6 +620,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
           <span className="spacer"/>
           <button type="button" className="secondaryButton" onClick={() => setModal(null)} disabled={busy}>{(modal.mode === 'create' ? canCreate : canEdit) ? 'Ləğv et' : 'Bağla'}</button>
           {(modal.mode === 'create' ? canCreate : canEdit) && <button className="primaryButton" type="submit" disabled={busy}>{busy ? <LoaderCircle size={17} className="spin"/> : <Save size={17}/>}{busy ? 'Saxlanılır…' : 'Yadda saxla'}</button>}
+          {resource === 'pending_jobs' && modal.mode === 'edit' && canEdit && <button type="button" className="secondaryButton" onClick={() => setApprovalNoteOpen(open => !open)} disabled={busy || approvalNoteBusy}><MessageSquareText size={17}/>Qeyd et</button>}
         </div>
       </form>
     </div>}
