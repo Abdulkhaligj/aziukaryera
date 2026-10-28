@@ -29,20 +29,22 @@ const Landing = {
         jobs: OPPORTUNITIES.filter(j => j.status === 'approved' && j.deadline >= today),
         companies: COMPANIES,
         events: EVENTS.filter(e => e.date >= today),
-        benefits: []
+        benefits: [],
+        awards: []
       };
       return;
     }
     try {
       const sb = Backend.init() ? Backend.sb : window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-      const [jobs, cos, evs, bens, parts, facs, majs] = await Promise.all([
+      const [jobs, cos, evs, bens, parts, facs, majs, awards] = await Promise.all([
         sb.from('jobs').select('*').eq('status', 'approved').gte('deadline', today).order('deadline'),
         sb.from('companies').select('*').eq('status', 'active').order('name'),
         sb.from('events').select('*').gte('starts_at', `${today}T00:00:00`).order('starts_at'),
         sb.from('benefits').select('*').eq('active', true),
         sb.from('benefit_partners').select('*'),
         sb.from('faculties').select('*').order('sort_order'),
-        sb.from('majors').select('*')
+        sb.from('majors').select('*'),
+        sb.from('company_awards').select('id,year,nomination,tier,company_name,logo_url,citation').eq('published', true).order('year', { ascending: false }).limit(20)
       ]);
       const tax = Adapt.taxonomy(facs.data || [], majs.data || []);
       const nameById = {};
@@ -53,7 +55,7 @@ const Landing = {
       this.data = {
         jobs: (jobs.data || []).map(j => Adapt.job(j, tax, nameById)),
         companies: (cos.data || []).map(c => ({
-          id: c.id, name: c.name, sector: c.sector || '—', about: c.about || '', city: 'Bakı'
+          id: c.id, name: c.name, logoUrl: c.logo_url || '', sector: c.sector || '—', about: c.about || '', city: 'Bakı'
         })),
         events: (evs.data || []).map(e => ({
           id: e.id, title: e.title, type: e.kind || '', date: e.starts_at.slice(0, 10),
@@ -63,11 +65,15 @@ const Landing = {
           title: b.title, discount: b.discount_label || '', description: b.description || '',
           partner: (partById[b.partner_id] || {}).name || '',
           emoji: (partById[b.partner_id] || {}).emoji || '◈'
+        })),
+        awards: (awards.data || []).map(a => ({
+          id: a.id, year: a.year, nomination: a.nomination || '', tier: a.tier || '',
+          company: a.company_name || '', logoUrl: a.logo_url || '', citation: a.citation || ''
         }))
       };
     } catch (e) {
       console.warn('Açılış məlumatı yüklənmədi:', e);
-      this.data = { jobs: [], companies: [], events: [], benefits: [] };
+      this.data = { jobs: [], companies: [], events: [], benefits: [], awards: [] };
     }
   },
 
@@ -154,6 +160,17 @@ const Landing = {
 
     const cities = [...new Set(d.jobs.map(j => j.location.split(' ')[0].replace(/[(),]/g, '')))].filter(Boolean).sort();
 
+    const companyLogos = d.companies.map(company => ({
+      name: company.name,
+      src: /^https:\/\//i.test(String(company.logoUrl || ''))
+        ? company.logoUrl
+        : (typeof companyLogoPath === 'function' ? companyLogoPath(company.name) : '')
+    })).filter(item => item.src);
+    const logoTiles = companyLogos.map(item => `<span class="lp-lgo" role="img" aria-label="${esc(item.name)}">
+      <img src="${esc(item.src)}" alt="${esc(item.name)}" loading="lazy" decoding="async"></span>`).join('');
+    const logoTilesCopy = companyLogos.map(item => `<span class="lp-lgo" aria-hidden="true">
+      <img src="${esc(item.src)}" alt="" loading="lazy" decoding="async"></span>`).join('');
+
     return `<div class="lp">
 
   <div class="lp-promo"><div class="wrap">
@@ -170,6 +187,8 @@ const Landing = {
       <button data-lp="scroll" data-to="lp-perks">Güzəştlər</button>
       <button data-lp="scroll" data-to="lp-how">Necə işləyir</button>
       <button data-lp="scroll" data-to="lp-faq">Suallar</button>
+      <button data-lp="scroll" data-to="lp-mentor">Mentor</button>
+      <button data-lp="scroll" data-to="lp-awards">Awards</button>
     </nav>
     <div class="right">
       ${signedIn
@@ -187,6 +206,8 @@ const Landing = {
     <button data-lp="scroll" data-to="lp-events">Tədbirlər</button>
     <button data-lp="scroll" data-to="lp-perks">Güzəştlər</button>
     <button data-lp="scroll" data-to="lp-how">Necə işləyir</button>
+    <button data-lp="scroll" data-to="lp-mentor">Mentor dəstəyi</button>
+    <button data-lp="scroll" data-to="lp-awards">Career Awards</button>
     <div style="display:flex;gap:10px;margin-top:10px">
       ${signedIn
         ? '<button class="b b-primary b-block" data-lp="dashboard">Kabinetə qayıt</button>'
@@ -236,10 +257,8 @@ const Landing = {
       <h2>Səni gözləyən şirkətlər</h2>
       <p class="lede center" style="margin-top:12px">ADNSU tələbələrinə elan verən tərəfdaşlar.</p>
     </div>
-    <div class="lp-logos"><div class="lp-track">
-      ${d.companies.map(c => `<span class="lp-lgo">
-        <span class="m${companyLogoClass(c.name)}" style="background:${this.grad(c.name)}">${companyMark(c.name)}</span>
-        <span>${esc(c.name)}</span></span>`).join('')}
+    <div class="lp-logos" aria-label="Tərəfdaş şirkətlərin loqoları"><div class="lp-track">
+      ${logoTiles}${logoTilesCopy}
     </div></div>
   </div></section>
 
@@ -370,6 +389,32 @@ const Landing = {
     </div>
   </div></section>
 
+  <section class="lp-sec lp-mentor-sec" id="lp-mentor"><div class="wrap">
+    <div class="lp-mentor-panel">
+      <div class="lp-mentor-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="3"/><path d="M5 21v-2a7 7 0 0 1 14 0v2M4 8h2M18 8h2M6 4l2 2M18 4l-2 2"/></svg></div>
+      <div class="lp-mentor-content"><p class="kicker">Şəxsi karyera inkişafı</p><h2>Mentor dəstəyi</h2>
+        <p>CV-ni təkmilləşdirmək, müsahibəyə hazırlaşmaq, təcrübə və ilk iş üçün yol xəritəsi qurmaq istəyirsən? ADNSU Karyera Mərkəzinə mentor dəstəyi üçün müraciət edə bilərsən.</p>
+        <div class="lp-mentor-tags"><span>CV və LinkedIn</span><span>Müsahibə hazırlığı</span><span>Karyera planı</span><span>İş və təcrübə</span></div>
+      </div>
+      <a class="b b-primary b-lg lp-mentor-button" href="mailto:career@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">Mentor dəstəyi üçün yaz</a>
+    </div>
+  </div></section>
+
+  <section class="lp-sec lp-awards-sec" id="lp-awards"><div class="wrap">
+    <div class="lp-sec-top"><div><p class="kicker">ADNSU Karyera Mərkəzi</p><h2>Career Awards</h2>
+      <p class="lede" style="margin-top:10px">İşəgötürən tərəfdaşların rəsmi mükafatlandırılması.</p></div></div>
+    <div class="lp-awards-grid">
+      ${(d.awards || []).length ? d.awards.map(award => `<article class="lp-award-card">
+        <div class="lp-award-medal ${['gold','silver','bronze'].includes(award.tier) ? 'tier-'+award.tier : ''}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+          <path d="m8 3 4 8 4-8M6 3h12"/><circle cx="12" cy="16" r="5"/></svg></div>
+        <div class="lp-award-content"><span class="lp-award-year">${esc(String(award.year))}</span>
+          <h3>${esc(award.nomination)}</h3><strong>${esc(award.company)}</strong>
+          ${award.citation ? `<p>${esc(award.citation)}</p>` : ''}</div>
+        ${/^https:\/\//i.test(award.logoUrl) ? `<img class="lp-award-logo" src="${esc(award.logoUrl)}" alt="${esc(award.company)} loqosu" loading="lazy">` : ''}
+      </article>`).join('') : '<div class="lp-award-empty">Növbəti rəsmi mükafatlandırma məlumatları burada paylaşılacaq.</div>'}
+    </div>
+  </div></section>
   <section class="lp-sec" id="lp-events"><div class="wrap">
     <div class="lp-sec-top"><div><p class="kicker">Tədbirlər</p><h2>Yaxınlaşan tədbirlər</h2></div></div>
     <div class="lp-grid lp-g3">
@@ -449,6 +494,8 @@ const Landing = {
         <li><button data-lp="scroll" data-to="lp-jobs">Vakansiyalar</button></li>
         <li><button data-lp="scroll" data-to="lp-events">Tədbirlər</button></li>
         <li><button data-lp="scroll" data-to="lp-perks">Güzəştlər</button></li>
+        <li><button data-lp="scroll" data-to="lp-mentor">Mentor dəstəyi</button></li>
+        <li><button data-lp="scroll" data-to="lp-awards">Career Awards</button></li>
       </ul></div>
       <div class="lp-fcol"><h4>Şirkətlər</h4><ul>
         <li><button data-lp="auth-register">Şirkət hesabı aç</button></li>
