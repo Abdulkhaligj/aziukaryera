@@ -44,6 +44,7 @@
     .em-upgrade,
     .registration-plans,
     .field:has(> .registration-plans),
+    .field:has([data-act="auth-plan"]),
     [data-act="plan-select"],
     [data-act="go"][data-view="subscription"],
     [data-act="auth-plan"] {

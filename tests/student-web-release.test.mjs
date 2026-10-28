@@ -14,6 +14,20 @@ test('company registration is presented without package marketing', () => {
   assert.match(index, /app\.js\?v=20261028b/);
 });
 
+test('public landing omits employer pricing without removing vacancy or events routes', () => {
+  const landing = read('student-web/assets/js/landing.js');
+  const index = read('student-web/index.html');
+  const hold = read('student-web/assets/js/company-package-hold.js');
+  assert.doesNotMatch(landing, /id="lp-pricing"/);
+  assert.doesNotMatch(landing, /Şirkət paketləri/);
+  assert.doesNotMatch(landing, /class="plan-grid"/);
+  assert.match(landing, /id="lp-events"/);
+  assert.match(landing, /id="lp-jobs"/);
+  assert.match(index, /landing\.js\?v=20261028c/);
+  assert.match(index, /company-package-hold\.js\?v=20261028c/);
+  assert.match(hold, /\.field:has\(\[data-act="auth-plan"\]\)/);
+});
+
 test('company profile guard gives safe fallback while preserving linked employer views', () => {
   const context = {
     VIEWS: { company: { dashboard: () => 'DASHBOARD', talent: () => 'TALENT POOL' } },

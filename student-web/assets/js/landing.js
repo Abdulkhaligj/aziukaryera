@@ -370,19 +370,6 @@ const Landing = {
     </div>
   </div></section>
 
-  <section class="lp-sec" id="lp-pricing"><div class="wrap">
-    <div class="center" style="max-width:700px;margin-bottom:30px"><p class="kicker">Şirkət paketləri</p><h2>İşə qəbul tempinizə uyğun plan</h2>
-      <p class="lede center" style="margin-top:12px">Tələbələr üçün bütün funksiyalar pulsuzdur. Şirkətlər Free ilə başlayıb ehtiyac olduqda yüksəldə bilər.</p></div>
-    <div class="plan-grid">
-      ${COMPANY_PLANS.map(plan => `<article class="plan-card ${plan.featured ? 'featured' : ''}">
-        ${plan.featured ? '<span class="plan-pop">Ən çox seçilən</span>' : ''}<h3>${esc(plan.name)}</h3>
-        <div class="plan-price"><b>$${esc(plan.price)}</b><span>${plan.price === '0' ? 'həmişəlik' : '/ ay'}</span></div>
-        <p>${esc(plan.description)}</p><ul>${plan.features.map(x => `<li>✓ ${esc(x)}</li>`).join('')}</ul>
-        <button class="b ${plan.featured ? 'b-primary' : 'b-outline'} b-block" data-lp="auth-register">${plan.id === 'free' ? 'Pulsuz başla' : `${esc(plan.name)} seç`}</button>
-      </article>`).join('')}
-    </div>
-  </div></section>
-
   <section class="lp-sec" id="lp-events"><div class="wrap">
     <div class="lp-sec-top"><div><p class="kicker">Tədbirlər</p><h2>Yaxınlaşan tədbirlər</h2></div></div>
     <div class="lp-grid lp-g3">
