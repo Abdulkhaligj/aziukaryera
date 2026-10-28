@@ -157,7 +157,7 @@ const Landing = {
     return `<div class="lp">
 
   <div class="lp-promo"><div class="wrap">
-    <span><b>ADNSU Career &amp; Innovation Fair 2026</b> — 24 oktyabr, əsas korpus. Qeydiyyat açıqdır.</span>
+    <span><b>ADNSU Karyera</b> — tələbə və məzunları işəgötürənlərlə birləşdirən karyera platforması.</span>
     <button class="b b-white" data-lp="${signedIn ? 'dashboard' : 'auth-register'}">${signedIn ? 'Kabinetə qayıt' : 'Hesab yarat'}</button>
   </div></div>
 
@@ -220,6 +220,7 @@ const Landing = {
       <div class="lp-cta">
         <button class="b b-primary b-lg" data-lp="auth-register">Pulsuz başla</button>
         <button class="b b-outline b-lg" data-lp="scroll" data-to="lp-companies">Şirkətləri kəşf et</button>
+        <button class="b b-lg aida-hero-cta" type="button" data-aida-open aria-label="AIDA AI köməkçisinə sual ver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="6" width="16" height="13" rx="4"/><path d="M12 3v3M8 12h.01M16 12h.01"/></svg>AIDA ilə danış</button>
       </div>
     </div>
 
@@ -334,7 +335,7 @@ const Landing = {
       <div class="lp-f">
         <p class="kicker">CV Mərkəzi</p>
         <h3>CV yarat, yoxlat, vakansiya ilə tutuşdur</h3>
-        <p>Profil məlumatından CV hazırlama, PDF ixracı, ATS analizi və yalnız sizin başladığınız zaman işləyən AI məzmun rəyi. Şablonlu qurucu təqdim edilən kodla bu modulun içinə qoşulacaq.</p>
+        <p>Profil məlumatlarından CV hazırlamaq, PDF ixrac etmək, ATS balını görmək və istədikdə AI ilə məzmun analizi aparmaq mümkündür.</p>
         <div class="lp-pills" style="margin-top:4px">
           <span class="lp-pill blue">Profil → CV</span><span class="lp-pill">ATS</span><span class="lp-pill">PDF</span>
         </div>

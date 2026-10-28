@@ -1,0 +1,99 @@
+/* ADNSU Karyera visual consistency pass — no new theme or layout system. */
+.rail a[data-view] { min-height: 40px; border-radius: 12px; line-height: 1.45; }
+.rail a[data-view] .ico { width: 24px; min-width: 24px; display: inline-grid; place-items: center; color: currentColor; }
+.adnsu-ux-icon { width: 19px; height: 19px; flex-shrink: 0; display: block; }
+.rail a[data-view]:hover .ico, .rail a[aria-current="page"] .ico { color: var(--brand); }
+.rail a[aria-current="page"] { font-weight: 700; }
+.account-choice-grid [data-account] .account-choice-icon .adnsu-ux-icon { width: 23px; height: 23px; }
+.notification-bell .adnsu-ux-icon { width: 21px; height: 21px; }
+.searchbar > .ico .adnsu-ux-icon { width: 17px; height: 17px; }
+.rail a[data-view]:focus-visible,
+.lp button:focus-visible,
+.topbar button:focus-visible,
+.account-choice-grid button:focus-visible,
+.aida-widget button:focus-visible,
+.aida-widget textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 68%, white);
+  outline-offset: 2px;
+}
+.card, .lp-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; }
+.lp-card-click:hover, .lp-card-button:hover { transform: translateY(-2px); }
+.lp-cta { flex-wrap: wrap; }
+.lp-cta .aida-hero-cta { border: 1px solid color-mix(in srgb, var(--brand) 38%, var(--line)); background: var(--brand-soft); color: var(--brand); }
+.lp-cta .aida-hero-cta:hover { background: color-mix(in srgb, var(--brand-soft) 68%, var(--surface)); border-color: var(--brand); }
+.lp-cta .aida-hero-cta svg { width: 18px; height: 18px; margin-right: 5px; vertical-align: middle; }
+.ai-panel { position: relative; overflow: hidden; }
+.ai-panel:has([data-act="cv-ai-analyze"]:disabled)::after {
+  content: ""; display: block; height: 3px; width: 38%; border-radius: 3px;
+  background: var(--brand); position: absolute; left: 0; bottom: 0; animation: aida-progress 1.55s ease-in-out infinite;
+}
+.bar > i { transition: width .75s cubic-bezier(.22,1,.36,1); }
+@keyframes aida-progress { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.aida-widget {
+  --aida-blue: var(--brand, #113d9b);
+  position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 1000; font-family: var(--font-sans, system-ui, sans-serif); color: var(--ink, #17213e);
+}
+.aida-widget *, .aida-widget *::before, .aida-widget *::after { box-sizing: border-box; }
+.aida-widget button { cursor: pointer; font-family: inherit; }
+.aida-widget [hidden] { display: none !important; }
+.aida-launch {
+  border: 1px solid rgba(255,255,255,.16); background: var(--aida-blue);
+  color: #fff; border-radius: 19px; display: inline-flex; align-items: center;
+  gap: 10px; padding: 10px 14px 10px 10px; min-height: 56px;
+  box-shadow: 0 12px 32px rgba(0,28,128,.22), 0 3px 8px rgba(0,28,128,.13);
+  float: right; transition: transform .17s, box-shadow .17s;
+}
+.aida-launch:hover { transform: translateY(-2px); box-shadow: 0 18px 36px rgba(0,28,128,.28); }
+.aida-launch-symbol { background: rgba(255,255,255,.17); width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; }
+.aida-launch-copy { display: grid; text-align: left; gap: 2px; }
+.aida-launch-copy b { font-size: 13px; letter-spacing: .035em; line-height: 1.15; }
+.aida-launch-copy small { font-size: 10.5px; opacity: .88; font-weight: 500; white-space: nowrap; }
+.aida-panel {
+  width: min(390px, calc(100vw - 26px)); height: min(575px, calc(100dvh - 110px));
+  display: flex; flex-direction: column;
+  position: absolute; right: 0; bottom: 68px;
+  background: var(--surface, #fff); color: var(--ink, #17213e);
+  border: 1px solid var(--line, #dce4f1); border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(15,30,67,.22), 0 4px 14px rgba(15,30,67,.08);
+  overflow: hidden; animation: aida-rise .18s ease-out; text-align: left;
+}
+@keyframes aida-rise { from { transform: translateY(9px); opacity: .2; } to { transform: translateY(0); opacity: 1; } }
+.aida-header {
+  display: flex; align-items: center; gap: 10px; padding: 15px 15px;
+  color: #fff; background: linear-gradient(117deg, #001c80, #2358bc);
+}
+.aida-avatar { width: 39px; height: 39px; border-radius: 13px; display: grid; place-items: center; background: rgba(255,255,255,.17); }
+.aida-header div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.aida-header strong { font-size: 15px; letter-spacing: .02em; }
+.aida-header small { font-size: 11px; opacity: .9; }
+.aida-close { display: grid; place-items: center; background: rgba(255,255,255,.12); border: 0; width: 33px; height: 33px; border-radius: 9px; color: #fff; }
+.aida-close:hover { background: rgba(255,255,255,.2); }
+.aida-chat { flex: 1; min-height: 0; overflow-y: auto; padding: 17px 14px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; background: var(--surface, #fff); }
+.aida-msg { display: flex; max-width: 92%; }
+.aida-bot { align-self: flex-start; }
+.aida-user { align-self: flex-end; }
+.aida-bubble { padding: 11px 13px; font-size: 12.8px; line-height: 1.6; border-radius: 15px 15px 15px 4px; background: var(--surface-2, #f0f4fc); border: 1px solid var(--line, #e0e7f2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.aida-user .aida-bubble { border: 1px solid var(--aida-blue); background: var(--aida-blue); color: #fff; border-radius: 15px 15px 4px 15px; }
+.aida-waiting .aida-bubble { opacity: .68; animation: aida-pulse 1.1s ease-in-out infinite alternate; }
+@keyframes aida-pulse { to { opacity: 1; } }
+.aida-extras { padding: 0 12px 10px; }
+.aida-suggestions { display: flex; gap: 6px; flex-wrap: wrap; max-height: 86px; overflow-y: auto; }
+.aida-suggestions button { background: var(--surface-2, #f5f8ff); border: 1px solid var(--line, #dce4f1); color: var(--aida-blue); border-radius: 100px; padding: 7px 10px; font-size: 11px; line-height: 1.25; font-weight: 650; }
+.aida-suggestions button:hover { border-color: var(--aida-blue); }
+.aida-suggestions .aida-link { background: var(--brand-soft, #e6eaff); }
+.aida-form { padding: 11px 11px 7px; border-top: 1px solid var(--line, #e0e7f2); display: flex; align-items: flex-end; gap: 8px; }
+.aida-form textarea { flex: 1; min-width: 0; min-height: 41px; max-height: 110px; resize: vertical; padding: 11px 12px; border: 1px solid var(--line, #dce4f1); background: var(--surface-2, #f9fbff); color: var(--ink, #17213e); border-radius: 12px; font-size: 12.5px; line-height: 1.45; font-family: inherit; }
+.aida-send { flex: none; width: 42px; height: 42px; border-radius: 12px; border: 0; display: grid; place-items: center; background: var(--aida-blue); color: #fff; }
+.aida-send:hover { filter: brightness(1.09); }
+.aida-send:disabled { opacity: .55; cursor: wait; }
+.aida-disclaimer { color: var(--muted, #65748d); padding: 0 12px 10px; margin: 0; font-size: 10px; line-height: 1.4; }
+.aida-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+@media (max-width: 600px) {
+  .aida-widget { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
+  .aida-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 90px); bottom: 65px; }
+  .aida-launch { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aida-panel, .aida-launch, .ai-panel::after, .aida-waiting .aida-bubble, .card, .lp-card { animation: none !important; transition: none !important; }
+}
