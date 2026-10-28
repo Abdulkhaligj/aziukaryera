@@ -105,7 +105,26 @@ function FacultyMajorPicker({ lookups, faculties, majors }: { lookups: Lookups; 
 function EditorFields({ resource, row, data, lookups, mode, self = false }: { resource: ResourceKey; row?: AdminRow; data: Store; lookups: Lookups; mode: 'create' | 'edit'; self?: boolean }) {
   const f = row?.fields || {};
   const companies = data.companies;
-  if (resource === 'jobs' || resource === 'pending_jobs') return <>
+  if (resource === 'pending_jobs') return <>
+    <div className="noticeBox subtle">Bu bölmədə yalnız təsdiq qərarı saxlanılır. Elanın digər məlumatlarını dəyişmək üçün “Vakansiyalar” bölməsindən istifadə edin.</div>
+    <div className="readGrid"><div><span>Vakansiya</span><b>{row?.title}</b></div><div><span>Şirkət</span><b>{row?.subtitle}</b></div></div>
+    <label className="field">Təsdiq statusu
+      <select name="status" defaultValue={String(f.status || 'pending_approval')}>
+        <option value="pending_approval">Təsdiq gözləyir</option>
+        <option value="changes_requested">Düzəliş tələb olunur</option>
+        <option value="approved">Təsdiqlənib</option>
+        <option value="published">Dərc olunub</option>
+        <option value="rejected">Rədd edilib</option>
+        <option value="archived">Arxivə keçir</option>
+      </select>
+    </label>
+    <label className="field">Düzəliş və ya imtina səbəbi
+      <textarea name="changes_requested" rows={3} maxLength={2000}
+        placeholder="Yalnız rədd və ya düzəliş qərarı üçün tələb olunur"
+        defaultValue={String(f.changes_requested || f.rejection_reason || '')}/>
+    </label>
+  </>;
+  if (resource === 'jobs') return <>
     <label className="field">Elanın adı<input name="title" defaultValue={row?.title} required/></label>
     <div className="formGrid"><label className="field">Şirkət<select name="company_id" defaultValue={String(f.company_id || companies[0]?.id || '')} required>{companies.map(company => <option key={company.id} value={company.id}>{company.title}</option>)}</select></label><label className="field">Elan növü<select name="type" defaultValue={String(f.type || 'tecrube')}><option value="is">İş</option><option value="tecrube">Təcrübə</option><option value="graduate">Məzun proqramı</option><option value="konullu">Könüllülük</option></select></label></div>
     <div className="formGrid"><label className="field">Status<select name="status" defaultValue={String(f.status || 'draft')}><option value="draft">Qaralama</option><option value="pending_approval">Təsdiq gözləyir</option><option value="changes_requested">Düzəliş tələb olunur</option><option value="approved">Təsdiqlənib</option><option value="published">Dərc olunub</option><option value="rejected">Rədd edilib</option><option value="expired">Müddəti bitib</option><option value="archived">Arxiv</option></select></label><label className="field">Son müraciət tarixi<input name="deadline" type="date" defaultValue={String(f.deadline || '')} required/></label></div>
@@ -359,7 +378,8 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     const form = new FormData(event.currentTarget);
     const payload: Record<string, unknown> = {};
     for (const [key, value] of form.entries()) if (!multiFields.includes(key)) payload[key] = value;
-    multiFields.forEach(key => { if (form.has(key) || active === 'jobs' || active === 'pending_jobs') payload[key] = form.getAll(key).join(','); });
+    multiFields.forEach(key => { if (form.has(key) || active === 'jobs') payload[key] = form.getAll(key).join(','); });
+    if (active === 'pending_jobs' && modal.mode === 'edit') payload.__action = 'approval_status';
     if ('active' in payload) payload.active = payload.active === 'true';
     const endpoint = modal.mode === 'edit' && modal.row ? `/api/admin/${active}/${modal.row.id}` : `/api/admin/${active}`;
     try {
