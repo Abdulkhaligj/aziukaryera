@@ -7,6 +7,7 @@ on:
       - 'components/**'
       - 'lib/**'
       - 'tests/**'
+      - 'student-web/**'
       - 'package*.json'
       - 'next.config.mjs'
       - '.github/workflows/admin-quality.yml'
@@ -38,7 +39,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Security regression checks
-        run: node --test tests/admin-security.test.mjs
+        run: node --test tests/*.test.mjs
       - name: TypeScript type check
         run: npm run typecheck
       - name: Production build

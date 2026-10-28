@@ -2677,7 +2677,7 @@ function authRegisterForm(busy) {
       <p class="auth-sub">Tələbə və şirkət üçün ayrı, təhlükəsiz qeydiyyat axını.</p></div>
     <div class="account-choice-grid">
       <button type="button" data-act="auth-account" data-account="learner"><span class="account-choice-icon">◎</span><b>Tələbə kimi qeydiyyat</b><small>Bakalavr, magistr və məzun hesabları</small><em>Davam et →</em></button>
-      <button type="button" data-act="auth-account" data-account="company"><span class="account-choice-icon">▣</span><b>Şirkət kimi qeydiyyat</b><small>Free, Pro və Business paketləri</small><em>Davam et →</em></button>
+      <button type="button" data-act="auth-account" data-account="company"><span class="account-choice-icon">▣</span><b>Şirkət kimi qeydiyyat</b><small>Şirkət profili yaradın və vakansiyalar paylaşın</small><em>Davam et →</em></button>
     </div>
     <div class="auth-alt"><span>Artıq hesabınız var? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="login">Daxil olun</button></span></div>
   </div>`;
