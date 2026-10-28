@@ -23,7 +23,7 @@ test('public landing omits employer pricing without removing vacancy or events r
   assert.doesNotMatch(landing, /class="plan-grid"/);
   assert.match(landing, /id="lp-events"/);
   assert.match(landing, /id="lp-jobs"/);
-  assert.match(index, /landing\.js\?v=20261028d/);
+  assert.match(index, /landing\.js\?v=20261028e/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
   assert.match(hold, /\.field:has\(\[data-act="auth-plan"\]\)/);
 });
