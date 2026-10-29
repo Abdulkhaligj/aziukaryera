@@ -2474,6 +2474,7 @@ function authScreen() {
           ? (tab === 'login' ? authLoginForm(busy) : authRegisterForm(busy))
           : `<div class="empty"><b>Giriş xidməti müvəqqəti əlçatan deyil</b><span>Məlumat bazası yenidən aktiv olduqda burada daxil ola biləcəksiniz.</span><button class="btn" type="button" onclick="location.reload()">Yenidən yoxla</button></div>`}
       </div>
+      <p class="auth-trust">${AUTH_ICONS.lock}<span>Şifrələnmiş bağlantı · ADNSU Karyera Mərkəzi</span></p>
     </main>
   </div>`;
 }
@@ -2483,38 +2484,56 @@ function ssoButtons(busy) {
   if (Store.mode !== 'supabase') return '';
   const buttons = [];
   if (UI.providers.google === true) buttons.push(`
-    <button type="button" class="btn-google" data-act="google" ${busy ? 'disabled' : ''}>
+    <button type="button" class="btn-google btn-sso" data-act="google" ${busy ? 'disabled' : ''}>
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z"/>
         <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-      </svg><span>ADNSU Google hesabı ilə daxil ol</span>
+      </svg><span>Google ilə davam et</span>
     </button>`);
   if (UI.providers.azure === true) buttons.push(`
-    <button type="button" class="btn-google" data-act="azure" ${busy ? 'disabled' : ''}>
-      <span style="font-weight:800;color:#0078d4">M</span><span>ADNSU Microsoft hesabı ilə daxil ol</span>
+    <button type="button" class="btn-google btn-sso" data-act="azure" ${busy ? 'disabled' : ''}>
+      <svg viewBox="0 0 21 21" aria-hidden="true">
+        <path fill="#F25022" d="M1 1h9v9H1z"/><path fill="#7FBA00" d="M11 1h9v9h-9z"/>
+        <path fill="#00A4EF" d="M1 11h9v9H1z"/><path fill="#FFB900" d="M11 11h9v9h-9z"/>
+      </svg><span>Microsoft (Outlook) ilə davam et</span>
     </button>`);
   if (!buttons.length) return '';
   return `
-    ${buttons.join('')}
-    <div class="auth-or"><span>və ya</span></div>`;
+    <div class="auth-sso">${buttons.join('')}</div>
+    <div class="auth-or"><span>və ya e-poçt ilə</span></div>`;
 }
 
+/* Giriş/qeydiyyat formalarında istifadə olunan kiçik ikonlar. */
+const AUTH_ICONS = {
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
+  photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>'
+};
+
 function authLoginForm(busy) {
-  return `<form class="stack" data-act="login-form" novalidate>
-    <h2 class="auth-h">Hesabınıza daxil olun</h2>
-    <p class="auth-sub">Rolunuz hesaba görə avtomatik təyin olunur.</p>
+  const resend = (UI.auth.notice || /təsdiqlənməyib/i.test(UI.auth.error || '')) && Store.mode === 'supabase';
+  return `<form class="auth-form" data-act="login-form" novalidate>
+    <header class="auth-form-head">
+      <h2 class="auth-h">Xoş gəlmisiniz</h2>
+      <p class="auth-sub">Hesabınıza daxil olun — rolunuz hesaba görə avtomatik təyin olunur.</p>
+    </header>
 
     ${ssoButtons(busy)}
 
     <div class="field">
       <label for="li-email">E-poçt</label>
-      <input id="li-email" name="email" type="email" autocomplete="username"
+      <input id="li-email" name="email" type="email" autocomplete="username" inputmode="email"
+             autocapitalize="none" spellcheck="false"
              placeholder="ad.soyad@asoiu.edu.az" value="${esc(UI.auth.email)}" required>
     </div>
     <div class="field">
-      <label for="li-password">Şifrə</label>
+      <div class="field-row">
+        <label for="li-password">Şifrə</label>
+        <button type="button" class="linkbtn" data-act="forgot">Şifrəni unutmusunuz?</button>
+      </div>
       <div class="pw-wrap">
         <input id="li-password" name="password" type="password" autocomplete="current-password"
                placeholder="Şifrənizi yazın" value="${esc(UI.auth.password)}" required>
@@ -2523,22 +2542,15 @@ function authLoginForm(busy) {
       </div>
     </div>
 
-    <button class="btn primary block" type="submit" ${busy ? 'disabled' : ''}>
-      ${busy ? 'Yoxlanılır…' : 'Daxil ol →'}
+    <button class="btn primary block auth-submit" type="submit" ${busy ? 'disabled aria-busy="true"' : ''}>
+      ${busy ? '<span class="auth-spin" aria-hidden="true"></span>Yoxlanılır…' : 'Daxil ol'}
     </button>
-    <button class="btn block" type="button" data-act="magic-link" ${busy ? 'disabled' : ''}>
-      Universitet e-poçtu ilə şifrəsiz giriş
+    <button class="btn block auth-ghost" type="button" data-act="magic-link" ${busy ? 'disabled' : ''}>
+      ${AUTH_ICONS.mail}<span>Universitet e-poçtuna giriş linki göndər</span>
     </button>
+    ${resend ? `<button type="button" class="btn block auth-ghost" data-act="resend-confirm">↻ Təsdiq e-poçtunu yenidən göndər</button>` : ''}
 
-    ${(UI.auth.notice || /təsdiqlənməyib/i.test(UI.auth.error || '')) && Store.mode === 'supabase'
-      ? `<button type="button" class="btn block" data-act="resend-confirm">
-           ↻ Təsdiq e-poçtunu yenidən göndər
-         </button>` : ''}
-
-    <div class="auth-alt">
-      <button type="button" class="linkbtn" data-act="forgot">Şifrəni unutmusunuz?</button>
-      <span>Hesabınız yoxdur? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="register">Qeydiyyatdan keçin</button></span>
-    </div>
+    <p class="auth-switch">Hesabınız yoxdur? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="register">Qeydiyyatdan keçin</button></p>
   </form>`;
 }
 
@@ -2671,63 +2683,204 @@ function authRegisterFormLegacy(busy) {
   </form>`;
 }
 
+/* Qeydiyyat addımları. Bütün sahələr formada qalır (captureAuthForm hamısını
+   oxuyur), yalnız aktiv addım görünür. */
+const AUTH_STEPS = {
+  learner: [
+    ['Şəxsi məlumat', 'Ad, əlaqə məlumatı və təhsil statusunuz.'],
+    ['Təhsil', 'Fakültə və ixtisas sizə uyğun imkanları seçmək üçün istifadə olunur.'],
+    ['Şifrə və təsdiq', 'Güclü şifrə təyin edin və qeydiyyatı tamamlayın.']
+  ],
+  company: [
+    ['Şirkət məlumatı', 'Şirkətin əsas məlumatları admin tərəfindən yoxlanılır.'],
+    ['Əlaqəli şəxs', 'Rəsmi əlaqə və təsdiq üçün məsul şəxs.'],
+    ['Şifrə və təsdiq', 'Güclü şifrə təyin edin və qeydiyyatı tamamlayın.']
+  ]
+};
+
 function authRegisterForm(busy) {
-  if (!UI.auth.intent) return `<div class="stack registration-choice">
-    <div><h2 class="auth-h">Necə qeydiyyatdan keçmək istəyirsiniz?</h2>
-      <p class="auth-sub">Tələbə və şirkət üçün ayrı, təhlükəsiz qeydiyyat axını.</p></div>
+  if (!UI.auth.intent) return `<div class="auth-form registration-choice">
+    <header class="auth-form-head">
+      <h2 class="auth-h">Hesab yaradın</h2>
+      <p class="auth-sub">Hesab növünü seçin — hər biri üçün qısa, ayrıca qeydiyyat axını var.</p>
+    </header>
     <div class="account-choice-grid">
-      <button type="button" data-act="auth-account" data-account="learner"><span class="account-choice-icon">◎</span><b>Tələbə kimi qeydiyyat</b><small>Bakalavr, magistr və məzun hesabları</small><em>Davam et →</em></button>
-      <button type="button" data-act="auth-account" data-account="company"><span class="account-choice-icon">▣</span><b>Şirkət kimi qeydiyyat</b><small>Şirkət profili yaradın və vakansiyalar paylaşın</small><em>Davam et →</em></button>
+      <button type="button" data-act="auth-account" data-account="learner"><span class="account-choice-icon">◎</span><span class="account-choice-body"><b>Tələbə kimi qeydiyyat</b><small>Bakalavr, magistr və məzun hesabları</small></span><em aria-hidden="true">→</em></button>
+      <button type="button" data-act="auth-account" data-account="company"><span class="account-choice-icon">▣</span><span class="account-choice-body"><b>Şirkət kimi qeydiyyat</b><small>Şirkət profili yaradın və vakansiyalar paylaşın</small></span><em aria-hidden="true">→</em></button>
     </div>
-    <div class="auth-alt"><span>Artıq hesabınız var? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="login">Daxil olun</button></span></div>
+    <p class="auth-switch">Artıq hesabınız var? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="login">Daxil olun</button></p>
   </div>`;
 
-  const isLearner = UI.auth.intent === 'learner';
-  const level = UI.auth.educationLevel || 'bachelor';
+  const a = UI.auth;
+  const isLearner = a.intent === 'learner';
+  const level = a.educationLevel || 'bachelor';
   const role = isLearner ? (level === 'master' ? 'master_student' : level === 'graduate' ? 'alumni' : 'student') : 'company';
-  const faculty = UI.auth.faculty || Object.keys(FACULTIES)[0];
-  const st = Auth.strength(UI.auth.password);
-  const passwordFields = `<div class="grid c2"><div class="field"><label for="rg-password">Şifrə</label><div class="pw-wrap">
-      <input id="rg-password" name="password" type="password" autocomplete="new-password" placeholder="Ən azı 8 simvol" value="${esc(UI.auth.password)}" data-act="pw-strength" required>
+  const faculty = a.faculty || Object.keys(FACULTIES)[0];
+  const steps = AUTH_STEPS[isLearner ? 'learner' : 'company'];
+  const step = Math.min(Math.max(Number(a.step) || 1, 1), steps.length);
+  const last = step === steps.length;
+  const st = Auth.strength(a.password);
+
+  const req = ' <span class="req" aria-hidden="true">*</span>';
+  const field = (name, label, control, o = {}) => `<div class="field">
+      <label for="rg-${name}">${label}${o.req ? req : ''}</label>${control}${o.help ? `<span class="help">${o.help}</span>` : ''}</div>`;
+  const input = (name, attrs = '') => `<input id="rg-${name}" name="${name}" value="${esc(a[name])}" ${attrs}>`;
+  const options = (list, current) => list.map(v => `<option ${v === current ? 'selected' : ''}>${esc(v)}</option>`).join('');
+  const pane = (n, body) => `<section class="auth-pane" data-step="${n}" aria-label="${steps[n - 1][0]}" ${n === step ? '' : 'hidden'}>${body}</section>`;
+  /* Magistr və məzun üçün sahələrin bakalavr təhsilinə aid olduğu yazılır. */
+  const lbl = (plain, bachelor) => level === 'bachelor' ? plain : bachelor;
+
+  const passwordFields = `<div class="grid c2"><div class="field"><label for="rg-password">Şifrə${req}</label><div class="pw-wrap">
+      <input id="rg-password" name="password" type="password" autocomplete="new-password" placeholder="Ən azı 8 simvol" value="${esc(a.password)}" data-act="pw-strength" required>
       <button type="button" class="pw-toggle" data-act="pw-toggle" data-for="rg-password" aria-label="Şifrəni göstər">${eyeIcon()}</button></div>
-      <div class="pw-foot"><div class="pw-meter" aria-hidden="true">${[0,1,2,3].map(i => `<i class="${UI.auth.password && i < st.level ? 'on l' + st.level : ''}"></i>`).join('')}</div><span class="pw-label">${UI.auth.password ? esc(st.label) : 'Hərf və rəqəm, ən azı 8 simvol'}</span></div></div>
-    <div class="field"><label for="rg-password2">Şifrənin təkrarı</label><div class="pw-wrap">
-      <input id="rg-password2" name="password2" type="password" autocomplete="new-password" placeholder="Şifrəni bir daha yazın" value="${esc(UI.auth.password2)}" data-act="pw-confirm" required>
+      <div class="pw-foot"><div class="pw-meter" aria-hidden="true">${[0,1,2,3].map(i => `<i class="${a.password && i < st.level ? 'on l' + st.level : ''}"></i>`).join('')}</div><span class="pw-label">${a.password ? esc(st.label) : 'Hərf və rəqəm, ən azı 8 simvol'}</span></div></div>
+    <div class="field"><label for="rg-password2">Şifrənin təkrarı${req}</label><div class="pw-wrap">
+      <input id="rg-password2" name="password2" type="password" autocomplete="new-password" placeholder="Şifrəni bir daha yazın" value="${esc(a.password2)}" data-act="pw-confirm" required>
       <button type="button" class="pw-toggle" data-act="pw-toggle" data-for="rg-password2" aria-label="Şifrəni göstər">${eyeIcon()}</button></div><span class="pw-match" id="pw-match"></span></div></div>`;
 
-  const learnerFields = `<div class="grid c2">
-      <div class="field"><label>Ad</label><input name="firstName" autocomplete="given-name" value="${esc(UI.auth.firstName)}" required></div>
-      <div class="field"><label>Soyad</label><input name="lastName" autocomplete="family-name" value="${esc(UI.auth.lastName)}" required></div></div>
-    <div class="grid c2"><div class="field"><label>${role === 'alumni' ? 'E-poçt' : 'Universitet e-poçtu'}</label><input name="email" type="email" autocomplete="username" placeholder="${role === 'alumni' ? 'ad.soyad@email.com' : 'ad.soyad@asoiu.edu.az'}" value="${esc(UI.auth.email)}" required><span class="help">${role === 'alumni' ? 'Şəxsi e-poçtla məzun hesabı admin təsdiqinə düşür.' : `Yalnız <b>@${UNI_DOMAIN}</b> ünvanı qəbul olunur.`}</span></div>
-      <div class="field"><label>Telefon</label><input name="phone" type="tel" autocomplete="tel" placeholder="+994 50 000 00 00" value="${esc(UI.auth.phone)}" required></div></div>
-    <div class="grid c2"><div class="field"><label>Təhsil səviyyəsi</label><select name="educationLevel" data-act="auth-education-level"><option value="bachelor" ${level === 'bachelor' ? 'selected' : ''}>Bakalavr</option><option value="master" ${level === 'master' ? 'selected' : ''}>Magistr</option><option value="graduate" ${level === 'graduate' ? 'selected' : ''}>Məzun / Alumni</option></select></div>
-      <div class="field"><label>Profil şəkli (istəyə bağlı)</label><input name="avatarUrl" type="url" placeholder="https://..." value="${esc(UI.auth.avatarUrl)}"><span class="help">Şəkil linkini profilinizdən sonra da əlavə edə bilərsiniz.</span></div></div>
-    <div class="field"><label>Bakalavr universiteti</label><input name="university" value="${esc(UI.auth.university)}" required></div>
-    <div class="grid c2"><div class="field"><label>Bakalavr fakültəsi</label><select name="faculty" data-act="auth-faculty">${Object.keys(FACULTIES).map(f => `<option ${f === faculty ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></div>
-      <div class="field"><label>Bakalavr ixtisası</label><select name="major">${(FACULTIES[faculty] || []).map(m => `<option ${m === UI.auth.major ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div></div>
-    <div class="grid c2"><div class="field"><label>Qrup</label><input name="groupName" value="${esc(UI.auth.groupName)}" placeholder="məsələn, 642.21"></div>
-      ${role !== 'alumni' ? `<div class="field"><label>Cari kurs</label><select name="course">${(role === 'master_student' ? [1,2] : [1,2,3,4]).map(c => `<option value="${c}" ${Number(UI.auth.course) === c ? 'selected' : ''}>${c}. kurs</option>`).join('')}</select></div>` : '<input type="hidden" name="course" value="4"><div></div>'}</div>
-    <div class="grid c2"><div class="field"><label>Bakalavr başlama ili</label><input name="bachelorStartYear" type="number" min="1950" max="2100" value="${esc(UI.auth.bachelorStartYear)}"></div><div class="field"><label>Bakalavr bitirmə ili</label><input name="bachelorEndYear" type="number" min="1950" max="2100" value="${esc(UI.auth.bachelorEndYear)}"></div></div>
-    ${level === 'master' ? `<section class="registration-section"><div><b>Magistr təhsili</b><span>Bakalavr məlumatı ayrıca saxlanılır və silinmir.</span></div>
-      <div class="field"><label>Magistr universiteti</label><input name="masterUniversity" value="${esc(UI.auth.masterUniversity)}" required></div>
-      <div class="grid c2"><div class="field"><label>Magistr fakültəsi</label><input name="masterFaculty" value="${esc(UI.auth.masterFaculty)}" required></div><div class="field"><label>Magistr ixtisası</label><input name="masterSpecialty" value="${esc(UI.auth.masterSpecialty)}" required></div></div>
-      <div class="grid c2"><div class="field"><label>İxtisaslaşma</label><input name="masterSpecialization" value="${esc(UI.auth.masterSpecialization)}"></div><div class="field"><label>Magistr qrupu</label><input name="masterGroup" value="${esc(UI.auth.masterGroup)}"></div></div>
-      <div class="grid c2"><div class="field"><label>Başlama ili</label><input name="masterStartYear" type="number" min="1950" max="2100" value="${esc(UI.auth.masterStartYear)}" required></div><div class="field"><label>Bitirmə ili</label><input name="masterEndYear" type="number" min="1950" max="2100" value="${esc(UI.auth.masterEndYear)}"></div></div></section>` : ''}`;
+  const terms = `<div class="field"><label class="check auth-terms"><input type="checkbox" name="terms" ${a.terms ? 'checked' : ''} data-act="auth-terms" required><span>Məlumatlarımın ADNSU Karyera Mərkəzi tərəfindən platformanın fəaliyyəti üçün emalına razıyam.</span></label></div>`;
 
-  const companyFields = `<div class="field"><label>Şirkət adı</label><input name="name" value="${esc(UI.auth.name)}" placeholder="SOCAR" required></div>
-    <div class="grid c2"><div class="field"><label>Korporativ e-poçt</label><input name="email" type="email" autocomplete="username" value="${esc(UI.auth.email)}" placeholder="careers@sirket.az" required></div><div class="field"><label>Telefon</label><input name="phone" type="tel" value="${esc(UI.auth.phone)}" required></div></div>
-    <div class="grid c2"><div class="field"><label>Vebsayt</label><input name="website" type="url" value="${esc(UI.auth.website)}" placeholder="https://sirket.az"></div><div class="field"><label>Sektor</label><select name="sector">${[...new Set(COMPANIES.map(c => c.sector))].concat('Digər').map(s => `<option ${s === UI.auth.sector ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div></div>
-    <div class="grid c2"><div class="field"><label>Şirkət ölçüsü</label><select name="companySize">${['1–10','11–50','51–200','201–1000','1000+'].map(v => `<option ${v === UI.auth.companySize ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="field"><label>Ünvan</label><input name="address" value="${esc(UI.auth.address)}" required></div></div>
-    <div class="grid c2"><div class="field"><label>Loqo linki</label><input name="logoUrl" type="url" value="${esc(UI.auth.logoUrl)}" placeholder="https://..."></div><div class="field"><label>Qısa şirkət təsviri</label><textarea name="description" maxlength="500">${esc(UI.auth.description)}</textarea></div></div>
-    <section class="registration-section"><div><b>Əlaqəli şəxs</b><span>Admin təsdiqi və rəsmi əlaqə üçün.</span></div><div class="grid c2"><div class="field"><label>Ad və soyad</label><input name="contact" value="${esc(UI.auth.contact)}" required></div><div class="field"><label>Vəzifə</label><input name="contactPosition" value="${esc(UI.auth.contactPosition)}" required></div></div><div class="grid c2"><div class="field"><label>E-poçt</label><input name="contactEmail" type="email" value="${esc(UI.auth.contactEmail)}" required></div><div class="field"><label>Telefon</label><input name="contactPhone" type="tel" value="${esc(UI.auth.contactPhone)}" required></div></div></section>
-    <div class="note warn"><span class="m">!</span><span>Şirkət hesabı və hər yeni vakansiya ayrıca admin təsdiqindən keçir.</span></div>
-    <div class="field"><label>Başlanğıc paket</label><div class="registration-plans">${COMPANY_PLANS.map(plan => `<button type="button" data-act="auth-plan" data-plan="${plan.id}" aria-pressed="${UI.auth.plan === plan.id}"><span>${plan.name}</span><b>${plan.price} AZN<small>/ ay</small></b><em>${plan.features.slice(0,3).join(' · ')}</em></button>`).join('')}</div><span class="help">Ödəniş provayderi qoşulana qədər Pro və Business seçimi admin təsdiqinə göndərilir.</span></div>`;
+  const learnerPanes = [
+    pane(1, `${ssoButtons(busy)}
+      <div class="field"><span class="field-label" id="rg-level-label">Statusunuz${req}</span>
+        <div class="seg" role="radiogroup" aria-labelledby="rg-level-label">
+          ${[['bachelor', 'Bakalavr'], ['master', 'Magistr'], ['graduate', 'Məzun']].map(([v, t]) => `<label><input type="radio" name="educationLevel" value="${v}" data-act="auth-level" ${level === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+        </div></div>
+      <div class="grid c2">
+        ${field('firstName', 'Ad', input('firstName', 'autocomplete="given-name" required'), { req: true })}
+        ${field('lastName', 'Soyad', input('lastName', 'autocomplete="family-name" required'), { req: true })}
+      </div>
+      ${field('email', role === 'alumni' ? 'E-poçt' : 'Universitet e-poçtu', input('email', `type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="${role === 'alumni' ? 'ad.soyad@email.com' : 'ad.soyad@' + UNI_DOMAIN}" required`), {
+        req: true, help: role === 'alumni' ? 'Şəxsi e-poçtla məzun hesabı admin təsdiqinə düşür.' : `Yalnız <b>@${UNI_DOMAIN}</b> ünvanı qəbul olunur.` })}
+      ${field('phone', 'Telefon', input('phone', 'type="tel" autocomplete="tel" inputmode="tel" placeholder="+994 50 000 00 00" required'), { req: true })}`),
+    pane(2, `${field('university', lbl('Universitet', 'Bakalavr universiteti'), input('university', 'autocomplete="organization" required'), { req: true })}
+      <div class="grid c2">
+        ${field('faculty', lbl('Fakültə', 'Bakalavr fakültəsi'), `<select id="rg-faculty" name="faculty" data-act="auth-faculty">${options(Object.keys(FACULTIES), faculty)}</select>`, { req: true })}
+        ${field('major', lbl('İxtisas', 'Bakalavr ixtisası'), `<select id="rg-major" name="major">${options(FACULTIES[faculty] || [], a.major)}</select>`, { req: true })}
+      </div>
+      <div class="grid c2">
+        ${field('groupName', 'Qrup', input('groupName', 'placeholder="məsələn, 642.21"'))}
+        ${role !== 'alumni'
+          ? field('course', 'Cari kurs', `<select id="rg-course" name="course">${(role === 'master_student' ? [1, 2] : [1, 2, 3, 4]).map(c => `<option value="${c}" ${Number(a.course) === c ? 'selected' : ''}>${c}. kurs</option>`).join('')}</select>`, { req: true })
+          : '<input type="hidden" name="course" value="4"><div></div>'}
+      </div>
+      <div class="grid c2">
+        ${field('bachelorStartYear', lbl('Başlama ili', 'Bakalavr başlama ili'), input('bachelorStartYear', 'type="number" inputmode="numeric" min="1950" max="2100" placeholder="2023"'))}
+        ${field('bachelorEndYear', lbl('Bitirmə ili', 'Bakalavr bitirmə ili'), input('bachelorEndYear', 'type="number" inputmode="numeric" min="1950" max="2100" placeholder="2027"'))}
+      </div>
+      ${level === 'master' ? `<section class="registration-section"><div><b>Magistr təhsili</b><span>Bakalavr məlumatı ayrıca saxlanılır və silinmir.</span></div>
+        ${field('masterUniversity', 'Magistr universiteti', input('masterUniversity', 'required'), { req: true })}
+        <div class="grid c2">${field('masterFaculty', 'Magistr fakültəsi', input('masterFaculty', 'required'), { req: true })}${field('masterSpecialty', 'Magistr ixtisası', input('masterSpecialty', 'required'), { req: true })}</div>
+        <div class="grid c2">${field('masterSpecialization', 'İxtisaslaşma', input('masterSpecialization'))}${field('masterGroup', 'Magistr qrupu', input('masterGroup'))}</div>
+        <div class="grid c2">${field('masterStartYear', 'Başlama ili', input('masterStartYear', 'type="number" inputmode="numeric" min="1950" max="2100" required'), { req: true })}${field('masterEndYear', 'Bitirmə ili', input('masterEndYear', 'type="number" inputmode="numeric" min="1950" max="2100"'))}</div></section>` : ''}`),
+    pane(3, `${passwordFields}
+      <div class="auth-tip">${AUTH_ICONS.photo}<span>Profil şəklini qeydiyyatdan sonra <b>Profil</b> bölməsindən yükləyə bilərsiniz.</span></div>
+      ${terms}`)
+  ];
 
-  return `<form class="stack" data-act="register-form" novalidate><div class="registration-head"><div><h2 class="auth-h">${isLearner ? 'Tələbə qeydiyyatı' : 'Şirkət qeydiyyatı'}</h2><p class="auth-sub">${isLearner ? 'Təhsil məlumatlarınız ayrıca saxlanılır.' : 'Şirkət məlumatları admin tərəfindən yoxlanılır.'}</p></div><button type="button" class="linkbtn" data-act="auth-account-back">Hesab növünü dəyiş</button></div>
-    ${isLearner ? ssoButtons(busy) : ''}${isLearner ? learnerFields : companyFields}${passwordFields}
-    <label class="check"><input type="checkbox" name="terms" ${UI.auth.terms ? 'checked' : ''} data-act="auth-terms"><span>Məlumatlarımın ADNSU Karyera Mərkəzi tərəfindən platformanın fəaliyyəti üçün emalına razıyam.</span></label>
-    <button class="btn primary block" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Hesab yaradılır…' : 'Hesab yarat →'}</button>
-    <div class="auth-alt"><span>Artıq hesabınız var? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="login">Daxil olun</button></span></div></form>`;
+  const companyPanes = [
+    pane(1, `${field('name', 'Şirkət adı', input('name', 'autocomplete="organization" placeholder="SOCAR" required'), { req: true })}
+      <div class="grid c2">
+        ${field('email', 'Korporativ e-poçt', input('email', 'type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="careers@sirket.az" required'), { req: true })}
+        ${field('phone', 'Telefon', input('phone', 'type="tel" autocomplete="tel" inputmode="tel" placeholder="+994 12 000 00 00" required'), { req: true })}
+      </div>
+      <div class="grid c2">
+        ${field('sector', 'Sektor', `<select id="rg-sector" name="sector">${options([...new Set(COMPANIES.map(c => c.sector))].concat('Digər'), a.sector)}</select>`, { req: true })}
+        ${field('companySize', 'Şirkət ölçüsü', `<select id="rg-companySize" name="companySize">${options(['1–10', '11–50', '51–200', '201–1000', '1000+'], a.companySize)}</select>`, { req: true })}
+      </div>
+      <div class="grid c2">
+        ${field('website', 'Vebsayt', input('website', 'type="url" inputmode="url" autocapitalize="none" placeholder="https://sirket.az"'))}
+        ${field('address', 'Ünvan', input('address', 'autocomplete="street-address" required'), { req: true })}
+      </div>
+      ${field('description', 'Qısa şirkət təsviri', `<textarea id="rg-description" name="description" maxlength="500" placeholder="Fəaliyyət sahəsi, missiya və tələbələr üçün imkanlar">${esc(a.description)}</textarea>`, { help: 'Ən çox 500 simvol.' })}
+      ${field('logoUrl', 'Loqo linki', input('logoUrl', 'type="url" inputmode="url" autocapitalize="none" placeholder="https://..."'))}`),
+    pane(2, `<div class="grid c2">
+        ${field('contact', 'Ad və soyad', input('contact', 'autocomplete="name" required'), { req: true })}
+        ${field('contactPosition', 'Vəzifə', input('contactPosition', 'autocomplete="organization-title" placeholder="HR menecer" required'), { req: true })}
+      </div>
+      <div class="grid c2">
+        ${field('contactEmail', 'E-poçt', input('contactEmail', 'type="email" inputmode="email" autocapitalize="none" spellcheck="false" required'), { req: true })}
+        ${field('contactPhone', 'Telefon', input('contactPhone', 'type="tel" inputmode="tel" required'), { req: true })}
+      </div>
+      <div class="note warn"><span class="m">!</span><span>Şirkət hesabı və hər yeni vakansiya ayrıca admin təsdiqindən keçir.</span></div>`),
+    pane(3, `<div class="field"><label>Başlanğıc paket</label><div class="registration-plans">${COMPANY_PLANS.map(plan => `<button type="button" data-act="auth-plan" data-plan="${plan.id}" aria-pressed="${a.plan === plan.id}"><span>${plan.name}</span><b>${plan.price} AZN<small>/ ay</small></b><em>${plan.features.slice(0,3).join(' · ')}</em></button>`).join('')}</div><span class="help">Ödəniş provayderi qoşulana qədər Pro və Business seçimi admin təsdiqinə göndərilir.</span></div>
+      ${passwordFields}
+      ${terms}`)
+  ];
+
+  return `<form class="auth-form" data-act="register-form" novalidate>
+    <ol class="auth-steps" aria-label="Qeydiyyat addımları">
+      ${steps.map(([title], i) => {
+        const n = i + 1;
+        const inner = `<span class="auth-step-n">${n < step ? AUTH_ICONS.check : n}</span><span class="auth-step-t">${title}</span>`;
+        return `<li class="${n < step ? 'done' : n === step ? 'current' : ''}" ${n === step ? 'aria-current="step"' : ''}>${n < step
+          ? `<button type="button" data-act="auth-step-go" data-step="${n}" aria-label="${title} addımına qayıt">${inner}</button>`
+          : `<span>${inner}</span>`}</li>`;
+      }).join('')}
+    </ol>
+    <header class="auth-form-head">
+      <span class="auth-eyebrow">${isLearner ? 'Tələbə qeydiyyatı' : 'Şirkət qeydiyyatı'} · Addım ${step}/${steps.length}</span>
+      <h2 class="auth-h" tabindex="-1">${steps[step - 1][0]}</h2>
+      <p class="auth-sub">${steps[step - 1][1]}</p>
+    </header>
+    ${(isLearner ? learnerPanes : companyPanes).join('')}
+    <p class="auth-legend"><span class="req" aria-hidden="true">*</span> məcburi sahələr</p>
+    <div class="auth-step-nav">
+      ${step === 1
+        ? '<button type="button" class="btn auth-ghost" data-act="auth-account-back">← Hesab növü</button>'
+        : '<button type="button" class="btn auth-ghost" data-act="auth-step-prev">← Geri</button>'}
+      <button class="btn primary auth-submit" type="submit" ${busy ? 'disabled aria-busy="true"' : ''}>${last
+        ? (busy ? '<span class="auth-spin" aria-hidden="true"></span>Hesab yaradılır…' : 'Hesab yarat')
+        : 'Davam et →'}</button>
+    </div>
+    <p class="auth-switch">Artıq hesabınız var? <button type="button" class="linkbtn" data-act="auth-tab" data-tab="login">Daxil olun</button></p>
+  </form>`;
+}
+
+/* Qeydiyyat addımının sahələrini yoxlayır və səhvi sahənin altında göstərir.
+   Yoxlamalar Auth.registerRemote ilə eynidir — server səhvi sona qalmır. */
+function validateAuthPane(pane) {
+  if (!pane) return true;
+  pane.querySelectorAll('.field-error').forEach(n => n.remove());
+  pane.querySelectorAll('[aria-invalid="true"]').forEach(n => n.removeAttribute('aria-invalid'));
+  let first = null;
+  pane.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.type === 'hidden' || el.type === 'radio') return;
+    const v = el.type === 'checkbox' ? el.checked : el.value.trim();
+    let msg = '';
+    if (el.required && !v) msg = el.type === 'checkbox' ? 'Davam etmək üçün razılıq verin.' : 'Bu sahəni doldurun.';
+    else if (!v) msg = '';
+    else if (el.name === 'email') msg = Auth.validateEmail(el.value, UI.auth.role) || '';
+    else if (el.type === 'email') msg = Auth.validateEmail(el.value, null) || '';
+    else if (el.type === 'tel' && el.value.replace(/\D/g, '').length < 7) msg = 'Telefon nömrəsini tam yazın.';
+    else if (el.type === 'number' && !el.checkValidity()) msg = 'İli 1950–2100 aralığında yazın.';
+    else if (el.name === 'password') msg = Auth.validatePassword(el.value) || '';
+    else if (el.name === 'password2' && el.value !== (pane.querySelector('[name="password"]') || {}).value) msg = 'Şifrələr üst-üstə düşmür.';
+    if (msg) { markFieldError(el, msg); first = first || el; }
+  });
+  if (first) first.focus();
+  return !first;
+}
+
+function markFieldError(el, msg) {
+  const field = el.closest('.field');
+  el.setAttribute('aria-invalid', 'true');
+  if (!field) return;
+  const old = field.querySelector('.field-error');
+  if (old) old.remove();
+  const id = (el.id || 'rg-' + el.name) + '-error';
+  field.insertAdjacentHTML('beforeend', `<span class="field-error" id="${id}" role="alert">${esc(msg)}</span>`);
+  el.setAttribute('aria-describedby', id);
+}
+
+function goAuthStep(n) {
+  captureAuthForm();
+  UI.auth.step = n; UI.auth.error = ''; UI.auth.notice = '';
+  render();
+  const head = document.querySelector('[data-act="register-form"] .auth-h');
+  if (head) head.focus({ preventScroll: true });
+  const card = document.querySelector('.auth-card');
+  if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 /* ================================================================ *
@@ -2780,7 +2933,7 @@ const UI = {
     address: '', logoUrl: '', description: '', faculty: '', major: '', course: 1, groupName: '',
     university: 'Azərbaycan Dövlət Neft və Sənaye Universiteti', bachelorStartYear: '', bachelorEndYear: '',
     masterUniversity: '', masterFaculty: '', masterSpecialty: '', masterSpecialization: '', masterGroup: '', masterStartYear: '', masterEndYear: '',
-    plan: 'free', terms: false
+    plan: 'free', terms: false, step: 1
   }
 };
 
@@ -2792,7 +2945,7 @@ function resetAuthForm(keep = {}) {
     address: '', logoUrl: '', description: '', faculty: '', major: '', course: 1, groupName: '',
     university: 'Azərbaycan Dövlət Neft və Sənaye Universiteti', bachelorStartYear: '', bachelorEndYear: '',
     masterUniversity: '', masterFaculty: '', masterSpecialty: '', masterSpecialization: '', masterGroup: '', masterStartYear: '', masterEndYear: '',
-    plan: 'free', terms: false,
+    plan: 'free', terms: false, step: 1,
     ...keep
   };
 }
@@ -2837,7 +2990,8 @@ function render() {
 
   if (!user) {
     root.innerHTML = authScreen();
-    const first = root.querySelector('input:not([type="checkbox"])');
+    const first = [...root.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])')]
+      .find(el => el.offsetParent !== null);
     if (first && !UI.auth.email) first.focus();
     return;
   }
@@ -3220,11 +3374,15 @@ document.addEventListener('click', e => {
     case 'auth-account':
       UI.auth.intent = t.dataset.account;
       UI.auth.role = t.dataset.account === 'company' ? 'company' : 'student';
-      UI.auth.error = '';
+      UI.auth.error = ''; UI.auth.step = 1;
       if (t.dataset.account === 'learner') UI.auth.faculty = UI.auth.faculty || Object.keys(FACULTIES)[0];
       rerender(); break;
     case 'auth-account-back':
-      captureAuthForm(); UI.auth.intent = ''; UI.auth.error = ''; rerender(); break;
+      captureAuthForm(); UI.auth.intent = ''; UI.auth.error = ''; UI.auth.step = 1; rerender(); break;
+    case 'auth-step-prev':
+      goAuthStep(Math.max(1, (Number(UI.auth.step) || 1) - 1)); break;
+    case 'auth-step-go':
+      goAuthStep(Number(t.dataset.step) || 1); break;
     case 'auth-education-level':
       captureAuthForm();
       UI.auth.educationLevel = t.value;
@@ -3846,6 +4004,13 @@ document.addEventListener('submit', e => {
   e.preventDefault();
   if (UI.auth.busy) return;
 
+  if (act === 'register-form') {
+    const step = Number(UI.auth.step) || 1;
+    const total = AUTH_STEPS[UI.auth.intent === 'company' ? 'company' : 'learner'].length;
+    if (!validateAuthPane(form.querySelector(`.auth-pane[data-step="${step}"]`))) return;
+    if (step < total) { goAuthStep(step + 1); return; }
+  }
+
   captureAuthForm();
   UI.auth.busy = true;
   UI.auth.error = '';
@@ -3870,10 +4035,13 @@ document.addEventListener('submit', e => {
       UI.auth.notice = res.error;
       render();
     } else {
-      UI.auth.error = res.error;
+      const before = res.field && document.querySelector(`[data-act="register-form"] [name="${res.field}"]`);
+      const pane = before && before.closest('.auth-pane');
+      if (pane) UI.auth.step = Number(pane.dataset.step);
+      UI.auth.error = pane ? '' : res.error;
       render();
       const target = res.field && document.querySelector(`[name="${res.field}"]`);
-      if (target) target.focus();
+      if (target) { if (pane) markFieldError(target, res.error); target.focus(); }
     }
   };
 
@@ -3898,6 +4066,13 @@ document.addEventListener('submit', e => {
 document.addEventListener('input', e => {
   const el = e.target;
   const S = Store.state;
+
+  /* Düzəldilən sahənin səhv mesajı dərhal götürülür */
+  if (el.getAttribute && el.getAttribute('aria-invalid') === 'true') {
+    el.removeAttribute('aria-invalid');
+    const err = el.closest('.field') && el.closest('.field').querySelector('.field-error');
+    if (err) err.remove();
+  }
 
   /* Qeydiyyat formasında şifrə gücü — tam render olmadan yenilənir */
   if (el.dataset.act === 'pw-strength') {
@@ -3927,12 +4102,15 @@ document.addEventListener('input', e => {
     return;
   }
   if (el.dataset.act === 'auth-terms') { UI.auth.terms = el.checked; return; }
-  if (el.dataset.act === 'auth-education-level') {
+  if (el.dataset.act === 'auth-education-level' || el.dataset.act === 'auth-level') {
     captureAuthForm();
     UI.auth.educationLevel = el.value;
     UI.auth.role = el.value === 'master' ? 'master_student' : el.value === 'graduate' ? 'alumni' : 'student';
     UI.auth.course = el.value === 'graduate' ? 4 : 1;
-    render(); return;
+    render();
+    const checked = document.querySelector('[data-act="auth-level"]:checked');
+    if (checked) checked.focus();
+    return;
   }
   if (el.dataset.act === 'post-body') {
     UI.postDraft = el.value;

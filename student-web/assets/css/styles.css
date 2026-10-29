@@ -494,7 +494,8 @@ button { cursor: pointer; }
 .field .help { font-size: 11px; color: var(--muted); }
 
 input[type="text"], input[type="email"], input[type="number"], input[type="tel"],
-input[type="url"], input[type="search"], select, textarea {
+input[type="url"], input[type="search"], input[type="password"], input:not([type]),
+select, textarea {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--line-2);

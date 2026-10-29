@@ -11,7 +11,7 @@ test('company registration is presented without package marketing', () => {
   assert.match(app, /Şirkət kimi qeydiyyat/);
   assert.match(app, /Şirkət profili yaradın və vakansiyalar paylaşın/);
   assert.doesNotMatch(app, /Free, Pro və Business paketləri/);
-  assert.match(index, /app\.js\?v=20261028b/);
+  assert.match(index, /app\.js\?v=20261029a/);
 });
 
 test('public landing omits employer pricing without removing vacancy or events routes', () => {

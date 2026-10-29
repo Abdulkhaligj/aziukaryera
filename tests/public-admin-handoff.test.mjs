@@ -47,7 +47,7 @@ test('approval note action is private, persistent and separate from saving statu
 
 test('student and employer scripts stay loaded with previous patch versions', () => {
   const index = read('student-web/index.html');
-  assert.match(index, /app\.js\?v=20261028b/);
+  assert.match(index, /app\.js\?v=20261029a/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
   assert.match(index, /aida-widget\.js\?v=20261028d/);
 });
