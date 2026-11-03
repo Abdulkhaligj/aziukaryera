@@ -835,10 +835,17 @@ function cvDesignerPayload(student) {
 function cvDesigner() {
   const s = Store.state.student;
   const ready = !!(s && s.name);
-  if (ready) {
-    try {
-      localStorage.setItem('asoiu-cv-profile-data', JSON.stringify(cvDesignerPayload(s)));
-    } catch (e) { /* yaddaş bağlıdırsa qurucu boş açılır */ }
+  if (ready && window.CVDrafts) {
+    const owner = Auth.currentUser()?.id;
+    if (Store.mode === 'local') window.CVDrafts.bindDemoOwner(owner);
+    const saveProfile = () => {
+      const scope = window.CVDrafts.snapshot();
+      if (scope?.ownerId === owner && Auth.currentUser()?.id === owner) {
+        window.CVDrafts.put('profile', cvDesignerPayload(s), scope);
+      }
+    };
+    saveProfile();
+    if (Store.mode === 'supabase') void window.CVDrafts.connect(Backend.sb).then(saveProfile);
   }
   return `<div class="card cv-designer-head">
     <div>
@@ -2472,7 +2479,7 @@ function authScreen() {
 
         ${Store.mode === 'supabase'
           ? (tab === 'login' ? authLoginForm(busy) : authRegisterForm(busy))
-          : `<div class="empty"><b>Giriş xidməti müvəqqəti əlçatan deyil</b><span>Məlumat bazası yenidən aktiv olduqda burada daxil ola biləcəksiniz.</span><button class="btn" type="button" onclick="location.reload()">Yenidən yoxla</button></div>`}
+          : `<div class="empty"><b>Giriş xidməti müvəqqəti əlçatan deyil</b><span>Məlumat bazası yenidən aktiv olduqda burada daxil ola biləcəksiniz.</span><button class="btn" type="button" data-act="reload">Yenidən yoxla</button></div>`}
       </div>
       <p class="auth-trust">${AUTH_ICONS.lock}<span>Şifrələnmiş bağlantı · ADNSU Karyera Mərkəzi</span></p>
     </main>
@@ -2909,6 +2916,7 @@ const VIEWS = {
 
 /* Sessiya daxili interfeys vəziyyəti (saxlanılmır) */
 const UI = {
+  sessionEpoch: 0,
   jobFilter: { q: '', type: 'Hamısı', min: 0, savedOnly: false },
   search: { q: '', faculty: 'Hamısı', course: 0, minGPA: 0 },
   cvTab: 'build',
@@ -2936,6 +2944,41 @@ const UI = {
     plan: 'free', terms: false, step: 1
   }
 };
+
+function clearPrivateSessionUI() {
+  UI.sessionEpoch++;
+  UI.cvText = ''; UI.compareJob = null;
+  UI.aiBusy = false; UI.aiCvResult = null; UI.aiInterviewResult = null;
+  UI.aiJobBusy = null; UI.aiJobResults = {};
+  UI.feed = null; UI.postDraft = ''; UI.postLink = ''; UI.openComments = null;
+  UI.benefits = null; UI.redeemResult = null;
+  UI.userMenu = false; UI.notificationsOpen = false; UI.pwMsg = null;
+  if (typeof EmployerTools !== 'undefined') { EmployerTools.userId = null; EmployerTools.resetSession(); EmployerTools.ui.busy = false; }
+  const modal = document.getElementById('modal');
+  if (modal) { modal.innerHTML = ''; modal.hidden = true; }
+}
+
+window.CareerSession?.subscribe(event => {
+  if (event.reason === 'verified') return;
+  if (Store.mode === 'supabase') Store.clearRemoteSession();
+  clearPrivateSessionUI();
+  stopNotificationUpdates();
+  const authenticating = event.reason === 'auth-start' || event.reason === 'auth-cancelled' || window.CareerSession.authPending();
+  if (!authenticating) resetAuthForm();
+  UI.publicView = authenticating ? 'auth' : 'landing';
+  render();
+});
+
+window.CVDrafts?.subscribe(scope => {
+  const owner = Store.state?.session?.userId;
+  if (Store.mode !== 'supabase' || !owner || scope?.ownerId === owner) return;
+  window.CareerSession?.invalidate('draft-owner-changed');
+  Store.clearRemoteSession();
+  clearPrivateSessionUI();
+  stopNotificationUpdates();
+  UI.publicView = 'landing';
+  render();
+});
 
 function resetAuthForm(keep = {}) {
   UI.auth = {
@@ -3207,10 +3250,14 @@ document.addEventListener('click', e => {
   if (!t) return;
   const act = t.dataset.act;
   const S = Store.state;
+  const sessionUser = S.session?.userId;
+  const sessionEpoch = UI.sessionEpoch;
+  const sameSession = () => Store.state.session?.userId === sessionUser && UI.sessionEpoch === sessionEpoch;
 
   const rerender = () => render();
 
   switch (act) {
+    case 'reload': location.reload(); break;
     case 'home':
       e.preventDefault();
       UI.publicView = 'landing';
@@ -3232,7 +3279,7 @@ document.addEventListener('click', e => {
       const role = Auth.role();
       if (item.link && VIEWS[role] && VIEWS[role][item.link]) S.view = item.link;
       rerender();
-      if (Store.mode === 'supabase') Backend.markNotificationRead(item).then(result => {
+      if (Store.mode === 'supabase') Backend.markNotificationRead(item).then(result => { if (result?.stale) return;
         if (!result.ok) refreshNotifications(false);
       });
       break;
@@ -3243,7 +3290,7 @@ document.addEventListener('click', e => {
       const now = new Date().toISOString();
       items.forEach(item => { if (!item.readAt) item.readAt = now; });
       rerender();
-      if (Store.mode === 'supabase') Backend.markAllNotificationsRead(unreadItems).then(result => {
+      if (Store.mode === 'supabase') Backend.markAllNotificationsRead(unreadItems).then(result => { if (result?.stale) return;
         if (!result.ok) { toast(result.error || 'Bildirişlər yenilənmədi'); refreshNotifications(false); }
       });
       break;
@@ -3278,7 +3325,7 @@ document.addEventListener('click', e => {
         tags: [...new Set((body.match(/#[\p{L}\p{N}_-]+/gu) || []).map(x => x.slice(1).toLocaleLowerCase('az-AZ')))].slice(0, 8)
       };
       UI.postDraft = ''; UI.postLink = ''; UI.postKind = 'general';
-      Backend.createPost(post).then(res => {
+      Backend.createPost(post).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Paylaşım alınmadı'); return; }
         toast('Paylaşıldı'); loadFeed();
       });
@@ -3288,7 +3335,7 @@ document.addEventListener('click', e => {
     case 'post-delete':
       if (UI.feed) UI.feed = UI.feed.filter(p => p.id !== t.dataset.id);
       rerender();
-      Backend.deletePost(t.dataset.id).then(res => {
+      Backend.deletePost(t.dataset.id).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Silinmədi'); loadFeed(); } else toast('Paylaşım silindi');
       });
       break;
@@ -3296,21 +3343,21 @@ document.addEventListener('click', e => {
       const on = t.dataset.on === '1';
       const p = UI.feed && UI.feed.find(x => x.id === t.dataset.id);
       if (p) { p.likedByMe = on; p.likes += on ? 1 : -1; rerender(); }
-      Backend.toggleLike(t.dataset.id, on).then(res => { if (!res.ok) loadFeed(); });
+      Backend.toggleLike(t.dataset.id, on).then(res => { if (res?.stale) return; if (!res.ok) loadFeed(); });
       break;
     }
     case 'post-save': {
       const on = t.dataset.on === '1';
       const p = UI.feed && UI.feed.find(x => x.id === t.dataset.id);
       if (p) { p.savedByMe = on; rerender(); }
-      Backend.togglePostSave(t.dataset.id, on).then(res => {
+      Backend.togglePostSave(t.dataset.id, on).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Saxlanılmadı'); loadFeed(); }
         else toast(on ? 'Paylaşım saxlanıldı' : 'Saxlanılanlardan çıxarıldı');
       });
       break;
     }
     case 'post-report':
-      Backend.reportPost(t.dataset.id, 'Uyğunsuz və ya yanlış məzmun').then(res => {
+      Backend.reportPost(t.dataset.id, 'Uyğunsuz və ya yanlış məzmun').then(res => { if (res?.stale) return;
         toast(res.ok ? 'Şikayət moderasiyaya göndərildi' : (res.error || 'Şikayət göndərilmədi'));
       });
       break;
@@ -3322,7 +3369,7 @@ document.addEventListener('click', e => {
       const body = el ? el.value.trim() : '';
       if (!body) break;
       el.value = '';
-      Backend.addComment(t.dataset.id, body).then(res => {
+      Backend.addComment(t.dataset.id, body).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Şərh əlavə olunmadı'); return; }
         loadFeed();
       });
@@ -3332,7 +3379,7 @@ document.addEventListener('click', e => {
     /* ---------------- Güzəştlər ---------------- */
     case 'benefit-cat': UI.benefitCat = t.dataset.cat; rerender(); break;
     case 'benefit-claim':
-      Backend.claimBenefit(t.dataset.id).then(res => {
+      Backend.claimBenefit(t.dataset.id).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Güzəşt alınmadı'); return; }
         toast('Güzəşt kodunuz hazırdır'); loadBenefits();
       });
@@ -3344,7 +3391,7 @@ document.addEventListener('click', e => {
       const el = document.getElementById('redeem-code');
       const code = el ? el.value.trim() : '';
       if (!code) { toast('Kodu daxil edin'); break; }
-      Backend.redeemCode(code).then(res => {
+      Backend.redeemCode(code).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Yoxlama alınmadı'); return; }
         UI.redeemResult = res.row;
         rerender();
@@ -3355,16 +3402,20 @@ document.addEventListener('click', e => {
     /* ---------------- Autentifikasiya ---------------- */
     case 'user-menu': UI.userMenu = !UI.userMenu; rerender(); break;
     case 'logout':
-      stopNotificationUpdates();
-      try {
-        localStorage.removeItem('asoiu-cv-profile-data');
-        localStorage.removeItem('asoiu-cv-builder-draft');
-      } catch (e) { /* yaddaş bağlıdırsa davam et */ }
-      Auth.logout(); UI.userMenu = false; UI.cvText = ''; UI.pwMsg = null;
-      resetAuthForm(); UI.publicView = 'landing';
-      Landing.detail = null;
-      Landing.load().then(rerender);
-      rerender(); toast('Sistemdən çıxdınız');
+      if (UI.loggingOut) break;
+      UI.loggingOut = true;
+      void (async () => {
+        try {
+          const result = await Auth.logout();
+          if (!result?.ok) { toast(result?.error || 'Çıxış tamamlanmadı. Yenidən cəhd edin.'); return; }
+          stopNotificationUpdates();
+          clearPrivateSessionUI();
+          resetAuthForm(); UI.publicView = 'landing';
+          Landing.detail = null;
+          Landing.load().then(rerender);
+          rerender(); toast('Sistemdən çıxdınız');
+        } finally { UI.loggingOut = false; }
+      })();
       break;
     case 'auth-tab':
       captureAuthForm();
@@ -3400,7 +3451,7 @@ document.addEventListener('click', e => {
       captureAuthForm(); UI.auth.plan = t.dataset.plan || 'free'; rerender(); break;
     case 'google': {
       UI.auth.busy = true; UI.auth.error = ''; rerender();
-      Backend.signInWithGoogle().then(res => {
+      Backend.signInWithGoogle().then(res => { if (res?.stale) return;
         /* Uğurlu halda səhifə Google-a yönləndirilir və bura qayıtmır. */
         if (!res.ok) { UI.auth.busy = false; UI.auth.error = res.error; rerender(); }
       });
@@ -3408,7 +3459,7 @@ document.addEventListener('click', e => {
     }
     case 'azure': {
       UI.auth.busy = true; UI.auth.error = ''; rerender();
-      Backend.signInWithAzure().then(res => {
+      Backend.signInWithAzure().then(res => { if (res?.stale) return;
         if (!res.ok) { UI.auth.busy = false; UI.auth.error = res.error; rerender(); }
       });
       break;
@@ -3417,7 +3468,7 @@ document.addEventListener('click', e => {
       captureAuthForm();
       if (!UI.auth.email) { UI.auth.error = 'Universitet e-poçtunuzu yazın.'; rerender(); break; }
       UI.auth.busy = true; UI.auth.error = ''; rerender();
-      Backend.signInWithMagicLink(UI.auth.email).then(res => {
+      Backend.signInWithMagicLink(UI.auth.email).then(res => { if (res?.stale) return;
         UI.auth.busy = false;
         if (res.ok) UI.auth.notice = 'Təhlükəsiz giriş linki universitet e-poçtunuza göndərildi.';
         else UI.auth.error = res.error;
@@ -3439,7 +3490,7 @@ document.addEventListener('click', e => {
       captureAuthForm();
       const em = UI.auth.email;
       if (!em) { toast('Əvvəlcə e-poçt ünvanınızı yazın'); break; }
-      Backend.resendConfirmation(em).then(res => {
+      Backend.resendConfirmation(em).then(res => { if (res?.stale) return;
         if (res.ok) { UI.auth.notice = `Təsdiq linki ${em} ünvanına yenidən göndərildi.`; UI.auth.error = ''; }
         else { UI.auth.error = res.error; UI.auth.notice = ''; }
         rerender();
@@ -3458,7 +3509,7 @@ document.addEventListener('click', e => {
     case 'reset-password': {
       const email = (document.getElementById('reset-email') || {}).value || '';
       if (!email) { toast('E-poçt ünvanını yazın'); break; }
-      Backend.resetPassword(email).then(res => {
+      Backend.resetPassword(email).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Link göndərilmədi'); return; }
         closeModal(); toast('Şifrə yeniləmə linki göndərildi');
       });
@@ -3466,7 +3517,7 @@ document.addEventListener('click', e => {
     }
     case 'change-password': {
       const g = id => (document.getElementById(id) || {}).value || '';
-      Auth.changePassword(g('pw-cur'), g('pw-new'), g('pw-new2')).then(res => {
+      Auth.changePassword(g('pw-cur'), g('pw-new'), g('pw-new2')).then(res => { if (res?.stale) return;
         UI.pwMsg = res.ok
           ? { tone: 'good', text: 'Şifrəniz yeniləndi.' }
           : { tone: 'bad', text: res.error };
@@ -3495,7 +3546,8 @@ document.addEventListener('click', e => {
         skills: student.skills,
         summary: student.summary,
         experience: student.experience
-      }, job, report).then(res => {
+      }, job, report).then(res => { if (res?.stale) return;
+        if (!sameSession()) return;
         UI.aiJobBusy = null;
         if (res.ok) {
           UI.aiJobResults[String(job.id)] = res.result;
@@ -3576,7 +3628,7 @@ document.addEventListener('click', e => {
       const text = UI.cvText || cvToText(buildCVFromProfile(S.student));
       const analysis = analyzeCV(text);
       if (Store.mode === 'supabase') {
-        Backend.saveCVAnalysis({ score: analysis.score }).then(res => {
+        Backend.saveCVAnalysis({ score: analysis.score }).then(res => { if (res?.stale) return;
           if (!res.ok) console.warn('CV nəticəsi saxlanmadı:', res.error);
         });
       }
@@ -3589,7 +3641,8 @@ document.addEventListener('click', e => {
       const text = UI.cvText || cvToText(buildCVFromProfile(S.student));
       if (text.trim().length < 80) { toast('AI analizi üçün CV mətnini tamamlayın'); break; }
       UI.aiBusy = true; UI.aiCvResult = null; rerender();
-      CareerAI.cvAnalyze(text, UI.compareJob ? Store.jobById(UI.compareJob) : null).then(res => {
+      CareerAI.cvAnalyze(text, UI.compareJob ? Store.jobById(UI.compareJob) : null).then(res => { if (res?.stale) return;
+        if (!sameSession()) return;
         UI.aiBusy = false;
         if (!res.ok) { toast(res.error || 'AI xidməti müvəqqəti əlçatan deyil'); rerender(); return; }
         UI.aiCvResult = res.result;
@@ -3630,7 +3683,8 @@ document.addEventListener('click', e => {
       const qs = buildInterview({ type: context.type, field, count });
       Store.setInterview({ ...context, questions: qs, answers: new Array(qs.length).fill(''), done: false, aiLoading: true });
       rerender(); window.scrollTo(0, 0);
-      CareerAI.interviewQuestions(context).then(res => {
+      CareerAI.interviewQuestions(context).then(res => { if (res?.stale) return;
+        if (!sameSession()) return;
         const iv = Store.state.interview;
         if (!iv || iv.done) return;
         iv.aiLoading = false;
@@ -3653,7 +3707,8 @@ document.addEventListener('click', e => {
       CareerAI.interviewEvaluate({
         major: S.student.major, faculty: S.student.faculty, role: iv.role, type: iv.type,
         questions: iv.questions, answers: iv.answers, deterministicResult: iv.result
-      }).then(res => {
+      }).then(res => { if (res?.stale) return;
+        if (!sameSession()) return;
         if (!S.interview) return;
         S.interview.aiLoading = false;
         if (res.ok) S.interview.aiResult = res.result;
@@ -3678,7 +3733,7 @@ document.addEventListener('click', e => {
 
     /* Şirkət */
     case 'plan-select':
-      Backend.selectCompanyPlan(t.dataset.plan).then(res => {
+      Backend.selectCompanyPlan(t.dataset.plan).then(res => { if (res?.stale) return;
         if (!res.ok) { toast(res.error || 'Paket sorğusu göndərilmədi'); return; }
         Store.state.subscription = { plan_id: t.dataset.plan, status: t.dataset.plan === 'free' ? 'active' : 'pending', plans: { slug: t.dataset.plan } };
         rerender(); toast(t.dataset.plan === 'free' ? 'Free paket aktivdir' : 'Paket sorğusu adminə göndərildi');
@@ -3718,7 +3773,7 @@ document.addEventListener('click', e => {
           application_url: g('v-application-url') || null,
           duties: g('v-duties').split('\n').map(x => x.trim()).filter(Boolean),
           requirements: g('v-requirements').split('\n').map(x => x.trim()).filter(Boolean)
-        }).then(res => {
+        }).then(res => { if (res?.stale) return;
           if (!res.ok) { toast(res.error || 'Elan yaradılmadı'); return; }
           OPPORTUNITIES.push(Adapt.job(res.row, Store.tax,
             COMPANIES.reduce((a, c) => (a[c.id] = c.name, a), {})));
@@ -3871,7 +3926,9 @@ let knownUnreadNotifications = 0;
 
 async function refreshNotifications(announceNew = false) {
   if (Store.mode !== 'supabase' || !Auth.isSignedIn()) return;
+  const scope = window.CareerSession.capture();
   const result = await Backend.notificationsFeed();
+  if (!window.CareerSession.matches(scope)) return;
   if (!result.ok) return;
   const nextUnread = result.rows.filter(item => !item.readAt).length;
   const hasNew = announceNew && nextUnread > knownUnreadNotifications;
@@ -3897,7 +3954,9 @@ function stopNotificationUpdates() {
 
 function loadFeed() {
   if (Store.mode !== 'supabase') { UI.feed = []; render(); return; }
-  Backend.feed().then(res => {
+  const scope = window.CareerSession.capture();
+  Backend.feed().then(res => { if (res?.stale) return;
+    if (!window.CareerSession.matches(scope)) return;
     UI.feed = res.ok ? res.rows : [];
     if (!res.ok && res.error) toast(res.error);
     render();
@@ -3906,7 +3965,9 @@ function loadFeed() {
 
 function loadBenefits() {
   if (Store.mode !== 'supabase') { UI.benefits = { rows: [], claims: [], partners: [] }; render(); return; }
-  Backend.benefits().then(res => {
+  const scope = window.CareerSession.capture();
+  Backend.benefits().then(res => { if (res?.stale) return;
+    if (!window.CareerSession.matches(scope)) return;
     UI.benefits = res.ok ? res : { rows: [], claims: [], partners: [] };
     if (!res.ok && res.error) toast(res.error);
     render();
@@ -3940,6 +4001,8 @@ function showQR(code, title, partner) {
   if (window.QRCode) { draw(); return; }
   const s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.integrity = 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU';
+  s.crossOrigin = 'anonymous';
   s.onload = draw;
   s.onerror = () => {
     const el = document.getElementById('qr-target');
@@ -4017,9 +4080,11 @@ document.addEventListener('submit', e => {
   render();
 
   const done = res => {
+    if (res?.stale) return;
     UI.auth.busy = false;
     if (res.ok) {
       const name = (res.user.name || res.user.email).split(' ')[0];
+      clearPrivateSessionUI();
       resetAuthForm();
       UI.cvText = '';
       UI.publicView = 'app';
@@ -4152,7 +4217,7 @@ document.addEventListener('input', e => {
       if (application) {
         application.statusKey = el.value;
         application.status = ({ applied:'Göndərildi',under_review:'Baxılır',shortlisted:'Qısa siyahı',interview:'Müsahibəyə dəvət',offer:'Təklif',rejected:'İmtina',hired:'İşə qəbul' })[el.value] || el.value;
-        Backend.setApplicationStatus(application.id, el.value).then(result => { if (!result.ok) toast(result.error || 'Mərhələ yenilənmədi'); else toast('Müraciət mərhələsi yeniləndi'); });
+        Backend.setApplicationStatus(application.id, el.value).then(result => { if (result?.stale) return; if (!result.ok) toast(result.error || 'Mərhələ yenilənmədi'); else toast('Müraciət mərhələsi yeniləndi'); });
       }
       break;
     }
@@ -4238,7 +4303,7 @@ async function probeBackend() {
   render();
 
   const online = await probeBackend();
-  Store.mode = online ? 'supabase' : 'local';
+  Store.mode = CAREER_DEMO_MODE ? 'local' : 'supabase';
   if (online) UI.providers = await Backend.providers();
 
   if (online) {
@@ -4251,13 +4316,18 @@ async function probeBackend() {
     } catch (e) {
       console.warn('Sessiya bərpası alınmadı:', e);
     }
-  } else {
+  } else if (CAREER_DEMO_MODE) {
     try {
-      await Auth.ensureSeededPasswords();  // offline demo hesablarını hazırla
+      await Auth.ensureSeededPasswords();  // explicit offline demo only
     } catch (e) {
       console.warn('Şifrə hashlənməsi alınmadı:', e);
     }
     Store.checkPersistence();
+  } else {
+    // A missing/failed backend must never silently authenticate demo accounts.
+    Store.state.session = null;
+    Store.bind();
+    UI.auth.error = 'Giriş xidməti hazırda əlçatan deyil. Yenidən cəhd edin.';
   }
 
   if (Auth.isSignedIn()) {

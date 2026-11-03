@@ -2,8 +2,8 @@ import type { AdminRole, ResourceKey } from '@/lib/types';
 
 /*
  * Role permissions, shared by the API routes (enforcement) and the UI (which
- * buttons to show). The database treats every admin role the same (is_admin),
- * so this table is where the roles actually differ.
+ * buttons to show). Database restrictive policies enforce the same matrix
+ * for direct Data API requests; keep both definitions in sync.
  *
  * super_admin — everything, including staff accounts and the platform reset
  * manager     — all content, people and commerce; delete

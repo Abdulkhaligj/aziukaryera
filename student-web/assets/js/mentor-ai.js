@@ -22,14 +22,25 @@
   const VIEWS = new Set(['jobs', 'events', 'benefits', 'awards', 'cv', 'interview', 'roadmap', 'profile', 'applications']);
 
   const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const key = () => 'mentor.ai.v1:' + ((typeof Auth !== 'undefined' && Auth.currentUser()?.id) || 'guest');
-  const load = () => { try { return JSON.parse(sessionStorage.getItem(key()) || '[]'); } catch { return []; } };
-  const save = () => { try { sessionStorage.setItem(key(), JSON.stringify(st.msgs.slice(-30))); } catch { /* gizli rejim */ } };
+  // v1 could contain mixed-owner history; it has no safe migration path.
+  try { for (let i = sessionStorage.length - 1; i >= 0; i--) { const old = sessionStorage.key(i); if (old?.startsWith('mentor.ai.v1:')) sessionStorage.removeItem(old); } } catch {}
+  const key = scope => 'mentor.ai.v2:' + scope.ownerId;
+  const load = scope => { try { return JSON.parse(sessionStorage.getItem(key(scope)) || '[]'); } catch { return []; } };
+  const save = scope => { if (!window.CareerSession.matches(scope)) return; try { sessionStorage.setItem(key(scope), JSON.stringify(st.msgs.slice(-30))); } catch { /* gizli rejim */ } };
   const catName = id => (MentorUI.types.find(x => x[0] === id) || [id, id])[1];
 
-  const st = { cat: 'karyera', msgs: null, busy: false, draft: '', owner: '' };
+  const st = { cat: 'karyera', msgs: null, busy: false, draft: '', scope: null, generation: 0 };
+  window.CareerSession.subscribe(() => {
+    if (st.scope) { try { sessionStorage.removeItem(key(st.scope)); } catch {} }
+    st.generation++; st.scope = null; st.msgs = []; st.busy = false; st.draft = '';
+    paint(false);
+  });
   function ensure() {
-    if (st.msgs === null || st.owner !== key()) { st.owner = key(); st.msgs = load(); }
+    const scope = window.CareerSession.capture();
+    if (!scope) { st.scope = null; st.msgs = []; return; }
+    if (st.msgs === null || !st.scope || !window.CareerSession.matches(st.scope)) {
+      st.scope = scope; st.msgs = load(scope);
+    }
   }
 
   function bubble(m, i, last) {
@@ -92,10 +103,13 @@
     const text = String(raw || '').trim().slice(0, 700);
     if (!text || st.busy) return;
     ensure();
+    const scope = st.scope, ticket = ++st.generation;
+    if (!scope) return;
+    const current = () => ticket === st.generation && window.CareerSession.matches(scope);
     const history = st.msgs.filter(m => !m.error).slice(-8).map(m => ({ role: m.role, text: m.text }));
     st.msgs.push({ role: 'user', text, cat: st.cat });
     st.busy = true; st.draft = '';
-    save(); paint();
+    save(scope); paint();
     let reply;
     try {
       /* AIDA vidcetindən asılı olmadan birbaşa aida-chat funksiyasına müraciət */
@@ -107,15 +121,18 @@
         return data;
       };
       const data = await askAida(`[Mentor dəstəyi, istiqamət: ${catName(st.cat)}] Tələbə mentordan soruşur: ${text}\nKonkret, addım-addım, ixtisasına uyğun məsləhət ver.`, history);
+      if (!current()) return;
       reply = data.ok
         ? { role: 'assistant', text: data.reply, links: data.links || [], suggestions: data.suggestions || [], cat: st.cat }
         : { role: 'assistant', text: data.error || 'AI mentor hazırda cavab verə bilmir.', error: true };
     } catch {
+      if (!current()) return;
       reply = { role: 'assistant', text: 'AI mentor ilə əlaqə alınmadı. İnternet bağlantısını yoxlayıb yenidən yaz.', error: true };
     }
+    if (!current()) return;
     st.busy = false;
     st.msgs.push(reply);
-    save(); paint(true);
+    save(scope); paint(true);
   }
 
   /* AI cavabından sonra sualı insan mentora müraciət formasına köçürür */
@@ -142,7 +159,7 @@
     const act = t.dataset.mai;
     if (act === 'cat') { st.cat = t.dataset.cat; paint(); }
     else if (act === 'ask') ask(t.dataset.q || t.textContent);
-    else if (act === 'reset') { st.msgs = []; save(); paint(true); }
+    else if (act === 'reset') { st.generation++; st.msgs = []; st.busy = false; save(st.scope); paint(true); }
     else if (act === 'handoff') handoff(Number(t.dataset.i));
   });
   document.addEventListener('submit', e => {

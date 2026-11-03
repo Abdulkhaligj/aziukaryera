@@ -1,4 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { readLimitedJson } from "../_shared/limits.ts";
+import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const cors = {
@@ -10,7 +11,8 @@ const cors = {
 type ManagedResource = "students" | "master_students" | "alumni" | "admins";
 type AdminAccessRole = "super_admin" | "manager" | "editor" | "reviewer";
 type RequestBody = {
-  action?: "invite" | "create" | "update" | "delete" | "reset_password" | "password_changed";
+  action?: "invite" | "create" | "update" | "delete" | "reset_password" | "change_password";
+  password?: string;
   resource?: ManagedResource;
   id?: string;
   full_name?: string;
@@ -80,27 +82,58 @@ Deno.serve(async (req: Request) => {
   const actorRole = actor?.app_metadata?.admin_role as AdminAccessRole | undefined;
   if (authError || !actor || !actorRole) return json({ ok: false, error: "İcazə yoxdur" }, 401);
 
-  const { data: actorProfile } = await service.from("profiles").select("role,status").eq("id", actor.id).maybeSingle();
-  if (actorProfile?.role !== "admin" || actorProfile?.status !== "active") return json({ ok: false, error: "Admin hesabı aktiv deyil" }, 403);
+  const { data: actorProfile } = await service.from("profiles").select("role,status,admin_role").eq("id", actor.id).maybeSingle();
+  if (actorProfile?.role !== "admin" || actorProfile?.status !== "active" || actorProfile?.admin_role !== actorRole || !["super_admin", "manager", "editor", "reviewer"].includes(actorRole)) return json({ ok: false, error: "Admin hesabı aktiv deyil" }, 403);
 
   let body: RequestBody;
-  try { body = await req.json(); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
+  try { body = await readLimitedJson(req); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
   const action = body.action;
   const resource = body.resource;
 
-  /* Əməkdaş müvəqqəti şifrəni öz şifrəsi ilə əvəz etdi — yalnız öz hesabı üçün tələbi götürür. */
-  if (action === "password_changed") {
-    const { error } = await service.auth.admin.updateUserById(actor.id, {
-      app_metadata: { ...actor.app_metadata, must_change_password: false },
+  // Durable intent precedes Auth mutations, which cannot share a transaction
+  // with the database audit. Never record passwords or raw request bodies.
+  async function audit(actionName: string, resourceName: string, targetId: string | null, title: string) {
+    const { error } = await service.from("admin_audit_logs").insert({ title, resource: resourceName, resource_id: targetId,
+      action: actionName, actor_id: actor!.id, actor_name: clean(actor!.user_metadata?.full_name) || actor!.email || "Admin" });
+    return !error;
+  }
+  if (action === "change_password") {
+    const password = typeof body.password === "string" ? body.password : "";
+    if (password.length < 10 || password.length > 128 || !/[A-Za-zƏəÇçĞğIıİiÖöŞşÜü]/.test(password) || !/\d/.test(password))
+      return json({ ok: false, error: "Şifrə 10–128 simvol, hərf və rəqəm olmalıdır." }, 400);
+    if (!await audit("change-password-intent", "admins", actor.id, "Şifrə dəyişikliyi başladıldı"))
+      return json({ ok: false, error: "Audit qeydi saxlanmadı; əməliyyat dayandırıldı." }, 503);
+    // This client only has a bearer header, not an SDK refresh-token session.
+    // Use the authenticated user endpoint (never Admin updateUserById(password))
+    // so Auth applies the normal same-password and session security checks.
+    try {
+      const changed = await fetch(`${url}/auth/v1/user`, {
+        method: "PUT", headers: { Authorization: authorization, apikey: anonKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ password }), signal: AbortSignal.timeout(12500), redirect: "error",
+      });
+      const changedUser = await readLimitedJson(changed, 131072);
+      if (!changed.ok || changedUser?.id !== actor.id) return json({ ok: false, error: "Şifrə dəyişmədi; fərqli yeni şifrə seçin." }, 400);
+    } catch {
+      return json({ ok: false, error: "Şifrə dəyişikliyi təsdiqlənmədi; yenidən cəhd edin." }, 503);
+    }
+    const { error: metadataError } = await service.auth.admin.updateUserById(actor.id, {
+      app_metadata: { must_change_password: false },
     });
-    if (error) return json({ ok: false, error: error.message }, 400);
+    if (metadataError) return json({ ok: false, error: "Şifrə yeniləndi, giriş tələbi götürülmədi. Yenidən cəhd edin." }, 503);
+    if (!await audit("change-password", "admins", actor.id, "Şifrə dəyişdirildi"))
+      return json({ ok: false, error: "Şifrə yeniləndi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true });
   }
+  if (actor.app_metadata?.must_change_password === true) return json({ ok: false, error: "Əvvəlcə şifrənizi dəyişin." }, 403);
   if (!action || !resource || !["students", "master_students", "alumni", "admins"].includes(resource)) {
     return json({ ok: false, error: "Naməlum əməliyyat" }, 400);
   }
   if (resource === "admins" && actorRole !== "super_admin") return json({ ok: false, error: "Admin hesablarını yalnız Super Admin idarə edə bilər" }, 403);
   if (resource !== "admins" && !["super_admin", "manager"].includes(actorRole)) return json({ ok: false, error: "İcazə yoxdur" }, 403);
+
+  if (!["create", "invite", "update", "delete", "reset_password"].includes(action)) return json({ ok: false, error: "Naməlum əməliyyat" }, 400);
+  if (!await audit(`${action}-intent`, resource, null, "İnzibati hesab əməliyyatı başladıldı"))
+    return json({ ok: false, error: "Audit qeydi saxlanmadı; əməliyyat dayandırıldı." }, 503);
 
   const identity = resourceIdentity(resource);
   const profileData = {
@@ -146,7 +179,7 @@ Deno.serve(async (req: Request) => {
       await service.auth.admin.deleteUser(created.user.id);
       return json({ ok: false, error: profileError.message }, 400);
     }
-    await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} hesabı yaradıldı`, resource, resource_id: created.user.id, action: "create-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    if ((await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} hesabı yaradıldı`, resource, resource_id: created.user.id, action: "create-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     /* Şifrə yalnız bu cavabda bir dəfə qaytarılır, heç yerdə saxlanmır. */
     return json({ ok: true, id: created.user.id, email: profileData.email, temporaryPassword: password }, 201);
   }
@@ -163,13 +196,14 @@ Deno.serve(async (req: Request) => {
       account_status: resource === "master_students" ? "master_student" : resource === "alumni" || resource === "admins" ? "alumni" : "student",
       full_name: profileData.full_name,
     };
-    const redirectTo = Deno.env.get("PUBLIC_SITE_URL") || "https://asoiu-career.vercel.app/";
+    const redirectTo = Deno.env.get("PUBLIC_SITE_URL");
+    if (!redirectTo || !/^https:\/\//i.test(redirectTo)) return json({ ok: false, error: "PUBLIC_SITE_URL konfiqurasiya olunmayıb." }, 503);
     const { data: invited, error: inviteError } = await service.auth.admin.inviteUserByEmail(profileData.email, { data: inviteMetadata, redirectTo });
     if (inviteError || !invited.user) return json({ ok: false, error: inviteError?.message || "Dəvət göndərilmədi" }, 400);
 
     if (resource === "admins") {
       const { error: authRoleError } = await service.auth.admin.updateUserById(invited.user.id, {
-        app_metadata: { ...invited.user.app_metadata, admin_role: profileData.admin_role },
+        app_metadata: { admin_role: profileData.admin_role },
       });
       if (authRoleError) {
         await service.auth.admin.deleteUser(invited.user.id);
@@ -182,7 +216,7 @@ Deno.serve(async (req: Request) => {
       await service.auth.admin.deleteUser(invited.user.id);
       return json({ ok: false, error: profileError.message }, 400);
     }
-    await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} dəvət edildi`, resource, resource_id: invited.user.id, action: "invite", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    if ((await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} dəvət edildi`, resource, resource_id: invited.user.id, action: "invite", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true, id: invited.user.id, invited: true }, 201);
   }
 
@@ -200,17 +234,17 @@ Deno.serve(async (req: Request) => {
     const password = tempPassword();
     const { error } = await service.auth.admin.updateUserById(id, {
       password,
-      app_metadata: { ...targetAuth.user.app_metadata, must_change_password: target.role === "admin" },
+      app_metadata: { must_change_password: target.role === "admin" },
     });
     if (error) return json({ ok: false, error: error.message }, 400);
-    await service.from("admin_audit_logs").insert({ title: `${target.full_name || target.email} üçün şifrə sıfırlandı`, resource, resource_id: id, action: "reset-password", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    if ((await service.from("admin_audit_logs").insert({ title: `${target.full_name || target.email} üçün şifrə sıfırlandı`, resource, resource_id: id, action: "reset-password", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true, email: target.email, temporaryPassword: password });
   }
 
   if (action === "delete") {
     const { error } = await service.auth.admin.deleteUser(id);
     if (error) return json({ ok: false, error: error.message }, 400);
-    await service.from("admin_audit_logs").insert({ title: `${target.full_name || target.email} silindi`, resource, resource_id: null, action: "delete-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    if ((await service.from("admin_audit_logs").insert({ title: `${target.full_name || target.email} silindi`, resource, resource_id: null, action: "delete-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true });
   }
 
@@ -225,12 +259,12 @@ Deno.serve(async (req: Request) => {
       user_metadata: { ...targetAuth.user.user_metadata, full_name: profileData.full_name },
     };
     if (profileData.email && profileData.email !== targetAuth.user.email) authUpdate.email = profileData.email;
-    if (resource === "admins") authUpdate.app_metadata = { ...targetAuth.user.app_metadata, admin_role: profileData.admin_role };
+    if (resource === "admins") authUpdate.app_metadata = { admin_role: profileData.admin_role };
     const { error: authUpdateError } = await service.auth.admin.updateUserById(id, authUpdate as never);
     if (authUpdateError) return json({ ok: false, error: authUpdateError.message }, 400);
     const { error: profileUpdateError } = await service.from("profiles").update({ ...profileData, role: identity.role }).eq("id", id);
     if (profileUpdateError) return json({ ok: false, error: profileUpdateError.message }, 400);
-    await service.from("admin_audit_logs").insert({ title: `${profileData.full_name || target.full_name} yeniləndi`, resource, resource_id: id, action: "update-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" });
+    if ((await service.from("admin_audit_logs").insert({ title: `${profileData.full_name || target.full_name} yeniləndi`, resource, resource_id: id, action: "update-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true });
   }
 

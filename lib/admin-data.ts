@@ -41,24 +41,29 @@ function applicationStatus(value: string): Status {
   return 'Yoxlamada';
 }
 
-export async function getAdminContext(): Promise<AdminContext | null> {
+export async function getAdminContext(options: { allowPasswordChange?: boolean } = {}): Promise<AdminContext | null> {
   const supabase = await createClient();
   if (!supabase) return null;
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims;
-  const userId = typeof claims?.sub === 'string' ? claims.sub : '';
-  if (!userId) return null;
-  const metadata = claims?.app_metadata as Record<string, unknown> | undefined;
+  // Fetch current server-owned metadata. An unexpired JWT can contain a role
+  // or password-change flag that has since been revoked.
+  const { data, error: authError } = await supabase.auth.getUser();
+  const user = data?.user;
+  const userId = user?.id || '';
+  if (authError || !userId) return null;
+  const metadata = user?.app_metadata as Record<string, unknown> | undefined;
   const requestedRole = metadata?.admin_role;
   if (!adminRoles.includes(requestedRole as AdminRole)) return null;
-  const { data: profile } = await supabase.from('profiles').select('full_name,email,role,status').eq('id', userId).single();
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('full_name,email,role,status,admin_role').eq('id', userId).single();
   if (!profile || profile.role !== 'admin' || profile.status !== 'active') return null;
-  const role = requestedRole as AdminRole;
+  if (profileError || profile.admin_role !== requestedRole) return null;
+  const mustChangePassword = metadata?.must_change_password === true;
+  if (mustChangePassword && !options.allowPasswordChange) return null;
+  const role = profile.admin_role as AdminRole;
   return {
     supabase, userId, role,
     fullName: profile.full_name || 'Karyera Mərkəzi',
-    email: profile.email || (typeof claims?.email === 'string' ? claims.email : ''),
-    mustChangePassword: metadata?.must_change_password === true
+    email: profile.email || user?.email || '',
+    mustChangePassword
   };
 }
 
@@ -322,5 +327,6 @@ export async function loadAdminData(context: AdminContext): Promise<AdminLoad> {
 
 export async function writeAudit(context: AdminContext, resource: string, resourceId: string | null, action: string, title: string) {
   const auditResourceId = resourceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(resourceId) ? resourceId : null;
-  await context.supabase.from('admin_audit_logs').insert({ title, resource, resource_id: auditResourceId, action, actor_id: context.userId, actor_name: context.fullName });
+  const { error } = await context.supabase.from('admin_audit_logs').insert({ title, resource, resource_id: auditResourceId, action, actor_id: context.userId, actor_name: context.fullName });
+  if (error) throw new Error('Əməliyyatın audit qeydi saxlanmadı. Nəticəni yoxlayın və təkrar etməzdən əvvəl administratorla əlaqə saxlayın.');
 }

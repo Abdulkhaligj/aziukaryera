@@ -13,6 +13,8 @@ var MentorUI = {
   statuses: {pending:'Yeni müraciət',in_review:'Baxılır',matched:'Mentor təyin edilib',completed:'Tamamlanıb',cancelled:'Bağlanıb'},
   h(s){return esc(String(s??''));},
   async load(force=false) {
+    const scope=window.CareerSession.capture();
+    if(!scope)return;
     const user=Auth.currentUser(), role=Auth.role();
     if(!user||!['student','admin'].includes(role))return;
     const key=role+':'+user.id;
@@ -24,9 +26,10 @@ var MentorUI = {
         .select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at')
         .order('created_at',{ascending:false}).limit(150);
       if(error)throw Error(error.message);
+      if(!window.CareerSession.matches(scope))return;
       this.rows=data||[];this.loadedFor=key;
-    }catch(e){this.error=e.message||'Müraciətləri yükləmək mümkün olmadı.';}
-    finally{this.loading=false;if(Store.state.view==='mentor'&&Auth.currentUser())render();}
+    }catch(e){if(window.CareerSession.matches(scope))this.error=e.message||'Müraciətləri yükləmək mümkün olmadı.';}
+    finally{if(window.CareerSession.matches(scope)){this.loading=false;if(Store.state.view==='mentor'&&Auth.currentUser())render();}}
   },
   page(admin=false){
     const u=Auth.currentUser(),key=(admin?'admin':'student')+':'+(u?.id||'');
@@ -99,6 +102,7 @@ var MentorUI = {
   },
   async send(form){
     if(this.busy)return;
+    const scope=window.CareerSession.capture();if(!scope)return;
     const v=Object.fromEntries(new FormData(form).entries());
     const p={category:String(v.category||''),topic:String(v.topic||'').trim(),details:String(v.details||'').trim(),
       format:String(v.format||'either'),preferred_time:String(v.preferred_time||'').trim()};
@@ -109,15 +113,18 @@ var MentorUI = {
     this.busy=true;form.querySelector('[type="submit"]').disabled=true;
     try{
       const {data:{user},error:authError}=await Backend.sb.auth.getUser();
+      if(!window.CareerSession.matches(scope)||user?.id!==scope.ownerId)return;
       if(authError||!user)throw Error('Sessiyanı yenilə və yenidən daxil ol.');
       const {data,error}=await Backend.sb.from('mentor_requests').insert({...p,student_id:user.id}).select().single();
       if(error)throw Error(error.message);
+      if(!window.CareerSession.matches(scope))return;
       this.rows.unshift(data);this.error='';toast('Mentor müraciətin göndərildi.');render();
-    }catch(e){toast('Müraciət alınmadı: '+(e.message||'Xəta'));}
-    finally{this.busy=false;const b=document.querySelector('#mentor-request-form [type="submit"]');if(b)b.disabled=false;}
+    }catch(e){if(window.CareerSession.matches(scope))toast('Müraciət alınmadı: '+(e.message||'Xəta'));}
+    finally{if(window.CareerSession.matches(scope)){this.busy=false;const b=document.querySelector('#mentor-request-form [type="submit"]');if(b)b.disabled=false;}}
   },
   async save(id){
     if(this.busy||Auth.role()!=='admin'||Store.mode!=='supabase')return;
+    const scope=window.CareerSession.capture();if(!scope)return;
     const el=k=>document.getElementById('mentor-'+k+'-'+id);
     const status=el('status')?.value,mentor_name=String(el('name')?.value||'').trim(),admin_note=String(el('note')?.value||'').trim();
     if(!this.statuses[status]||mentor_name.length>120||admin_note.length>1200){toast('Məlumatlar düzgün deyil.');return;}
@@ -126,12 +133,14 @@ var MentorUI = {
     try{
       const {data,error}=await Backend.sb.from('mentor_requests').update({status,mentor_name,admin_note,updated_at:new Date().toISOString()}).eq('id',id).select().single();
       if(error)throw Error(error.message);
+      if(!window.CareerSession.matches(scope))return;
       const i=this.rows.findIndex(r=>r.id===id);if(i>=0)this.rows[i]=data;
       toast('Müraciət yeniləndi.');render();
-    }catch(e){toast('Yeniləmə alınmadı: '+(e.message||'Xəta'));}
-    finally{this.busy=false;}
+    }catch(e){if(window.CareerSession.matches(scope))toast('Yeniləmə alınmadı: '+(e.message||'Xəta'));}
+    finally{if(window.CareerSession.matches(scope))this.busy=false;}
   }
 };
+window.CareerSession.subscribe(()=>{MentorUI.rows=[];MentorUI.loading=false;MentorUI.busy=false;MentorUI.loadedFor='';MentorUI.error='';});
 function viewMentorSupport(){return MentorUI.page(false);}
 function viewMentorAdmin(){return MentorUI.page(true);}
 document.addEventListener('submit',e=>{if(e.target?.id==='mentor-request-form'){e.preventDefault();MentorUI.send(e.target);}});

@@ -1,12 +1,13 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { readLimitedJson } from "../_shared/limits.ts";
+import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 /* AI moderation for network posts and comments, and for profile photos.
  * The database calls this with {table, id} (pg_net) after every new or edited
  * text or photo and again from the retry job while it is still pending. Deploy
- * with verify_jwt = false. No caller auth is needed: the function reads the
- * row itself and only decides rows that are 'pending', so a repeated or
- * forged call can at most re-check something that is waiting anyway.
+ * with verify_jwt = false. A dedicated x-moderation-secret authenticates only
+ * the configured database sender. A service-only RPC atomically claims the
+ * exact content version before paid work; duplicate delivery skips the job.
  * On any AI failure the row stays pending (hidden from others) and is retried.
  * table = 'profiles' means the profile photo in profiles.avatar_pending_path.
  */
@@ -48,6 +49,12 @@ function response(body: unknown, status = 200) {
   });
 }
 
+async function providerFetch(reservationId: string, input: string, init: RequestInit) {
+  const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
+  if (error || data !== true) throw new Error("provider_budget_unavailable");
+  return fetch(input, init);
+}
+
 function safeJson(text: string) {
   const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
   try { return JSON.parse(cleaned); } catch {
@@ -72,12 +79,12 @@ function models() {
   const primary = Deno.env.get("GEMINI_MODERATION_MODEL") || Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
   const fallback = (Deno.env.get("GEMINI_FALLBACK_MODELS") || "gemini-3.6-flash,gemini-3.5-flash-lite")
     .split(",").map((m) => m.trim()).filter(Boolean);
-  return [primary, ...fallback.filter((m) => m !== primary)];
+  return [...new Set([primary, ...fallback])].slice(0, 3);
 }
 
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
 
-async function generate(key: string, model: string, parts: Part[]) {
+async function generate(reservationId: string, key: string, model: string, parts: Part[]) {
   const legacy = /2\.5-flash/.test(model);
   const send = async (thinkingConfig: Record<string, unknown> | null) => {
     const generationConfig: Record<string, unknown> = {
@@ -87,15 +94,16 @@ async function generate(key: string, model: string, parts: Part[]) {
       maxOutputTokens: legacy ? 512 : 4608,
     };
     if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const res = await providerFetch(reservationId, `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      signal: AbortSignal.timeout(12500),
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
         generationConfig,
       }),
     });
-    return { res, data: await res.json() };
+    return { res, data: await readLimitedJson(res, 2097152) };
   };
   let { res, data } = await send(legacy ? { thinkingBudget: 0 } : { thinkingLevel: "low" });
   if (res.status === 400 && /thinking/i.test(String(data?.error?.message || ""))) {
@@ -104,12 +112,12 @@ async function generate(key: string, model: string, parts: Part[]) {
   return { res, data };
 }
 
-async function classify(key: string, parts: Part[], allowed = CATEGORIES): Promise<Verdict> {
+async function classify(reservationId: string, key: string, parts: Part[], allowed = CATEGORIES): Promise<Verdict> {
   let model = "";
   let data: any = null;
   for (const m of models()) {
     model = m;
-    const out = await generate(key, m, parts);
+    const out = await generate(reservationId, key, m, parts);
     data = out.data;
     if (out.res.ok) break;
     const message = String(data?.error?.message || "Gemini request failed");
@@ -137,117 +145,120 @@ async function classify(key: string, parts: Part[], allowed = CATEGORIES): Promi
   return { allow, categories, reason, model, outputChars: out.length };
 }
 
-async function applyAvatar(id: string, path: string, requestedAt: string, verdict: Omit<Verdict, "model" | "outputChars">) {
-  const { data, error } = await db.rpc("avatar_moderation_apply", {
-    p_profile_id: id,
-    p_path: path,
-    p_requested_at: requestedAt,
-    p_allow: verdict.allow,
-    p_reason: verdict.reason,
-    p_categories: verdict.categories,
+type ClaimedRow = { content_version?: number; avatar_pending_path?: string; avatar_requested_at?: string; body?: string; link_url?: string | null; tags?: Array<string | null> | null; moderation_requested_at?: string };
+
+// Keep serialization identical to private.moderation_text. Count Unicode code
+// points, including field separators, instead of truncating UTF-16 units.
+function moderationText(row: ClaimedRow, table: string) {
+  if (row.content_version !== 2 || typeof row.body !== "string") throw new Error("unsupported_content");
+  const fields = [row.body];
+  if (table === "posts") {
+    if (row.link_url != null && typeof row.link_url !== "string") throw new Error("invalid_link");
+    if (row.link_url) fields.push(row.link_url);
+    if (row.tags != null) {
+      if (!Array.isArray(row.tags) || row.tags.some(tag => tag !== null && typeof tag !== "string")) throw new Error("invalid_tags");
+      const tags = row.tags.filter(tag => tag !== null).join("\n");
+      if (tags) fields.push(tags);
+    }
+  }
+  const present = fields.filter(field => field !== "");
+  let length = Math.max(0, present.length - 1);
+  for (const field of present) for (const _point of field) {
+    if (++length > 6000) throw new Error("content_too_long");
+  }
+  return present.join("\n");
+}
+
+async function finishClaim(claimId: string, verdict: Omit<Verdict, "model" | "outputChars"> | null) {
+  const { data, error } = await db.rpc("moderation_finish", {
+    p_claim_id: claimId, p_allow: verdict?.allow ?? null,
+    p_reason: verdict?.reason ?? null, p_categories: verdict?.categories ?? [],
+    p_content_version: 2,
   });
-  if (error) throw new Error(`avatar_moderation_apply: ${error.message}`);
+  if (error) throw new Error("moderation_finish unavailable");
   return (data || {}) as { status?: string; previous_path?: string | null };
 }
 
-// Profile photo: download the unchecked file with the service role, show it to
-// Gemini, then publish or reject it. The replaced approved photo is deleted.
-async function moderateAvatar(id: string) {
-  const { data: row, error: rowError } = await db.from("profiles")
-    .select("id, avatar_pending_path, avatar_requested_at").eq("id", id).maybeSingle();
-  if (rowError) {
-    console.error("avatar row read failed:", rowError.message);
-    return response({ ok: false, error: "Row read failed" }, 500);
-  }
-  if (!row || !row.avatar_pending_path) return response({ ok: true, skipped: true });
-  const path = String(row.avatar_pending_path);
-
+async function moderateAvatar(id: string, row: ClaimedRow, claimId: string, reservationId: string, key: string) {
+  const path = String(row.avatar_pending_path || "");
   try {
     const { data: file, error: fileError } = await db.storage.from("avatars").download(path);
-    // Other storage errors are transient: throw, keep the photo pending, retry.
-    if (fileError && !/not.?found/i.test(fileError.message)) throw new Error(`download: ${fileError.message}`);
+    if (fileError && !/not.?found/i.test(fileError.message)) throw new Error("download failed");
     if (fileError || !file) {
-      const result = await applyAvatar(id, path, row.avatar_requested_at, {
-        allow: false, categories: [], reason: "Şəkil faylı tapılmadı. Zəhmət olmasa, yenidən yükləyin.",
-      });
+      const result = await finishClaim(claimId, { allow: false, categories: [], reason: "Şəkil faylı tapılmadı. Zəhmət olmasa, yenidən yükləyin." });
       return response({ ok: true, status: result.status, missing: true });
     }
     const mimeType = path.endsWith(".webp") ? "image/webp" : "image/jpeg";
     if (file.size > MAX_IMAGE_BYTES || !IMAGE_TYPES.has(mimeType)) {
-      const result = await applyAvatar(id, path, row.avatar_requested_at, {
-        allow: false, categories: [], reason: "Şəkil çox böyükdür və ya formatı dəstəklənmir.",
-      });
+      const result = await finishClaim(claimId, { allow: false, categories: [], reason: "Şəkil çox böyükdür və ya formatı dəstəklənmir." });
       return response({ ok: true, status: result.status });
     }
-
-    const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) return response({ ok: false, code: "not_configured" }, 503);
-
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const verdict = await classify(key, [
-      { text: IMAGE_POLICY },
-      { inlineData: { mimeType, data: toBase64(bytes) } },
+    const verdict = await classify(reservationId, key, [
+      { text: IMAGE_POLICY }, { inlineData: { mimeType, data: toBase64(bytes) } },
     ], IMAGE_CATEGORIES);
-    const result = await applyAvatar(id, path, row.avatar_requested_at, verdict);
+    const result = await finishClaim(claimId, verdict);
     if (result.status === "visible" && result.previous_path) {
       const { error: removeError } = await db.storage.from("avatars").remove([result.previous_path]);
-      if (removeError) console.error("old avatar remove failed:", removeError.message);
+      if (removeError) console.error("old avatar remove failed");
     }
-    // input_chars holds the photo size in bytes.
-    await db.from("ai_usage").insert({
-      profile_id: null, company_id: null, task: "avatar_moderation", provider: "gemini", model: verdict.model,
-      input_chars: bytes.length, output_chars: verdict.outputChars, success: true, error_code: null,
-    });
+    await db.from("ai_usage").insert({ profile_id: null, company_id: null, task: "avatar_moderation", provider: "gemini", model: verdict.model,
+      input_chars: bytes.length, output_chars: verdict.outputChars, success: true, error_code: null });
     return response({ ok: true, status: result.status, categories: verdict.categories, model: verdict.model });
-  } catch (error) {
-    console.error(`content-moderation avatar ${id} failed:`, error instanceof Error ? error.message : error);
+  } catch {
+    try { await finishClaim(claimId, null); } catch { /* Lease expires; pending content stays hidden. */ }
+    console.error("avatar moderation failed");
     return response({ ok: false, code: "provider_error" }, 502);
   }
 }
 
+function validWebhookSecret(received: string, expected: string) {
+  if (expected.length < 32 || received.length !== expected.length) return false;
+  let different = 0;
+  for (let i = 0; i < expected.length; i++) different |= received.charCodeAt(i) ^ expected.charCodeAt(i);
+  return different === 0;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return response({ ok: false, error: "Method not allowed" }, 405);
+  const secret = Deno.env.get("MODERATION_WEBHOOK_SECRET") || "";
+  if (secret.length < 32) return response({ ok: false, code: "not_configured" }, 503);
+  if (!validWebhookSecret(req.headers.get("x-moderation-secret") || "", secret)) return response({ ok: false, error: "Unauthorized" }, 401);
 
   let body: { table?: string; id?: string };
-  try { body = await req.json(); } catch { return response({ ok: false, error: "Invalid JSON" }, 400); }
+  try {
+    body = await readLimitedJson(req);
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("invalid_body");
+  } catch { return response({ ok: false, error: "Invalid JSON" }, 400); }
   const table = String(body.table || "");
   const id = String(body.id || "");
   if (!TABLES.has(table) || !UUID.test(id)) return response({ ok: false, error: "Invalid target" }, 400);
-  if (table === "profiles") return moderateAvatar(id);
-
-  const columns = table === "posts"
-    ? "id, body, link_url, moderation_status, moderation_requested_at"
-    : "id, body, moderation_status, moderation_requested_at";
-  const { data: row, error: rowError } = await db.from(table).select(columns).eq("id", id).maybeSingle();
-  if (rowError) {
-    console.error("moderation row read failed:", rowError.message);
-    return response({ ok: false, error: "Row read failed" }, 500);
-  }
-  if (!row || row.moderation_status !== "pending") return response({ ok: true, skipped: true });
-
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return response({ ok: false, code: "not_configured" }, 503);
 
-  const text = [row.body, (row as { link_url?: string | null }).link_url].filter(Boolean).join("\n").slice(0, 6000);
+  const { data: claim, error: claimError } = await db.rpc("moderation_claim", { p_table: table, p_id: id });
+  if (claimError || !claim) return response({ ok: false, code: "claim_unavailable" }, 503);
+  if (!claim.claimed) return response({ ok: true, skipped: true });
+  if (!claim.claim_id || !claim.reservation_id || !claim.row) return response({ ok: false, code: "claim_unavailable" }, 503);
+  const row = claim.row as ClaimedRow;
+  if (table === "profiles") return moderateAvatar(id, row, claim.claim_id, claim.reservation_id, key);
+  let text: string;
+  try { text = moderationText(row, table); }
+  catch {
+    try {
+      const result = await finishClaim(claim.claim_id, { allow: false, categories: [], reason: "Məzmunun formatı və ya uzunluğu uyğun deyil. Qısaldıb yenidən göndərin." });
+      return response({ ok: true, status: result.status, code: "invalid_content" });
+    } catch { return response({ ok: false, code: "finish_unavailable" }, 503); }
+  }
   try {
-    const verdict = await classify(key, [{ text: `${POLICY}\nTEXT:\n${text}` }]);
-    const { data: status, error } = await db.rpc("moderation_apply", {
-      p_table: table,
-      p_id: id,
-      p_requested_at: row.moderation_requested_at,
-      p_allow: verdict.allow,
-      p_reason: verdict.reason,
-      p_categories: verdict.categories,
-    });
-    if (error) throw new Error(`moderation_apply: ${error.message}`);
-    // Cost tracking only: no profile, so it never counts toward a user's AI limit.
-    await db.from("ai_usage").insert({
-      profile_id: null, company_id: null, task: "content_moderation", provider: "gemini", model: verdict.model,
-      input_chars: text.length, output_chars: verdict.outputChars, success: true, error_code: null,
-    });
-    return response({ ok: true, status, categories: verdict.categories, model: verdict.model });
-  } catch (error) {
-    console.error(`content-moderation ${table} ${id} failed:`, error instanceof Error ? error.message : error);
+    const verdict = await classify(claim.reservation_id, key, [{ text: `${POLICY}\nTEXT:\n${text}` }]);
+    const result = await finishClaim(claim.claim_id, verdict);
+    await db.from("ai_usage").insert({ profile_id: null, company_id: null, task: "content_moderation", provider: "gemini", model: verdict.model,
+      input_chars: text.length, output_chars: verdict.outputChars, success: true, error_code: null });
+    return response({ ok: true, status: result.status, categories: verdict.categories, model: verdict.model });
+  } catch {
+    try { await finishClaim(claim.claim_id, null); } catch { /* Lease expires; pending content stays hidden. */ }
+    console.error("content moderation failed");
     return response({ ok: false, code: "provider_error" }, 502);
   }
 });

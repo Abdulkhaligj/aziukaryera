@@ -7,9 +7,9 @@
 (() => {
   'use strict';
   if (typeof Backend === 'undefined') return;
-  const client = () => {
-    if (!Backend.init()) return null;
-    return Backend.sb;
+  const client = backend => {
+    if (!backend.init()) return null;
+    return backend.sb;
   };
   const errorMessage = e => String(e?.message || 'Əməliyyat alınmadı. Yenidən cəhd edin.');
 
@@ -17,7 +17,7 @@
     Backend.myAvatar = async function () {
       const uid = typeof Store !== 'undefined' ? Store.state?.session?.userId : null;
       if (!uid) return { ok: false };
-      const sb = client();
+      const sb = client(this);
       if (!sb) return { ok: false, uid };
       try {
         const { data, error } = await sb.from('profiles')
@@ -42,7 +42,7 @@
 
   if (typeof Backend.activeAds !== 'function') {
     Backend.activeAds = async function (placement) {
-      const sb = client();
+      const sb = client(this);
       if (!sb) return [];
       try {
         const { data, error } = await sb.rpc('active_ads', { p_placement: placement || null });
@@ -54,7 +54,7 @@
 
   if (typeof Backend.trackAd !== 'function') {
     Backend.trackAd = async function (id, kind) {
-      const sb = client();
+      const sb = client(this);
       if (!sb || !id || !['view', 'click'].includes(kind)) return { ok: false };
       const { error } = await sb.rpc('ad_track', { p_id: id, p_kind: kind });
       return { ok: !error };
@@ -63,7 +63,7 @@
 
   if (typeof Backend.awards !== 'function') {
     Backend.awards = async function () {
-      const sb = client();
+      const sb = client(this);
       if (!sb) return { ok: false, rows: [] };
       const { data, error } = await sb.from('company_awards')
         .select('*').order('year', { ascending: false });
@@ -73,7 +73,7 @@
 
   if (typeof Backend.saveAward !== 'function') {
     Backend.saveAward = async function (fields) {
-      const sb = client();
+      const sb = client(this);
       if (!sb) return { ok: false, error: 'Serverə qoşulmaq mümkün olmadı.' };
       const { data, error } = await sb.from('company_awards')
         .insert(fields).select().single();
@@ -83,7 +83,7 @@
 
   if (typeof Backend.updateAward !== 'function') {
     Backend.updateAward = async function (id, fields) {
-      const sb = client();
+      const sb = client(this);
       if (!sb) return { ok: false };
       const { data, error } = await sb.from('company_awards')
         .update(fields).eq('id', id).select().single();
@@ -93,7 +93,7 @@
 
   if (typeof Backend.deleteAward !== 'function') {
     Backend.deleteAward = async function (id) {
-      const sb = client();
+      const sb = client(this);
       if (!sb) return { ok: false };
       const { error } = await sb.from('company_awards').delete().eq('id', id);
       return { ok: !error, error: errorMessage(error) };
@@ -103,7 +103,7 @@
   if (typeof Backend.uploadAvatar !== 'function') {
     Backend.uploadAvatar = async function (blob) {
       const uid = Store.state?.session?.userId;
-      const sb = client();
+      const sb = client(this);
       if (!uid || !sb || !(blob instanceof Blob)) {
         return { ok: false, error: 'Profil şəkli yükləmək mümkün olmadı.' };
       }
@@ -131,7 +131,7 @@
 
   if (typeof Backend.removeAvatar !== 'function') {
     Backend.removeAvatar = async function () {
-      const sb = client();
+      const sb = client(this);
       if (!sb) return { ok: false, error: 'Serverə qoşulmaq mümkün olmadı.' };
       const { data, error } = await sb.rpc('avatar_remove');
       if (error) return { ok: false, error: errorMessage(error) };

@@ -31,6 +31,8 @@ const EmployerTools = {
   },
   async load(section, force = false) {
     this.resetSession();
+    const scope=window.CareerSession?.capture();
+    if(Store.mode==='supabase'&&!scope)return;
     if (!force && this.loaded[section]) return;
     this.ui.busy = true;
     this.ui.error = '';
@@ -45,6 +47,7 @@ const EmployerTools = {
     } catch (error) {
       result = { ok:false, error:String(error?.message || 'Bağlantı xətası') };
     }
+    if(Store.mode==='supabase'&&!window.CareerSession.matches(scope))return;
     this.ui.busy = false;
     if (!result.ok) this.ui.error = result.error || 'Məlumatları yükləmək mümkün olmadı.';
     else {

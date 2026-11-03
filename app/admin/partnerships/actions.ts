@@ -9,6 +9,7 @@ const STATUSES = ['submitted','reviewing','approved','rejected','completed'] as 
 export async function reviewPartnership(formData: FormData): Promise<void> {
   const ctx = await getAdminContext();
   if (!ctx) redirect('/login');
+  if (ctx.mustChangePassword) redirect('/account/password');
   if (!['super_admin','manager'].includes(ctx.role)) {
     redirect('/admin/partnerships?result=denied');
   }

@@ -131,6 +131,7 @@ const Store = {
    * state-ə yerləşdirir. Render kodu bundan sonra sinxron işləyir.
    */
   hydrate(p) {
+    if (this.mode === 'supabase' && !window.CareerSession?.payloadMatches(p)) return false;
     const tax = Adapt.taxonomy(p.faculties, p.majors);
     this.tax = tax;
 
@@ -233,7 +234,15 @@ const Store = {
         interview: null
       }
     };
-    this.state.subscription = p.subscription || null;
+    this.state.subscription = p.subscription ? { ...p.subscription } : null;
+    const subscription = this.state.subscription;
+    if (subscription?.status === 'active' && subscription.plan_id !== 'free') {
+      const start = subscription.starts_at ? Date.parse(subscription.starts_at) : NaN;
+      const end = subscription.ends_at ? Date.parse(subscription.ends_at) : NaN;
+      if (!Number.isFinite(end) || end <= Date.now() || (Number.isFinite(start) && start > Date.now())) {
+        subscription.status = 'expired';
+      }
+    }
     this.state.notifications = Adapt.notifications(p.notifications, p.broadcasts, p.broadcastReads);
     this.state.invites = p.invites.map(i => ({
       companyId: i.company_id, studentId: i.student_id, jobId: i.job_id,
@@ -242,6 +251,7 @@ const Store = {
     this.state.customJobs = [];
     this.state.approvals = {};
     this.bind();
+    return true;
   },
 
   /* ---------------------------------------------------------------- *
@@ -296,6 +306,21 @@ const Store = {
     this.state = structuredClone(DEFAULT_STATE);
     this.bind();
     return this.state;
+  },
+
+  clearRemoteSession() {
+    if (!this.state || this.mode !== 'supabase') return;
+    this.state.session = null;
+    this.state.users = [];
+    this.state.profiles = {};
+    this.state.companyProfiles = {};
+    this.state.userData = {};
+    this.state.subscription = null;
+    this.state.notifications = [];
+    this.state.invites = [];
+    this.state.view = 'dashboard';
+    STUDENT_POOL.length = 0;
+    this.bind();
   },
 
   /**
@@ -399,13 +424,17 @@ const Store = {
    */
   remote(fn, rollback) {
     if (this.mode !== 'supabase') return;
+    const scope = window.CareerSession?.capture();
+    if (!scope) return;
     Promise.resolve(fn()).then(res => {
+      if (!window.CareerSession.matches(scope)) return;
       if (res && res.ok === false) {
         if (rollback) rollback();
         if (typeof toast === 'function') toast(res.error || 'Əməliyyat alınmadı');
         if (typeof render === 'function') render();
       }
     }).catch(e => {
+      if (!window.CareerSession.matches(scope)) return;
       if (rollback) rollback();
       if (typeof toast === 'function') toast('Şəbəkə xətası — dəyişiklik saxlanmadı');
       if (typeof render === 'function') render();

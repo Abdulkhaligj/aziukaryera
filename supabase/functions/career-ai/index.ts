@@ -1,5 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { readLimitedJson } from "../_shared/limits.ts";
+import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 /* ADNSU Career AI.
  * Deploy with verify_jwt = false: the caller's token is verified here with
@@ -97,6 +98,12 @@ function quotaMessage(ctx: Context) {
   return `Bugünkü AI limitiniz dolub (${ctx.used}/${ctx.limit}). Sabah yenidən cəhd edin.`;
 }
 
+async function providerFetch(reservationId: string, input: string, init: RequestInit) {
+  const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
+  if (error || data !== true) throw new Error("provider_budget_unavailable");
+  return fetch(input, init);
+}
+
 function safeJson(text: string) {
   const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
   try { return JSON.parse(cleaned); } catch {
@@ -145,10 +152,10 @@ function geminiModels() {
   const primary = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
   const fallback = (Deno.env.get("GEMINI_FALLBACK_MODELS") || "gemini-3.6-flash,gemini-3.5-flash-lite")
     .split(",").map((m) => m.trim()).filter(Boolean);
-  return [primary, ...fallback.filter((m) => m !== primary)];
+  return [...new Set([primary, ...fallback])].slice(0, 3);
 }
 
-async function geminiOnce(key: string, model: string, prompt: string, maxTokens: number) {
+async function geminiOnce(reservationId: string, key: string, model: string, prompt: string, maxTokens: number) {
   const legacy = /2\.5-flash/.test(model);
   const send = async (thinkingConfig: Record<string, unknown> | null) => {
     const generationConfig: Record<string, unknown> = {
@@ -158,13 +165,13 @@ async function geminiOnce(key: string, model: string, prompt: string, maxTokens:
       maxOutputTokens: legacy ? maxTokens : maxTokens + 4096,
     };
     if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const res = await providerFetch(reservationId, `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       signal: AbortSignal.timeout(17500),
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig }),
     });
-    return { res, data: await res.json() };
+    return { res, data: await readLimitedJson(res, 2097152) };
   };
   // JSON tasks need little reasoning; if the model rejects the thinking field, retry without it.
   let { res, data } = await send(legacy ? { thinkingBudget: 0 } : { thinkingLevel: "low" });
@@ -174,12 +181,12 @@ async function geminiOnce(key: string, model: string, prompt: string, maxTokens:
   return { res, data };
 }
 
-async function callGemini(key: string, prompt: string, maxTokens: number) {
+async function callGemini(reservationId: string, key: string, prompt: string, maxTokens: number) {
   for (const model of geminiModels()) {
     let res: Response;
     let data: any;
     try {
-      ({ res, data } = await geminiOnce(key, model, prompt, maxTokens));
+      ({ res, data } = await geminiOnce(reservationId, key, model, prompt, maxTokens));
     } catch (error) {
       console.warn("Gemini model timed out or network failed; trying next:", model);
       continue;
@@ -196,9 +203,9 @@ async function callGemini(key: string, prompt: string, maxTokens: number) {
   throw new Error("All Gemini models are busy");
 }
 
-async function callGroq(key: string, prompt: string, maxTokens: number) {
+async function callGroq(reservationId: string, key: string, prompt: string, maxTokens: number) {
   const model = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const res = await providerFetch(reservationId, "https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     signal: AbortSignal.timeout(17500),
@@ -210,24 +217,24 @@ async function callGroq(key: string, prompt: string, maxTokens: number) {
       messages: [{ role: "user", content: prompt }],
     }),
   });
-  const data = await res.json();
+  const data = await readLimitedJson(res, 2097152);
   if (!res.ok) throw new Error(data?.error?.message || "Groq request failed");
   return { provider: "groq", model, text: String(data?.choices?.[0]?.message?.content || "") };
 }
 
 // Gemini first; Groq when Gemini is missing or fails.
-async function callModel(prompt: string, maxTokens: number) {
+async function callModel(reservationId: string, prompt: string, maxTokens: number) {
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const groqKey = Deno.env.get("GROQ_API_KEY");
   if (geminiKey) {
     try {
-      return await callGemini(geminiKey, prompt, maxTokens);
+      return await callGemini(reservationId, geminiKey, prompt, maxTokens);
     } catch (error) {
       if (!groqKey) throw error;
       console.error("Gemini failed, falling back to Groq:", error instanceof Error ? error.message : error);
     }
   }
-  return await callGroq(groqKey as string, prompt, maxTokens);
+  return await callGroq(reservationId, groqKey as string, prompt, maxTokens);
 }
 
 // Candidates go to the model as C1..Cn without names or contacts.
@@ -337,7 +344,7 @@ Deno.serve(async (req: Request) => {
   const userId = auth.user.id;
 
   let body: AIRequest;
-  try { body = await req.json(); } catch { return response({ ok: false, error: "Invalid JSON" }, 400); }
+  try { body = await readLimitedJson(req); } catch { return response({ ok: false, error: "Invalid JSON" }, 400); }
   const task = String(body.task || "");
   const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
   const isCompanyTask = task in companySchemas;
@@ -416,6 +423,12 @@ Deno.serve(async (req: Request) => {
     return refuse("not_configured", "AI provayder açarı hələ konfiqurasiya edilməyib.");
   }
 
+  const { data: reservation, error: reserveError } = await db.rpc("ai_reserve_request", {
+    p_profile_id: userId, p_task: task, p_job_id: jobId,
+  });
+  if (reserveError || !reservation) return response({ ok: false, code: "budget_unavailable", error: "AI limiti yoxlanılmadı." }, 503);
+  if (!reservation.allowed || !reservation.reservation_id) return refuse(reservation.reason || "quota_exceeded", quotaMessage(reservation), { quota: quotaOf(reservation) });
+
   const locale = body.locale === "en" ? "English" : "Azerbaijani";
   const schema = isCompanyTask ? companySchemas[task] : studentSchemas[task];
   const prompt = `You are the ADNSU Career Center assistant. Respond only with valid JSON. Language: ${locale}. ${schema}
@@ -426,7 +439,7 @@ ${inputText}`;
   let provider = "none";
   let model = "none";
   try {
-    const out = await callModel(prompt, maxTokens);
+    const out = await callModel(reservation.reservation_id, prompt, maxTokens);
     provider = out.provider;
     model = out.model;
     let result = safeJson(out.text);
@@ -435,7 +448,7 @@ ${inputText}`;
     if (task === "interview_questions") result = cleanInterviewQuestions(result);
     else if (task in studentSchemas) result = trimTips(result);
     await logUsage({ ...usage, provider, model, input_chars: inputText.length, output_chars: out.text.length, success: true });
-    return response({ ok: true, provider, model, result, quota: quotaOf(ctx, 1) });
+    return response({ ok: true, provider, model, result, quota: quotaOf(reservation) });
   } catch (error) {
     console.error(`career-ai ${task} failed:`, error instanceof Error ? error.message : error);
     await logUsage({ ...usage, provider, model, input_chars: inputText.length, output_chars: 0, success: false, error_code: "provider_error" });

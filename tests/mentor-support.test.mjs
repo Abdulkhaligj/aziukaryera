@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './read-source.mjs';
 import { Script } from 'node:vm';
-const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const read = readSource;
 
 test('student Mentor dəstəyi page: request form, history and AI mentor are loaded', () => {
   const index = read('student-web/index.html');

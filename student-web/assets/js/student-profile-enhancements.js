@@ -4,6 +4,7 @@
   const root = document.getElementById('root');
   if (!root) return;
   const photo = {userId:null,last:0,pending:false,url:null,loading:false};
+  window.CareerSession.subscribe(()=>{photo.userId=null;photo.last=0;photo.pending=false;photo.url=null;photo.loading=false;});
   function student() {
     try {
       const me = Auth.currentUser();
@@ -80,6 +81,7 @@
   }
   async function readCurrent() {
     const me=student();
+    const scope=window.CareerSession.capture();if(!scope)return;
     if (!me || !Backend.init() || !Backend.sb || photo.loading) return;
     if (photo.userId===me.id && Date.now()-photo.last<90000) {
       picture(photo.url,photo.pending);
@@ -90,13 +92,15 @@
       const {data,error}=await Backend.sb.from('profiles')
         .select('avatar_path,avatar_pending_path,avatar_reason').eq('id',me.id).single();
       if (error) throw error;
+      if(!window.CareerSession.matches(scope))return;
       photo.userId=me.id;photo.pending=!!data.avatar_pending_path;
       photo.url=await signed(data.avatar_pending_path || data.avatar_path);
+      if(!window.CareerSession.matches(scope))return;
       photo.last=Date.now();picture(photo.url,photo.pending);
       if (photo.pending) notify('Şəkil yoxlamadadır; təsdiqlənəndə profilinizdə görünəcək.');
       else if (data.avatar_reason) notify(String(data.avatar_reason),true);
-    } catch {notify('Foto məlumatını oxumaq mümkün olmadı. Bir daha yoxlayın.',true);}
-    finally {photo.loading=false;}
+    } catch {if(window.CareerSession.matches(scope))notify('Foto məlumatını oxumaq mümkün olmadı. Bir daha yoxlayın.',true);}
+    finally {if(window.CareerSession.matches(scope))photo.loading=false;}
   }
   async function toWebp(file) {
     const image=new Image();
@@ -119,6 +123,7 @@
   }
   async function upload(file,input) {
     const me=student();
+    const scope=window.CareerSession.capture();if(!scope)return;
     if (!me || !Backend.init() || !Backend.sb) {notify('Şəkil yükləmək üçün daxil olun.',true);return;}
     if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>6*1024*1024) {
       notify('JPG, PNG və ya WebP seçin (maksimum 6 MB).',true);return;
@@ -126,16 +131,20 @@
     input.disabled=true;notify('Şəkil yüklənir…');
     try {
       const blob=await toWebp(file);
+      if(!window.CareerSession.matches(scope))return;
       const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
       const path=me.id+'/'+Array.from(bytes,v=>v.toString(16).padStart(2,'0')).join('')+'.webp';
       const response=await Backend.sb.storage.from('avatars').upload(path,blob,{contentType:'image/webp',upsert:false});
       if (response.error) throw response.error;
+      if(!window.CareerSession.matches(scope))return;
       const result=await Backend.sb.rpc('avatar_submit',{p_path:path});
       if (result.error || result.data?.status!=='pending') throw result.error || Error('Yoxlama sorğusu qəbul edilmədi.');
+      if(!window.CareerSession.matches(scope))return;
       photo.userId=me.id;photo.url=await signed(path);photo.pending=true;photo.last=Date.now();
+      if(!window.CareerSession.matches(scope))return;
       picture(photo.url,true);
       notify('Şəkil uğurla yükləndi, yoxlamadadır. Təsdiq olunduqdan sonra göstəriləcək.');
-    } catch(error) {notify('Yükləmə xətası: '+String(error?.message||'Yenidən yoxlayın.'),true);}
+    } catch(error) {if(window.CareerSession.matches(scope))notify('Yükləmə xətası: '+String(error?.message||'Yenidən yoxlayın.'),true);}
     finally {input.disabled=false;input.value='';}
   }
   function draw() {

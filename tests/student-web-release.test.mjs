@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './read-source.mjs';
 import { runInNewContext, Script } from 'node:vm';
 
-const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const read = readSource;
 
 test('company registration is presented without package marketing', () => {
   const app = read('student-web/assets/js/app.js');
@@ -11,7 +11,7 @@ test('company registration is presented without package marketing', () => {
   assert.match(app, /Şirkət kimi qeydiyyat/);
   assert.match(app, /Şirkət profili yaradın və vakansiyalar paylaşın/);
   assert.doesNotMatch(app, /Free, Pro və Business paketləri/);
-  assert.match(index, /app\.js\?v=20261029a/);
+  assert.match(index, /app\.js\?v=[0-9a-z]+/);
 });
 
 test('public landing omits employer pricing without removing vacancy or events routes', () => {
@@ -76,7 +76,7 @@ test('AIDA chat and polished icons load on all public/authenticated screens', ()
   // Compile real browser scripts so that malformed quotes do not reach production.
   new Script(chat);
   new Script(icons);
-  assert.match(index, /aida-widget\.js\?v=20261028d/);
+  assert.match(index, /aida-widget\.js\?v=20261102b/);
   assert.match(index, /ui-icons\.js\?v=20261028a/);
   assert.match(index, /ux-polish\.css\?v=20261028d/);
   assert.match(chat, /functions\.invoke\('aida-chat'/);

@@ -76,12 +76,19 @@ const Auth = {
     return !!this.currentUser();
   },
 
-  logout() {
-    if (Store.mode === 'supabase') Backend.signOut();
+  async logout() {
+    if (Store.mode === 'supabase') {
+      const result = await Backend.signOut();
+      if (!result?.ok) return result || { ok: false, error: 'Çıxış tamamlanmadı.' };
+    }
+    window.CareerSession?.invalidate('logout');
+    window.CVDrafts?.clear();
+    if (Store.mode === 'supabase' && typeof Store.clearRemoteSession === 'function') Store.clearRemoteSession();
     Store.state.session = null;
     Store.state.view = 'dashboard';
     Store.bind();
     Store.save();
+    return { ok: true };
   },
 
   /* ---------------------------------------------------------------- *
@@ -94,12 +101,16 @@ const Auth = {
     const emailErr = this.validateEmail(email, null);
     if (emailErr) return { ok: false, field: 'email', error: emailErr };
 
+    const attempt = window.CareerSession.beginAuth(email);
     const res = await Backend.signIn(email, password);
-    if (!res.ok) return res;
+    if (!window.CareerSession.authMatches(attempt)) return window.CareerSession.stale();
+    if (!res.ok) { window.CareerSession.finishAuth(attempt); return res; }
 
     const payload = await Backend.loadAll();
-    if (!payload.ok) return { ok: false, error: payload.error };
-    Store.hydrate(payload);
+    if (!window.CareerSession.authMatches(attempt)) return window.CareerSession.stale();
+    if (!payload.ok) { window.CareerSession.finishAuth(attempt); return { ok: false, error: payload.error }; }
+    if (!Store.hydrate(payload)) return window.CareerSession.stale();
+    window.CareerSession.finishAuth(attempt);
     return { ok: true, user: this.currentUser() };
   },
 
@@ -137,10 +148,13 @@ const Auth = {
      * Ona görə seçimi ad kimi saxlayır, sessiya yarandıqdan sonra id-yə çevirib
      * profilə yazırıq. (Əvvəl bu addım yox idi və fakültə boş qalırdı.)
      */
+    const attempt = window.CareerSession.beginAuth(p.email);
     const res = await Backend.signUp({ ...p, role });
-    if (!res.ok) return res;
+    if (!window.CareerSession.authMatches(attempt)) return window.CareerSession.stale();
+    if (!res.ok) { window.CareerSession.finishAuth(attempt); return res; }
 
     if (res.needsConfirmation) {
+      window.CareerSession.finishAuth(attempt);
       return { ok: false, confirmation: true, error:
         `Hesab yaradıldı. ${res.email} ünvanına təsdiq linki göndərildi — ` +
         `linkə klikləyib geri qayıdın və daxil olun. Fakültə seçiminizi ilk ` +
@@ -148,8 +162,10 @@ const Auth = {
     }
 
     const payload = await Backend.loadAll();
+    if (!window.CareerSession.authMatches(attempt)) return window.CareerSession.stale();
     if (!payload.ok) return { ok: false, error: payload.error };
-    Store.hydrate(payload);
+    if (!Store.hydrate(payload)) return window.CareerSession.stale();
+    const scope = window.CareerSession.capture();
 
     /* İndi taksonomiya əlçatandır — akademik sahələri yazırıq. */
     if (isLearner) {
@@ -166,12 +182,14 @@ const Auth = {
         personal_email: role === 'alumni' && !String(p.email).toLowerCase().endsWith('@' + UNI_DOMAIN) ? p.email : null
       };
       const upd = await Backend.updateProfile(patch);
+      if (!window.CareerSession.authMatches(attempt) || !window.CareerSession.matches(scope)) return window.CareerSession.stale();
       if (upd.ok && Store.state.student) {
         Store.state.student.faculty = p.faculty;
         Store.state.student.major = p.major;
         Store.state.student.course = patch.course;
       }
     }
+    window.CareerSession.finishAuth(attempt);
     return { ok: true, user: this.currentUser() };
   },
 
@@ -181,7 +199,7 @@ const Auth = {
     if (!session) return false;
     const payload = await Backend.loadAll();
     if (!payload.ok) return false;
-    Store.hydrate(payload);
+    if (!Store.hydrate(payload)) return false;
     return true;
   },
 
@@ -321,6 +339,7 @@ const Auth = {
   },
 
   startSession(user) {
+    window.CareerSession?.demoOwner(user.id);
     Store.state.session = { userId: user.id, at: new Date().toISOString() };
     Store.state.view = 'dashboard';
     Store.bind();
@@ -338,7 +357,9 @@ const Auth = {
 
     if (Store.mode === 'supabase') {
       /* Supabase cari şifrəni yenidən yoxlamır — əvvəlcə onu təsdiqləyirik. */
+      const scope = window.CareerSession.capture();
       const verify = await Backend.signIn(user.email, currentPw);
+      if (!window.CareerSession.matches(scope)) return window.CareerSession.stale();
       if (!verify.ok) return { ok: false, field: 'current', error: 'Cari şifrə yanlışdır.' };
       return await Backend.changePassword(newPw);
     }

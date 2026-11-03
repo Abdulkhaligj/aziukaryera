@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './read-source.mjs';
 import { Script } from 'node:vm';
-const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const read = readSource;
 
 test('approval decision saves only status without replacing job content',()=>{
   const api=read('app/api/admin/[resource]/[id]/route.ts');
@@ -33,7 +33,7 @@ test('student profile has real avatar file upload backed by private moderation',
   assert.match(js,/me\.role === 'student'/);
   assert.doesNotMatch(js,/localStorage|service_role|supabaseKey/);
   assert.match(css,/\.student-photo-card/);
-  assert.match(index,/student-profile-enhancements\.js\?v=20261028m/);
+  assert.match(index,/student-profile-enhancements\.js\?v=20261102b/);
 });
 
 test('mentor support is present within student dashboard and profile',()=>{

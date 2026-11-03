@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './read-source.mjs';
 
-const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const read = readSource;
 
 test('admin role validation uses fixed role allow-list', () => {
   const login = read('app/login/actions.ts');

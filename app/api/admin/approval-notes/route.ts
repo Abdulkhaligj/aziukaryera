@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext } from '@/lib/admin-data';
 import { can } from '@/lib/permissions';
+import { readAdminJson } from '@/lib/request-body';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -28,10 +29,9 @@ export async function POST(request: NextRequest) {
   if (!can(context.role, 'edit', 'pending_jobs'))
     return NextResponse.json({ error: 'Bu bölmədə qeyd yazmağa icazəniz yoxdur.' }, { status: 403 });
 
-  let body: unknown;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: 'Sorğunun formatı yanlışdır.' }, { status: 400 }); }
-  const payload = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+  const parsed = await readAdminJson(request);
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  const payload = parsed.body;
   const jobId = typeof payload.job_id === 'string' ? payload.job_id : '';
   const note = typeof payload.note === 'string' ? payload.note.trim() : '';
   if (!uuid.test(jobId)) return NextResponse.json({ error: 'Vakansiya identifikatoru yanlışdır.' }, { status: 400 });

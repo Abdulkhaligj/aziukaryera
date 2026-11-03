@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-
-const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+import { readSource as read } from './read-source.mjs';
 
 test('password and untyped inputs share the base form styling', () => {
   const css = read('student-web/assets/css/styles.css');

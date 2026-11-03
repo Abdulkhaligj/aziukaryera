@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4' 'sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z' 'sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1' 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU' 'sha256-2FijLVW+Cyl3LivPVpmNzLc+9iw6Tuwkq0E6TEs7MJ0=' 'sha256-6j1I0vi2T2PHVI5z8FgczKKiIaEI07T5x1/b3qhXrQY=' 'sha256-QPIs62GP3u5zxpxAUFYRESWv5Hx+MzfIf0nlEtWYk6U=' 'sha256-qUajXYZD56UEVAJtuglhxBQnaEKAMpopJBy1R8jGvqs=' 'sha256-lqE2UXJxoqPej9siVlnHxX+vq6Jph6gEtJ2x5c+ITQ4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'self'; worker-src 'self'; form-action 'self'">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -364,6 +365,10 @@ html.is-embedded body { background: #f5edd8; }
 </style>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js" integrity="sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4" crossorigin="anonymous"></script>
+<script src="assets/js/runtime-config.js?v=20261103a"></script>
+<script src="assets/js/config.js?v=20261102a"></script>
+<script src="assets/js/cv-drafts.js?v=20261102a"></script>
 <script>
   if (new URLSearchParams(location.search).get('embed') === '1') {
     document.documentElement.classList.add('is-embedded');
@@ -374,11 +379,11 @@ html.is-embedded body { background: #f5edd8; }
   <div class="rg-nav-mark">ASOIU <span>CV Studio</span></div>
   <div style="display:flex;align-items:center;">
     <div class="rg-lang-switch">
-      <button class="rg-lang-btn" data-lang="az" onclick="window.RG_APPLY_LANG('az')">AZ</button>
-      <button class="rg-lang-btn" data-lang="ru" onclick="window.RG_APPLY_LANG('ru')">RU</button>
-      <button class="rg-lang-btn" data-lang="en" onclick="window.RG_APPLY_LANG('en')">EN</button>
+      <button class="rg-lang-btn" data-lang="az">AZ</button>
+      <button class="rg-lang-btn" data-lang="ru">RU</button>
+      <button class="rg-lang-btn" data-lang="en">EN</button>
     </div>
-    <button class="rg-nav-cta" id="rg-nav-cta" onclick="document.getElementById('root').scrollIntoView({behavior:'smooth'})">Start free</button>
+    <button class="rg-nav-cta" id="rg-nav-cta" data-scroll-editor="true">Start free</button>
   </div>
 </nav>
 
@@ -391,7 +396,7 @@ html.is-embedded body { background: #f5edd8; }
       and export a polished Word or PDF file in minutes.
     </p>
     <div class="rg-hero-actions">
-      <button class="rg-cta-primary" id="rg-cta-primary" onclick="document.getElementById('root').scrollIntoView({behavior:'smooth'})">
+      <button class="rg-cta-primary" id="rg-cta-primary" data-scroll-editor="true">
         Build my résumé
       </button>
       <div class="rg-ticket-wrap">
@@ -789,6 +794,11 @@ window.RG_TOOL_I18N = {
 <script>
 
 window.RG_INIT_LANG();
+document.addEventListener('click', event => {
+  const language = event.target.closest('[data-lang]');
+  if (language) window.RG_APPLY_LANG(language.dataset.lang);
+  if (event.target.closest('[data-scroll-editor]')) document.getElementById('root').scrollIntoView({ behavior: 'smooth' });
+});
 
 </script>
 
@@ -808,9 +818,10 @@ window.RG_INIT_LANG();
   function loadScript(srcs, onDone) {
     var i = 0;
     function tryNext() {
-      if (i >= srcs.length) { onDone(new Error('All CDN sources failed.')); return; }
+      if (i >= srcs.length) { onDone(new Error('The pinned dependency could not be loaded or its integrity check failed.')); return; }
       var s = document.createElement('script');
-      s.src = srcs[i];
+      s.src = srcs[i].src;
+      s.integrity = srcs[i].integrity;
       s.crossOrigin = 'anonymous';
       s.onload = function () { onDone(null); };
       s.onerror = function () { i++; tryNext(); };
@@ -828,8 +839,8 @@ window.RG_INIT_LANG();
   }
 
   loadSequential([
-    ['https://unpkg.com/react@18/umd/react.production.min.js', 'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js'],
-    ['https://unpkg.com/react-dom@18/umd/react-dom.production.min.js', 'https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js'],
+    [{ src: "https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js", integrity: "sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" }],
+    [{ src: "https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js", integrity: "sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" }],
   ], function (err) {
     var status = document.getElementById('__status');
     if (err) {
@@ -954,13 +965,6 @@ function PaywallModal({
   onClose
 }) {
   const lang = useRGLang();
-  useEffect(() => {
-    if (document.getElementById('gumroad-js')) return;
-    const s = document.createElement('script');
-    s.id = 'gumroad-js';
-    s.src = 'https://gumroad.com/js/gumroad.js';
-    document.body.appendChild(s);
-  }, []);
   const t = window.RG_I18N && window.RG_I18N[lang] || {
     paywallTitle: 'Unlock your download',
     paywallBody: 'Pay once, export as many résumés as you like — forever. No account, no recurring charge.',
@@ -996,7 +1000,7 @@ function PaywallModal({
   }, t.paywallBody), /*#__PURE__*/React.createElement("a", {
     href: CHECKOUT_URL,
     className: "gumroad-button rg-paywall-cta",
-    "data-gumroad-overlay-checkout": "true"
+    target: "_blank", rel: "noopener noreferrer"
   }, t.paywallCta), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     className: "rg-paywall-cancel"
@@ -3137,43 +3141,57 @@ function ResumeGenerator() {
   const previewWrapRef = useRef(null);
   const printAreaRef = useRef(null);
 
-  /* Main platform sends the signed-in student's structured profile here.
-     The same payload is available when the editor opens in a new tab. */
+  // Private drafts are restored only after the current Auth user is verified.
+  // Keep the scope beside the in-memory data so stale renders cannot save as
+  // another account after a same-tab or cross-tab logout/account switch.
+  const draftScopeRef = useRef(null);
+  const draftGenerationRef = useRef(0);
+  const generation = draftGenerationRef.current;
+  const renderScope = draftScopeRef.current;
+  const validEditor = () => generation === draftGenerationRef.current &&
+    (!renderScope || window.CVDrafts.matches(renderScope));
   useEffect(() => {
-    const applyProfile = payload => {
-      if (!payload || typeof payload !== 'object') return;
-      const next = normalizeResumeData(payload);
-      setData(next);
+    let active = true;
+    const reset = () => {
+      draftGenerationRef.current++;
+      draftScopeRef.current = null;
+      setData(EMPTY_RESUME);
       setRawText('');
-      setStep('edit');
+      setStep('empty');
       setParseError(null);
+      pendingExportRef.current = null;
+      setIsExporting(null);
     };
-    const receive = event => {
-      if (event.origin !== location.origin) return;
-      if (event.data?.type === 'asoiu-cv-profile') applyProfile(event.data.payload);
+    const restore = scope => {
+      if (!active) return;
+      const old = draftScopeRef.current;
+      if (old?.ownerId === scope?.ownerId && old?.revision === scope?.revision) return;
+      reset();
+      if (!scope) return;
+      draftScopeRef.current = scope;
+      const saved = window.CVDrafts.get('draft', scope) || window.CVDrafts.get('profile', scope);
+      if (saved && typeof saved === 'object') {
+        setData(normalizeResumeData(saved));
+        setStep('edit');
+      }
     };
-    window.addEventListener('message', receive);
-    try {
-      const savedProfile = localStorage.getItem('asoiu-cv-profile-data');
-      const savedDraft = localStorage.getItem('asoiu-cv-builder-draft');
-      if (savedDraft) applyProfile(JSON.parse(savedDraft));
-      else if (savedProfile) applyProfile(JSON.parse(savedProfile));
-    } catch (error) {
-      console.warn('CV draft could not be restored', error);
-    }
-    return () => window.removeEventListener('message', receive);
+    const unsubscribe = window.CVDrafts.subscribe(restore);
+    void window.CVDrafts.connect().then(restore);
+    const hide = () => reset();
+    const show = () => void window.CVDrafts.revalidate().then(restore);
+    window.addEventListener('pagehide', hide);
+    window.addEventListener('pageshow', show);
+    return () => {
+      active = false;
+      unsubscribe();
+      window.removeEventListener('pagehide', hide);
+      window.removeEventListener('pageshow', show);
+    };
   }, []);
 
   useEffect(() => {
-    if (step !== 'edit') return;
-    try {
-      localStorage.setItem('asoiu-cv-builder-draft', JSON.stringify(data));
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'asoiu-cv-draft-saved', payload: data }, location.origin);
-      }
-    } catch (error) {
-      console.warn('CV draft could not be saved', error);
-    }
+    if (step !== 'edit' || !validEditor()) return;
+    window.CVDrafts.put('draft', data, renderScope);
   }, [data, step]);
 
   // Auto-fit preview to container width
@@ -3248,7 +3266,7 @@ function ResumeGenerator() {
     }
   };
   const handleParse = async () => {
-    if (!rawText.trim()) return;
+    if (!validEditor() || !rawText.trim()) return;
     setStep('parsing');
     setParseError(null);
     try {
@@ -3263,18 +3281,21 @@ function ResumeGenerator() {
     }
   };
   const handleSample = () => {
+    if (!validEditor()) return;
     setRawText(SAMPLE_RESUME_TEXT);
     setData(SAMPLE_DATA);
     setStep('edit');
   };
   const handleStartOver = () => {
+    if (!validEditor()) return;
     setData(EMPTY_RESUME);
     setRawText('');
     setStep('empty');
     setParseError(null);
-    try { localStorage.removeItem('asoiu-cv-builder-draft'); } catch (error) {}
+    window.CVDrafts.remove('draft', draftScopeRef.current);
   };
   const runExportPDF = () => {
+    if (!validEditor()) return;
     setIsExporting('pdf');
     try {
       exportToPDF(printAreaRef.current, data);
@@ -3286,6 +3307,7 @@ function ResumeGenerator() {
     }
   };
   const runExportDocx = () => {
+    if (!validEditor()) return;
     setIsExporting('docx');
     try {
       exportToWord(data, template, effectiveAccent, effectiveAccent2, data.name);
@@ -3341,7 +3363,7 @@ function ResumeGenerator() {
       }
     }, /*#__PURE__*/React.createElement("textarea", {
       value: rawText,
-      onChange: e => setRawText(e.target.value),
+      onChange: e => { if (validEditor()) setRawText(e.target.value); },
       placeholder: t.pastePlaceholder,
       className: "tool-body w-full px-5 py-4 text-sm focus:outline-none resize-none",
       style: {
@@ -3473,7 +3495,7 @@ function ResumeGenerator() {
     className: "tool-body text-xs text-stone-500 mb-5 leading-relaxed"
   }, t.reviewEditSub), /*#__PURE__*/React.createElement(ResumeForm, {
     data: data,
-    setData: setData
+    setData: value => { if (validEditor()) setData(value); }
   }))), /*#__PURE__*/React.createElement("main", {
     className: "lg:h-[calc(100vh-49px)] flex flex-col overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {

@@ -26,12 +26,18 @@ const Backend = {
     return USE_SUPABASE && typeof window !== 'undefined' && !!window.supabase;
   },
 
-  init() {
+  init(authOptions = {}) {
     if (!this.available()) return false;
-    if (this.sb) return true;
+    if (this.sb) {
+      window.CareerSession?.connect(this.sb);
+      if (window.CVDrafts) void window.CVDrafts.connect(this.sb);
+      return true;
+    }
     this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, ...authOptions }
     });
+    window.CareerSession?.connect(this.sb);
+    if (window.CVDrafts) void window.CVDrafts.connect(this.sb);
     return true;
   },
 
@@ -191,8 +197,13 @@ const Backend = {
   },
 
   async signOut() {
-    if (!this.init()) return;
-    await this.sb.auth.signOut();
+    if (!this.init()) return { ok: false, error: 'Giriş xidməti əlçatan deyil.' };
+    try {
+      const { error } = await this.sb.auth.signOut();
+      return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
+    } catch {
+      return { ok: false, error: 'Çıxış tamamlanmadı. Bağlantını yoxlayıb yenidən cəhd edin.' };
+    }
   },
 
   async resetPassword(email) {
@@ -284,7 +295,7 @@ const Backend = {
       this.sb.from('majors').select('*'),
       this.sb.from('profiles').select('*').eq('id', uid).single(),
       this.sb.from('education').select('*').eq('profile_id', uid).order('start_year', { ascending: false }),
-      this.sb.from('profiles').select('id,full_name,role,status,faculty_id,major_id,course,gpa,skills,summary,account_status').in('role', ['student', 'graduate']).eq('status', 'active'),
+      this.sb.rpc('candidate_profiles'),
       this.sb.from('companies').select('*'),
       this.sb.from('jobs').select('*'),
       this.sb.from('applications').select('*'),
@@ -575,18 +586,19 @@ const Backend = {
 
   async feed(limit = 30) {
     if (!this.init()) return { ok: false, rows: [] };
-    const [posts, likes, saves, comments, profiles] = await Promise.all([
+    const [posts, likes, saves, comments] = await Promise.all([
       this.sb.from('posts').select('*').order('created_at', { ascending: false }).limit(limit),
       this.sb.from('post_likes').select('post_id, profile_id'),
       this.sb.from('post_saves').select('post_id, profile_id'),
-      this.sb.from('post_comments').select('*').order('created_at'),
-      this.sb.from('profiles').select('id, full_name, role, faculty_id, major_id')
+      this.sb.from('post_comments').select('*').order('created_at')
     ]);
-    const bad = [posts, likes, saves, comments, profiles].find(r => r.error);
+    const bad = [posts, likes, saves, comments].find(r => r.error);
     if (bad) return { ok: false, rows: [], error: this.translate(bad.error.message) };
-
+    const authorIds = [...new Set([...posts.data, ...comments.data].map(row => row.author_id))];
+    const profiles = await this.sb.rpc('profile_cards', { p_ids: authorIds.slice(0, 500) });
+    if (profiles.error) return { ok: false, rows: [], error: this.translate(profiles.error.message) };
     const who = {};
-    profiles.data.forEach(p => { who[p.id] = p; });
+    (profiles.data || []).forEach(p => { who[p.id] = p; });
     const session = await this.getSession();
     const me = session ? session.user.id : null;
 

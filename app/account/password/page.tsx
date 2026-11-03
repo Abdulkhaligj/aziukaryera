@@ -5,7 +5,7 @@ import { PasswordChangeButton, PasswordField } from '@/components/login-form';
 import { getAdminContext } from '@/lib/admin-data';
 
 export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const context = await getAdminContext();
+  const context = await getAdminContext({ allowPasswordChange: true });
   if (!context) redirect('/login');
   const query = await searchParams;
   return <main className="loginPage"><section className="loginCard">

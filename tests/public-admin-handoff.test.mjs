@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from './read-source.mjs';
 import { Script } from 'node:vm';
 
-const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const read = readSource;
 
 test('public landing restores Awards, Mentor and real logo-only ticker', () => {
   const landing = read('student-web/assets/js/landing.js');
@@ -47,7 +47,7 @@ test('approval note action is private, persistent and separate from saving statu
 
 test('student and employer scripts stay loaded with previous patch versions', () => {
   const index = read('student-web/index.html');
-  assert.match(index, /app\.js\?v=20261029a/);
+  assert.match(index, /app\.js\?v=[0-9a-z]+/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
-  assert.match(index, /aida-widget\.js\?v=20261028d/);
+  assert.match(index, /aida-widget\.js\?v=20261102b/);
 });

@@ -1,5 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { readLimitedJson, readLimitedBytes } from "../_shared/limits.ts";
+import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 /* AI assistant for the admin panel (Gemini).
  * Staff type or speak a request ("sabah saat 15-də SOCAR ilə karyera
@@ -55,6 +56,12 @@ function toBase64(bytes: Uint8Array) {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);
+}
+
+async function providerFetch(reservationId: string, input: string, init: RequestInit) {
+  const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
+  if (error || data !== true) throw new Error("provider_budget_unavailable");
+  return fetch(input, init);
 }
 
 function safeJson(text: string) {
@@ -113,21 +120,22 @@ function cleanAction(raw: any): Action | null {
 function models() {
   const primary = Deno.env.get("GEMINI_ASSISTANT_MODEL") || Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
   const fallback = (Deno.env.get("GEMINI_FALLBACK_MODELS") || "gemini-3.6-flash,gemini-3.5-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
-  return [primary, ...fallback.filter((m) => m !== primary)];
+  return [...new Set([primary, ...fallback])].slice(0, 3);
 }
 
-async function callGemini(key: string, parts: Part[]) {
+async function callGemini(reservationId: string, key: string, parts: Part[]) {
   let lastError = "All Gemini models are busy";
   for (const model of models()) {
     const send = async (thinking: boolean) => {
       const generationConfig: Record<string, unknown> = { temperature: 0.2, responseMimeType: "application/json", maxOutputTokens: 8192 };
       if (thinking) generationConfig.thinkingConfig = { thinkingLevel: "low" };
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      const res = await providerFetch(reservationId, `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        signal: AbortSignal.timeout(12500),
         body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig }),
       });
-      return { res, data: await res.json() };
+      return { res, data: await readLimitedJson(res, 2097152) };
     };
     let { res, data } = await send(true);
     if (res.status === 400 && /thinking/i.test(String(data?.error?.message || ""))) ({ res, data } = await send(false));
@@ -180,11 +188,11 @@ Deno.serve(async (req: Request) => {
   const { data: auth } = token ? await db.auth.getUser(token) : { data: null };
   const actor = auth?.user;
   if (!actor || !ADMIN_ROLES.has(String(actor.app_metadata?.admin_role || ""))) return json({ ok: false, error: "İcazə yoxdur" }, 401);
-  const { data: profile } = await db.from("profiles").select("role,status").eq("id", actor.id).maybeSingle();
-  if (profile?.role !== "admin" || profile?.status !== "active") return json({ ok: false, error: "Admin hesabı aktiv deyil" }, 403);
+  const { data: profile } = await db.from("profiles").select("role,status,admin_role").eq("id", actor.id).maybeSingle();
+  if (profile?.role !== "admin" || profile?.status !== "active" || profile?.admin_role !== actor.app_metadata?.admin_role || actor.app_metadata?.must_change_password === true) return json({ ok: false, error: "Admin hesabı aktiv deyil" }, 403);
 
   let body: { text?: string; audio_path?: string; image_url?: string; history?: Array<{ role: string; text: string }> };
-  try { body = await req.json(); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
+  try { body = await readLimitedJson(req); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
   const text = String(body.text || "").trim().slice(0, 4000);
   const audioPath = String(body.audio_path || "");
   const imageUrl = String(body.image_url || "");
@@ -192,12 +200,6 @@ Deno.serve(async (req: Request) => {
 
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return json({ ok: false, error: "AI açarı konfiqurasiya olunmayıb" }, 503);
-
-  /* Daily limit per staff member (Baku day) */
-  const since = new Date(`${bakuToday()}T00:00:00+04:00`).toISOString();
-  const { count } = await db.from("ai_usage").select("id", { count: "exact", head: true })
-    .eq("profile_id", actor.id).eq("task", "admin_assistant").eq("success", true).gte("created_at", since);
-  if ((count || 0) >= DAILY_LIMIT) return json({ ok: false, error: `Bugünkü AI limiti dolub (${DAILY_LIMIT}). Sabah yenidən cəhd edin.` }, 429);
 
   const parts: Part[] = [];
   let inputBytes = text.length;
@@ -216,10 +218,10 @@ Deno.serve(async (req: Request) => {
     if (imageUrl) {
       const prefix = `${SUPABASE_URL}/storage/v1/object/public/public-media/`;
       if (!imageUrl.startsWith(prefix)) return json({ ok: false, error: "Şəkil yalnız panelin öz yükləməsindən ola bilər" }, 400);
-      const res = await fetch(imageUrl);
+      const res = await fetch(imageUrl, { redirect: "error", signal: AbortSignal.timeout(12500) });
       const type = (res.headers.get("content-type") || "").split(";")[0];
       if (!res.ok || !/^image\/(png|jpeg|webp)$/.test(type)) return json({ ok: false, error: "Şəkil oxunmadı" }, 400);
-      const bytes = new Uint8Array(await res.arrayBuffer());
+      const bytes = await readLimitedBytes(res, MAX_IMAGE_BYTES);
       if (bytes.length > MAX_IMAGE_BYTES) return json({ ok: false, error: "Şəkil çox böyükdür" }, 400);
       inputBytes += bytes.length;
       parts.push({ inlineData: { mimeType: type, data: toBase64(bytes) } });
@@ -235,9 +237,13 @@ Deno.serve(async (req: Request) => {
     .map((h) => `${h.role === "assistant" ? "Assistant" : "Staff"}: ${String(h.text || "").slice(0, 600)}`).join("\n");
   parts.unshift({ text: prompt(bakuToday(), companies, !!audioPath, !!imageUrl, history) + (text ? `\nSTAFF REQUEST:\n${text}` : "") });
 
+  const { data: reservation, error: reserveError } = await db.rpc("ai_reserve_request", { p_profile_id: actor.id, p_task: "admin_assistant" });
+  if (reserveError || !reservation) return json({ ok: false, error: "AI limiti yoxlanılmadı." }, 503);
+  if (!reservation.allowed || !reservation.reservation_id) return json({ ok: false, error: "Bugünkü AI limiti dolub və ya hesaba icazə yoxdur." }, 429);
+
   let model = "none";
   try {
-    const out = await callGemini(key, parts);
+    const out = await callGemini(reservation.reservation_id, key, parts);
     model = out.model;
     const parsed = safeJson(out.text);
     const actions = (Array.isArray(parsed?.actions) ? parsed.actions : []).slice(0, 10).map(cleanAction).filter(Boolean) as Action[];

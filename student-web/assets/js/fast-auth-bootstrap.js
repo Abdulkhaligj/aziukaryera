@@ -8,7 +8,7 @@
   'use strict';
   if (typeof Backend === 'undefined' || typeof Backend.loadAll !== 'function') return;
 
-  const oldLoadAll = Backend.loadAll.bind(Backend);
+  const oldLoadAll = Backend.loadAll;
 
   Backend.loadAll = async function () {
     if (!this.init()) {
@@ -23,7 +23,7 @@
 
       if (error) {
         // Allow older backend deployments to continue working temporarily.
-        if (['PGRST202', '42883'].includes(error.code)) return oldLoadAll();
+        if (['PGRST202', '42883'].includes(error.code)) return oldLoadAll.call(this);
         console.warn('[ADNSU] Fast bootstrap failed:', error.code || error.message);
         return {
           ok: false,

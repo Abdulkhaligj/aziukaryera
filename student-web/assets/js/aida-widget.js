@@ -46,6 +46,14 @@
   const submit = host.querySelector('.aida-send');
   const messages = [];
   let busy = false;
+  let generation = 0, pending = null;
+  window.CareerSession.subscribe(() => {
+    generation++; pending?.abort(); pending = null;
+    messages.length = 0; busy = false; input.value = ''; submit.disabled = false;
+    log.replaceChildren(); extras.replaceChildren();
+    panel.hidden = true; host.classList.remove('is-open');
+    launch.setAttribute('aria-expanded', 'false');
+  });
 
   function open() {
     panel.hidden = false;
@@ -122,6 +130,8 @@
   async function send(question) {
     const text = String(question || '').trim().slice(0,800);
     if (!text || busy) return;
+    const scope = window.CareerSession.snapshot(), ticket = ++generation;
+    const current = () => ticket === generation && window.CareerSession.matches(scope);
     const history = messages.slice(-10);
     message('user',text);
     messages.push({role:'user',text});
@@ -134,7 +144,9 @@
     try {
       if (typeof Backend === 'undefined' || !Backend.init() || !Backend.sb || !Backend.sb.functions)
         throw new Error('connection unavailable');
+      if (!current()) return;
       const controller = new AbortController();
+      pending = controller;
       const timer = setTimeout(() => controller.abort(), 24000);
       let response;
       try {
@@ -143,6 +155,7 @@
           signal:controller.signal
         });
       } finally { clearTimeout(timer); }
+      if (!current()) return;
       if (response.error) throw response.error;
       const result=response.data;
       if (!result || result.ok !== true || !String(result.reply || '').trim())
@@ -152,10 +165,13 @@
       messages.push({role:'assistant',text:reply});
       setExtras(result.suggestions,result.links);
     } catch (error) {
+      if (!current()) return;
       const detail=String(error && error.message || '');
       const notice=/limit|dolub/i.test(detail) ? detail : 'AIDA hazırda cavab verə bilmir. Yenidən yoxlayın və ya career@asoiu.edu.az ünvanına müraciət edin.';
       waiting.querySelector('.aida-bubble').textContent=notice;
     } finally {
+      if (!current()) return;
+      pending = null;
       waiting.classList.remove('aida-waiting');
       busy=false;
       submit.disabled=false;

@@ -1,3 +1,4 @@
+import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext, loadLookups, loadResource, resourceKeys, writeAudit } from '@/lib/admin-data';
 import { can } from '@/lib/permissions';
@@ -34,7 +35,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const context = await getAdminContext();
   if (!context) return NextResponse.json({ error: 'Sessiya bitib. Yenidən daxil olun.' }, { status: 401 });
   if (!resources.has(key) || !can(context.role, 'create', key)) return NextResponse.json({ error: 'Bu əməliyyata icazəniz yoxdur' }, { status: 403 });
-  const body = await request.json() as Record<string, unknown>;
+  const parsed = await readAdminJson(request);
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  const body = parsed.body;
 
   /* Hesablar e-poçtsuz, müvəqqəti şifrə ilə yaradılır (SMTP tələb olunmur) */
   if (people.has(key)) {

@@ -1,18 +1,14 @@
-/*!
- * ADNSU / ASOIU Career v2 — config.js
- *
- * Supabase konfiqurasiyası. Bu iki dəyər ictimaidir — publishable key
- * brauzerə göndərilmək üçün nəzərdə tutulub və RLS ilə qorunur.
- * (Service role açarını BURAYA HEÇ VAXT YAZMAYIN.)
- *
- * SUPABASE_URL boş qalsa, platforma avtomatik olaraq offline demo rejimində
- * işləyir: məlumat localStorage-də saxlanılır, auth isə brauzer tərəfli olur.
- * Bu, artifact və ya internetsiz nümayiş üçün lazımdır.
- *
+/* Public deployment configuration only; never put service-role or secret keys here.
+ * Set the URL/key below to YOUR test project, or provide window.CAREER_CONFIG
+ * before this file loads. An unconfigured/offline backend fails closed.
+ * To run an intentional offline demo, explicitly set demoMode: true.
  */
-
-const SUPABASE_URL = 'https://ttfsbgbhyomfheglefkn.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_aVM-oMg1JHO-gZ-C9Np3cA_sygbgtRV';
-
-/* Fakültə/ixtisas id-ləri bazadakı arayış cədvəlləri ilə eynidir. */
-const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+const CAREER_CONFIG = window.CAREER_CONFIG || {
+  supabaseUrl: '',
+  supabasePublishableKey: '',
+  demoMode: false
+};
+const SUPABASE_URL = String(CAREER_CONFIG.supabaseUrl || '').replace(/\/$/, '');
+const SUPABASE_PUBLISHABLE_KEY = String(CAREER_CONFIG.supabasePublishableKey || '');
+const CAREER_DEMO_MODE = CAREER_CONFIG.demoMode === true;
+const USE_SUPABASE = !CAREER_DEMO_MODE && Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);

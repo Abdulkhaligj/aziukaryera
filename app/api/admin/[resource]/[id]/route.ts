@@ -1,3 +1,4 @@
+import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext, writeAudit } from '@/lib/admin-data';
 import { can } from '@/lib/permissions';
@@ -24,7 +25,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!can(context.role, 'edit', key)) {
     return NextResponse.json({ error: key === 'admins' ? 'Əməkdaş hesablarını yalnız Super Admin idarə edə bilər' : 'Bu əməliyyata icazəniz yoxdur' }, { status: 403 });
   }
-  const body = await request.json() as Record<string, unknown>;
+  const parsed = await readAdminJson(request);
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  const body = parsed.body;
 
   // Təsdiq səhifəsi yalnız statusu dəyişir. Formanın bütün vakansiya
   // sütunlarını yenidən yazmaq bu əməliyyatı uğursuz edirdi.
@@ -120,7 +123,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   else if (resource === 'reports') { table = 'reports'; payload = { status: text(body.status), reviewed_by: context.userId, reviewed_at: new Date().toISOString() }; }
   else if (resource === 'subscriptions') { table = 'subscriptions'; payload = { plan_id: text(body.plan_id), status: text(body.status), approved_by: text(body.status) === 'active' ? context.userId : null }; }
-  else if (resource === 'payments') { table = 'payments'; payload = { status: text(body.status), paid_at: text(body.status) === 'paid' ? new Date().toISOString() : null }; }
+  else if (resource === 'payments') { table = 'payments'; payload = { status: text(body.status) }; }
   else if (resource === 'plans') {
     table = 'plans';
     payload = { monthly_price: number(body.monthly_price), currency: 'AZN', description: text(body.description), updated_at: new Date().toISOString() };

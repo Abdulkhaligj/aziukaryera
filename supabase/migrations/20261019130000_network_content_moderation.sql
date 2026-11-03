@@ -156,13 +156,12 @@ create trigger post_comments_moderation_guard before insert or update on public.
 
 /* ---------------- AI request ---------------- */
 
+-- Safe baseline: the later AI reservations migration installs a sender using
+-- explicit private configuration. Never call the previous owner's project
+-- while a fresh environment is replaying migrations.
 create or replace function private.moderation_send(p_table text, p_id uuid)
 returns bigint language sql security definer set search_path = '' as $$
-  select net.http_post(
-    url := 'https://ttfsbgbhyomfheglefkn.supabase.co/functions/v1/content-moderation',
-    body := jsonb_build_object('table', p_table, 'id', p_id),
-    headers := jsonb_build_object('Content-Type', 'application/json'),
-    timeout_milliseconds := 30000);
+  select null::bigint;
 $$;
 
 -- pg_net sends after the transaction commits, so the function sees the row.

@@ -30,6 +30,7 @@
     },
     async load(force=false) {
       this.reset();
+      const scope=window.CareerSession.capture();if(!scope)return;
       if (this.loading || (!force && this.loaded)) return;
       if (Store.mode !== 'supabase' || !Backend.init()) {
         this.error='Serverə bağlı hesab tələb olunur. Demo rejimində sorğu göndərilmir.';
@@ -54,6 +55,7 @@
         if(slots.error)throw slots.error;
         if(applications.error)throw applications.error;
         const latestApplications=applications.data||[];
+        if(!window.CareerSession.matches(scope))return;
         const names={};
         if(Auth.currentUser()?.role==='company') {
           const ids=[...new Set(latestApplications.map(a=>a.student_id).filter(Boolean))];
@@ -63,14 +65,16 @@
             (profiles.data||[]).forEach(profile=>{names[String(profile.id)]=profile.full_name||'Namizəd';});
           }
         }
+        if(!window.CareerSession.matches(scope))return;
         this.rows=requests.data||[];
         this.slots=slots.data||[];
         this.dbApplications=latestApplications;
         this.names=names;
         this.loaded=true;
       } catch(error) {
+        if(!window.CareerSession.matches(scope))return;
         this.error=Backend.translate?.(error.message)||error.message||'Sorğular yüklənmədi.';
-      } finally { this.loading=false; this.repaint(); }
+      } finally { if(window.CareerSession.matches(scope)){this.loading=false;this.repaint();} }
     },
     repaint() {
       const view=Store.state?.view;
@@ -78,25 +82,30 @@
     },
     async rpc(name,fields) {
       if (this.saving || Store.mode!=='supabase' || !Backend.init()) return;
+      const scope=window.CareerSession.capture();if(!scope)return;
       this.saving=true; this.error=''; this.repaint();
       try {
         const {error}=await Backend.sb.rpc(name,fields);
+        if(!window.CareerSession.matches(scope))return;
         if(error) throw error;
         if(typeof toast==='function') toast('Müsahibə sorğusu yeniləndi');
         this.loaded=false;
         this.saving=false;
         await this.load(true);
+        if(!window.CareerSession.matches(scope))return;
         if (typeof Backend.notificationsFeed==='function') {
           const note=await Backend.notificationsFeed();
+          if(!window.CareerSession.matches(scope))return;
           if(note.ok && Array.isArray(note.rows)) {
             Store.state.notifications=note.rows;
             this.repaint();
           }
         }
       } catch(error) {
+        if(!window.CareerSession.matches(scope))return;
         this.error=Backend.translate?.(error.message)||error.message||'Əməliyyat tamamlanmadı.';
         if(typeof toast==='function') toast(this.error);
-      } finally { this.saving=false; this.repaint(); }
+      } finally { if(window.CareerSession.matches(scope)){this.saving=false;this.repaint();} }
     },
     ownedApplications() {
       const role=Auth.currentUser()?.role;
@@ -120,6 +129,7 @@
       return [];
     }
   };
+  window.CareerSession.subscribe(()=>{client.identity='';client.reset();});
 
   const escapeHTML = input => typeof esc==='function'?esc(String(input??'')):String(input??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const E=escapeHTML;

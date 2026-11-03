@@ -50,7 +50,7 @@
         const data = await Backend.loadAll();
         if (!data.ok || userInteracted || UI.auth.busy ||
             UI.publicView !== 'landing') return;
-        Store.hydrate(data);
+        if (!Store.hydrate(data)) return;
         UI.publicView = 'app';
         UI.booting = false;
         render();

@@ -17,6 +17,7 @@ const nextConfig = {
     return [
       { source: '/admin/:path*', headers: securityHeaders },
       { source: '/account/:path*', headers: securityHeaders },
+      { source: '/api/admin/:path*', headers: securityHeaders },
       { source: '/login', headers: securityHeaders }
     ];
   }

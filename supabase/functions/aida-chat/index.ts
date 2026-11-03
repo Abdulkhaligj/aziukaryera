@@ -1,5 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { readLimitedJson } from "../_shared/limits.ts";
+import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 /* AIDA — the career center's chat assistant on the main site (Gemini).
  * Open to everyone: visitors who are not signed in get a small daily limit
@@ -61,6 +62,12 @@ async function clientHash(req: Request, day: string) {
   return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
 }
 
+async function providerFetch(reservationId: string, input: string, init: RequestInit) {
+  const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
+  if (error || data !== true) throw new Error("provider_budget_unavailable");
+  return fetch(input, init);
+}
+
 function safeJson(text: string) {
   const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
   try { return JSON.parse(cleaned); } catch {
@@ -74,22 +81,22 @@ function safeJson(text: string) {
 function models() {
   const primary = Deno.env.get("GEMINI_AIDA_MODEL") || Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
   const fallback = (Deno.env.get("GEMINI_FALLBACK_MODELS") || "gemini-3.6-flash,gemini-3.5-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
-  return [primary, ...fallback.filter((m) => m !== primary)];
+  return [...new Set([primary, ...fallback])].slice(0, 3);
 }
 
-async function callGemini(key: string, prompt: string) {
+async function callGemini(reservationId: string, key: string, prompt: string) {
   let lastError = "All Gemini models are busy";
   for (const model of models()) {
     const send = async (thinking: boolean) => {
       const generationConfig: Record<string, unknown> = { temperature: 0.4, responseMimeType: "application/json", maxOutputTokens: 4096 };
       if (thinking) generationConfig.thinkingConfig = { thinkingLevel: "low" };
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      const res = await providerFetch(reservationId, `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         signal: AbortSignal.timeout(12500),
         body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig }),
       });
-      return { res, data: await res.json() };
+      return { res, data: await readLimitedJson(res, 2097152) };
     };
     let res: Response;
     let data: any;
@@ -206,7 +213,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
   let body: { message?: string; history?: Array<{ role?: string; text?: string }> };
-  try { body = await req.json(); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
+  try { body = await readLimitedJson(req); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
   const message = String(body.message || "").trim().slice(0, 800);
   if (!message) return json({ ok: false, error: "Sualınızı yazın" }, 400);
 
@@ -222,20 +229,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const today = bakuToday();
-  const since = new Date(`${today}T00:00:00+04:00`).toISOString();
   const hash = userId ? null : await clientHash(req, today);
-  if (userId) {
-    const { count } = await db.from("ai_usage").select("id", { count: "exact", head: true })
-      .eq("task", TASK).eq("profile_id", userId).eq("success", true).gte("created_at", since);
-    if ((count || 0) >= USER_DAILY) return json({ ok: false, error: `Bugünkü AIDA limitiniz dolub (${USER_DAILY} sual). Sabah yenidən yazın.` });
-  } else {
-    const [{ count: mine }, { count: all }] = await Promise.all([
-      db.from("ai_usage").select("id", { count: "exact", head: true }).eq("task", TASK).eq("client_hash", hash).eq("success", true).gte("created_at", since),
-      db.from("ai_usage").select("id", { count: "exact", head: true }).eq("task", TASK).is("profile_id", null).eq("success", true).gte("created_at", since),
-    ]);
-    if ((mine || 0) >= ANON_DAILY) return json({ ok: false, error: `Qonaqlar üçün gündəlik limit dolub (${ANON_DAILY} sual). Daxil olsanız, söhbəti davam etdirə bilərsiniz.`, limit: "guest" });
-    if ((all || 0) >= ANON_GLOBAL_DAILY) return json({ ok: false, error: "AIDA bu gün çox məşğuldur. Daxil olub yenidən yazın və ya sabah cəhd edin.", limit: "guest" });
-  }
+  const { data: reservation, error: reserveError } = await db.rpc("ai_reserve_request", {
+    p_profile_id: userId, p_task: TASK, p_client_hash: hash,
+  });
+  if (reserveError || !reservation) return json({ ok: false, error: "AIDA limiti yoxlanılmadı." }, 503);
+  if (!reservation.allowed || !reservation.reservation_id) return json({ ok: false, error: "Bugünkü AIDA limiti dolub və ya hesab aktiv deyil. Sabah yenidən yazın.", limit: userId ? "user" : "guest" }, 429);
 
   const history = (Array.isArray(body.history) ? body.history : []).slice(-10)
     .map((h) => `${h.role === "assistant" ? "AIDA" : "İstifadəçi"}: ${String(h.text || "").replace(/\s+/g, " ").slice(0, 600)}`).join("\n");
@@ -243,7 +242,7 @@ Deno.serve(async (req: Request) => {
   let model = "none";
   try {
     const [live, who] = await Promise.all([liveData(today), userId ? studentContext(userId) : Promise.resolve("")]);
-    const out = await callGemini(key, prompt(today, live, who, history, message));
+    const out = await callGemini(reservation.reservation_id, key, prompt(today, live, who, history, message));
     model = out.model;
     const parsed = safeJson(out.text);
     const reply = String(parsed?.reply || parsed?.answer || parsed?.cavab || "").trim().slice(0, 2500);

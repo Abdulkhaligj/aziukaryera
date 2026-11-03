@@ -1,3 +1,4 @@
+import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext } from '@/lib/admin-data';
 
@@ -7,7 +8,9 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const context = await getAdminContext();
   if (!context) return NextResponse.json({ error: 'Sessiya bitib. Yenidən daxil olun.' }, { status: 401 });
-  const body = await request.json() as Record<string, unknown>;
+  const parsed = await readAdminJson(request);
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  const body = parsed.body;
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
   const payload = {
     text: typeof body.text === 'string' ? body.text.slice(0, 4000) : '',

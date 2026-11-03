@@ -2,6 +2,22 @@
 
 ADNSU Career Center tələbə, magistr, məzun, şirkət və Karyera Mərkəzi əməkdaşlarını eyni Supabase backend-i üzərindən birləşdirən karyera platformasıdır.
 
+## 2 noyabr 2026 təhlükəsizlik yeniləməsi
+
+Bu paketdəki yeni təhlükəsizlik migration-ları mövcud, tam sxem üçün **upgrade**-dir. Təhvil verilmiş köhnə migration-lar sıfırdan qurulmaq üçün natamamdır: ikinci migration `public.is_admin()` tərifini və digər baza obyektlərini gözləyir. Tam schema-only baseline olmadan boş Supabase layihəsinə bütün faylları ardıcıl tətbiq etməyin. Bu məhdudiyyət yerli sintetik testlərlə aradan qalxmış sayılmır.
+
+Əvvəlki production ünvanları aşağıda tarixi məlumatdır. Düzəldilmiş portal üçün öz Supabase konfiqurasiyası tələb olunur; əvvəlki layihəyə avtomatik qoşulmur. Admin və portal dəyişiklikləri ilə birlikdə `20261102190000_security_boundaries.sql`, `20261102200000_business_integrity.sql`, `20261102210000_ai_reservations.sql`, `20261102220000_atomic_company_quotas.sql` və `20261102230000_complete_moderation_input.sql` tarix sırası ilə tətbiq edilməlidir. Mövcud üst-üstə düşən müsahibələr migration-u dayandırır; onları məsul şəxs ayrıca uyğunlaşdırmalıdır.
+
+Moderasiya öz layihəniz üçün qurulan `private.moderation_webhook_config` və eyni `MODERATION_WEBHOOK_SECRET` Edge secret-i ilə işləyir. Konfiqurasiya edilməyən sistem xaricə çağırış göndərmir və məzmunu pending saxlayır. Service Role və webhook secret brauzer konfiqurasiyasına yazılmamalıdır.
+
+Moderasiya upgrade-i zamanı öz layihənizdə sender-i müvəqqəti deaktiv edin (`private.moderation_webhook_config.enabled=false`), migration-ları və yeni `content-moderation` funksiyasını tətbiq edin, sonra sender-i yenidən aktiv edin. Yeni verdict kontraktı `p_content_version=2` tələb edir; köhnə handler yeni mətni təsdiqləyə bilmir. Mətn, keçid və göstərilən teqlər separatorlarla birlikdə ən çox 6000 Unicode code point ola bilər. Köhnə həddən uzun məzmun, köhnə UTF-16 kəsilməsinə düşən Unicode mətnləri, həmçinin köhnə kontraktda keçid/teqlərinin yoxlandığı sübut edilməyən görünən paylaşımlar silinmədən gizlədilir. Admin onları nəzərdən keçirib `pending` ilə yeni yoxlamaya göndərməlidir; upgrade kütləvi AI çağırışı yaratmır. Mətn və keçid/teq dəyişməsi yenidən moderasiyaya gedir.
+
+Kvotalar transaction daxilində atomik sayğaclarla yoxlanır. Əvvəlki saydan artıq qeydlər migration zamanı silinmir; yeni artırıcı yazılar limitə uyğun olmalıdır. Vakansiya/komanda aktiv sayı və aylıq paylaşım sayı silinmə/deaktivləşmə zamanı əvvəlki qaydaya uyğun azalır. Aylıq paylaşım UTC ayı ilə hesablanır; adi istifadəçi paylaşımın sahibini və yaradılma vaxtını dəyişə bilmir.
+
+Yeni mühitdə email confirmation və SMTP, admin MFA, backup/restore, bildiriş və açar rotasiyası ayrıca təsdiqlənməlidir. Yerli yoxlamalar həmin hesab sazlamalarını dəyişmir. Yeni DB qaydalarında ödənişli planların vaxtı sorğu zamanı bitir; gizli grace period tətbiq edilmir.
+
+Yoxlama: `npm ci --ignore-scripts`, `npm test`, `npm audit --audit-level=moderate`, `npm run typecheck`, `npm run build`. Tam repo nüsxəsində Docker ilə `python supabase/tests/test_security_migrations.py`, `python supabase/tests/test_atomic_company_quotas.py`, `python supabase/tests/test_moderation_boundary.py` və `python tests/ai-database-security.py` də işlədin. Bunlar real Supabase gateway/Storage və tam baseline replay sınağını əvəz etmir.
+
 ## İstehsal ünvanları
 
 - Əsas platforma: https://asoiu-career.vercel.app/

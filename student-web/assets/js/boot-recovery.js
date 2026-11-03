@@ -20,7 +20,7 @@
   // Normally keep the cross-tab lock; if it is orphaned, recover after 3s.
   const originalInit = Backend.init.bind(Backend);
   Backend.init = function () {
-    if (this.sb) return true;
+    if (this.sb) return originalInit();
     if (!this.available()) return false;
     const lock = async (name, _acquireTimeout, task) => {
       if (typeof navigator === 'undefined' || !navigator.locks?.request) return task();
@@ -36,9 +36,7 @@
         clearTimeout(timer);
       }
     };
-    this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, lock }
-    });
+    if (!originalInit({ lock })) return false;
     // A slow AI provider must never leave the UI's send button spinning forever.
     const invoke = this.sb.functions.invoke.bind(this.sb.functions);
     this.sb.functions.invoke = (name, options = {}) => {

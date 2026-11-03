@@ -3,9 +3,10 @@
 <head>
 <!-- Production: ADNSU Career static client -->
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4' 'sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z' 'sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1' 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU' 'sha256-2FijLVW+Cyl3LivPVpmNzLc+9iw6Tuwkq0E6TEs7MJ0=' 'sha256-6j1I0vi2T2PHVI5z8FgczKKiIaEI07T5x1/b3qhXrQY=' 'sha256-QPIs62GP3u5zxpxAUFYRESWv5Hx+MzfIf0nlEtWYk6U=' 'sha256-qUajXYZD56UEVAJtuglhxBQnaEKAMpopJBy1R8jGvqs=' 'sha256-lqE2UXJxoqPej9siVlnHxX+vq6Jph6gEtJ2x5c+ITQ4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'self'; worker-src 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ASOIU Karyera Mərkəzi</title>
-<meta name="description" content="ADNSU tələbələri üçün ixtisasa görə avtomatik karyera matching platforması — iş, təcrübə, graduate proqramları, CV mərkəzi və müsahibə hazırlığı.">
+<title>ASOIU Karyera MÉ™rkÉ™zi</title>
+<meta name="description" content="ADNSU tÉ™lÉ™bÉ™lÉ™ri Ã¼Ã§Ã¼n ixtisasa gÃ¶rÉ™ avtomatik karyera matching platformasÄ± â€” iÅŸ, tÉ™crÃ¼bÉ™, graduate proqramlarÄ±, CV mÉ™rkÉ™zi vÉ™ mÃ¼sahibÉ™ hazÄ±rlÄ±ÄŸÄ±.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#071f78">
 <meta name="application-name" content="ADNSU Karyera">
@@ -14,10 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="ADNSU Karyera">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="msapplication-TileColor" content="#001c80">
-<meta property="og:title" content="ADNSU Karyera Mərkəzi">
-<meta property="og:description" content="Tələbə, magistr və məzunlar üçün vakansiyalar, peşəkar şəbəkə, AI CV Studio və müsahibə hazırlığı.">
+<meta property="og:title" content="ADNSU Karyera MÉ™rkÉ™zi">
+<meta property="og:description" content="TÉ™lÉ™bÉ™, magistr vÉ™ mÉ™zunlar Ã¼Ã§Ã¼n vakansiyalar, peÅŸÉ™kar ÅŸÉ™bÉ™kÉ™, AI CV Studio vÉ™ mÃ¼sahibÉ™ hazÄ±rlÄ±ÄŸÄ±.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://asoiu-career.vercel.app/">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="assets/icons/favicon-48.png">
@@ -41,37 +41,40 @@
 <div id="root"></div>
 <noscript>
   <p style="padding:24px;font-family:system-ui">
-    ASOIU Karyera Mərkəzi platforması işləmək üçün JavaScript tələb edir.
+    ASOIU Karyera MÉ™rkÉ™zi platformasÄ± iÅŸlÉ™mÉ™k Ã¼Ã§Ã¼n JavaScript tÉ™lÉ™b edir.
   </p>
 </noscript>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
-<script src="assets/js/config.js?v=20261016a"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js" integrity="sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4" crossorigin="anonymous"></script>
+<script src="assets/js/runtime-config.js?v=20261103a"></script>
+<script src="assets/js/config.js?v=20261102a"></script>
+<script src="assets/js/cv-drafts.js?v=20261102a"></script>
 <script src="assets/js/data.js?v=20261016a"></script>
 <script src="assets/js/match.js?v=20261016a"></script>
 <script src="assets/js/cv.js?v=20261016a"></script>
 <script src="assets/js/interview.js?v=20261016a"></script>
-<script src="assets/js/backend.js?v=20261016a"></script>
+<script src="assets/js/backend.js?v=20261102b"></script>
 <script src="assets/js/ai.js?v=20261016a"></script>
-<script src="assets/js/store.js?v=20261016a"></script>
-<script src="assets/js/auth.js?v=20261016a"></script>
+<script src="assets/js/store.js?v=20261102b"></script>
+<script src="assets/js/auth.js?v=20261102b"></script>
 <script src="assets/js/landing.js?v=20261028m"></script>
 <script src="assets/js/employer-analytics.js?v=20261024a"></script>
-<script src="assets/js/employer-tools.js?v=20261024b"></script>
-<script src="assets/js/boot-recovery.js?v=20261027a"></script>
-<script src="assets/js/login-recovery.js?v=20261027a"></script>
-<script src="assets/js/fast-auth-bootstrap.js?v=20261027a"></script>
-<script src="assets/js/backend-compat.js?v=20261027a"></script>
-<script src="assets/js/boot-instant.js?v=20261027c"></script>
-<script src="assets/js/app.js?v=20261029a"></script>
+<script src="assets/js/employer-tools.js?v=20261102b"></script>
+<script src="assets/js/boot-recovery.js?v=20261102b"></script>
+<script src="assets/js/login-recovery.js?v=20261102b"></script>
+<script src="assets/js/fast-auth-bootstrap.js?v=20261102b"></script>
+<script src="assets/js/backend-compat.js?v=20261102b"></script>
+<script src="assets/js/boot-instant.js?v=20261102b"></script>
+<script src="assets/js/session.js?v=20261102b"></script>
+<script src="assets/js/app.js?v=20261103a"></script>
 <script src="assets/js/hr-refine.js?v=20261026a"></script>
-<script src="assets/js/interview-requests.js?v=20261026a"></script>
-<script src="assets/js/mentor.js?v=20261028m"></script>
-<script src="assets/js/mentor-ai.js?v=20261028m"></script>
+<script src="assets/js/interview-requests.js?v=20261102b"></script>
+<script src="assets/js/mentor.js?v=20261102b"></script>
+<script src="assets/js/mentor-ai.js?v=20261102b"></script>
 <script src="assets/js/company-package-hold.js?v=20261028c"></script>
 <script src="assets/js/company-profile-guard.js?v=20261028a"></script>
 <script src="assets/js/ui-icons.js?v=20261028a"></script>
-<script src="assets/js/aida-widget.js?v=20261028d"></script>
-<script src="assets/js/student-profile-enhancements.js?v=20261028m"></script>
+<script src="assets/js/aida-widget.js?v=20261102b"></script>
+<script src="assets/js/student-profile-enhancements.js?v=20261102b"></script>
 <script src="assets/js/pwa.js?v=20261016a"></script>
 </body>
 </html>

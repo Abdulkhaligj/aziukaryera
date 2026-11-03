@@ -13,13 +13,18 @@
   Auth.loginRemote = async (email, password) => {
     let timeout;
     try {
+      const work = originalLogin(email, password);
+      const attempt = window.CareerSession.currentAuth();
       const result = await Promise.race([
-        Promise.resolve().then(() => originalLogin(email, password)),
+        work,
         new Promise(resolve => {
-          timeout = setTimeout(() => resolve({
+          timeout = setTimeout(() => {
+            window.CareerSession.cancelAuth(attempt);
+            resolve({
             ok: false,
             error: 'Giriş cavabı gecikir. İnternet bağlantınızı yoxlayıb bir daha cəhd edin. Şifrəniz dəyişdirilməyib.'
-          }), 18000);
+            });
+          }, 18000);
         })
       ]);
       if (!result || typeof result !== 'object') {
