@@ -185,7 +185,7 @@ function viewEmployerTalentPool() {
     '<div class="section-head"><h2>'+list.length+' uyğun namizəd</h2><span class="hint">Yalnız səlahiyyətiniz çatan profillər</span></div>'+
     (list.length?'<div class="grid c3">'+list.slice(0,100).map(s=>{
       const report=job?matchReport(job,s):null;
-      return '<article class="card em-candidate-card"><div class="row" style="gap:10px"><div class="brandbox">'+esc(initials(s.name))+'</div>'+
+      return '<article class="card em-candidate-card"><div class="row" style="gap:10px"><div class="brandbox" data-avatar-id="'+esc(s.id)+'">'+esc(initials(s.name))+'</div>'+
       '<div><b>'+esc(s.name)+'</b><div class="em-muted">'+esc(s.major||'İxtisas göstərilməyib')+'</div></div></div>'+
       '<div class="em-muted">'+esc(s.faculty||'')+' · '+esc(s.course||'—')+'. kurs · GPA '+esc(s.gpa||'—')+'</div>'+
       '<div class="skillrow">'+(s.skills||[]).slice(0,5).map(t=>'<span class="sk">'+esc(t)+'</span>').join('')+'</div>'+

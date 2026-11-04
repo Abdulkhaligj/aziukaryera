@@ -33,7 +33,8 @@ test('student profile has real avatar file upload backed by private moderation',
   assert.match(js,/me\.role === 'student'/);
   assert.doesNotMatch(js,/localStorage|service_role|supabaseKey/);
   assert.match(css,/\.student-photo-card/);
-  assert.match(index,/student-profile-enhancements\.js\?v=20261102b/);
+  assert.match(index,/student-profile-enhancements\.js\?v=20261104a/);
+  assert.match(index,/profile-photos\.js\?v=20261104a/);
 });
 
 test('mentor support is present within student dashboard and profile',()=>{
@@ -43,5 +44,5 @@ test('mentor support is present within student dashboard and profile',()=>{
   assert.match(js,/mailto:career@asoiu\.edu\.az/);
   assert.match(js,/Mentora müraciət et/);
   const index=read('student-web/index.html');
-  assert.match(index,/student-profile-enhancements\.css\?v=20261028a/);
+  assert.match(index,/student-profile-enhancements\.css\?v=20261104a/);
 });

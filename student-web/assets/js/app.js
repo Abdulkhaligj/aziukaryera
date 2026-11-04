@@ -1468,7 +1468,7 @@ function viewNetwork() {
       </div>
       <div class="card pad-lg">
         <div class="row" style="gap:12px;align-items:flex-start">
-          <span class="avatar" style="width:38px;height:38px;flex:none">${esc(initials(me.name))}</span>
+          <span class="avatar" data-avatar-id="${esc(me.id)}" style="width:38px;height:38px;flex:none">${esc(initials(me.name))}</span>
           <div style="flex:1;min-width:0">
             <div class="field">
               <label class="sr-only" for="post-body">Paylaşım</label>
@@ -1495,7 +1495,7 @@ function viewNetwork() {
         : filteredFeed.length === 0 ? emptyState('Bu filtrdə paylaşım yoxdur', 'Başqa filtr seçin və ya ilk paylaşımı siz edin.')
         : filteredFeed.map(p => `<article class="post">
             <div class="post-head">
-              <span class="avatar">${esc(initials(p.author))}</span>
+              <span class="avatar" data-avatar-id="${esc(p.authorId)}">${esc(initials(p.author))}</span>
               <div class="who">
                 <b>${esc(p.author)}</b>
                 <small>${esc(ROLE_CHIP[p.authorRole] || '')} · ${esc(timeAgo(p.at))}</small>
@@ -1520,7 +1520,7 @@ function viewNetwork() {
             </div>
             ${UI.openComments === p.id ? `<div class="post-comments">
               ${p.comments.map(c => `<div class="comment">
-                <span class="avatar sm">${esc(initials(c.author))}</span>
+                <span class="avatar sm" data-avatar-id="${esc(c.authorId)}">${esc(initials(c.author))}</span>
                 <div><b>${esc(c.author)}</b> <small>${esc(timeAgo(c.at))}</small>
                   <p>${esc(c.body)}</p></div>
               </div>`).join('')}
@@ -1883,7 +1883,8 @@ function viewCandidates() {
         ${ranked.map(({ student, report }) => {
           const invited = ownInvites().some(i => i.studentId === student.id && String(i.jobId) === String(jobId));
           return `<tr>
-            <td><div class="who"><b>${esc(student.name)}</b><small>${esc(student.faculty)}</small></div></td>
+            <td><div class="row tight" style="flex-wrap:nowrap"><span class="avatar sm" data-avatar-id="${esc(student.id)}">${esc(initials(student.name))}</span>
+              <div class="who"><b>${esc(student.name)}</b><small>${esc(student.faculty)}</small></div></div></td>
             <td style="font-size:12.5px">${esc(student.major)}</td>
             <td class="num">${student.course}</td>
             <td class="num">${student.gpa}</td>
@@ -1905,7 +1906,7 @@ function viewCompanyApplications() {
     ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Namizəd</th><th>Vakansiya</th><th>İxtisas</th><th>Mərhələ</th><th>Tarix</th></tr></thead><tbody>${rows.map(application => {
       const student = STUDENT_POOL.find(item => String(item.id) === String(application.studentId));
       const job = Store.jobById(application.jobId);
-      return `<tr><td><div class="who"><b>${esc(student?.name || 'Namizəd')}</b><small>${esc(student?.faculty || '')}</small></div></td><td>${esc(job?.title || application.jobTitle || 'Vakansiya')}</td><td>${esc(student?.major || '—')}</td><td><select data-act="company-app-status" data-id="${esc(application.id)}">${Object.entries(labels).filter(([key]) => !['gonderildi','baxilir','musahibe','teklif','imtina'].includes(key)).map(([key,label]) => `<option value="${key}" ${application.statusKey === key ? 'selected' : ''}>${label}</option>`).join('')}</select></td><td class="num">${fmtDate(application.at)}</td></tr>`;
+      return `<tr><td><div class="row tight" style="flex-wrap:nowrap"><span class="avatar sm" data-avatar-id="${esc(application.studentId)}">${esc(initials(student?.name || 'Namizəd'))}</span><div class="who"><b>${esc(student?.name || 'Namizəd')}</b><small>${esc(student?.faculty || '')}</small></div></div></td><td>${esc(job?.title || application.jobTitle || 'Vakansiya')}</td><td>${esc(student?.major || '—')}</td><td><select data-act="company-app-status" data-id="${esc(application.id)}">${Object.entries(labels).filter(([key]) => !['gonderildi','baxilir','musahibe','teklif','imtina'].includes(key)).map(([key,label]) => `<option value="${key}" ${application.statusKey === key ? 'selected' : ''}>${label}</option>`).join('')}</select></td><td class="num">${fmtDate(application.at)}</td></tr>`;
     }).join('')}</tbody></table></div>` : emptyState('Hələ müraciət yoxdur', 'Tələbələr vakansiyalarınıza müraciət etdikdə burada görünəcək.')}`;
 }
 
@@ -1954,7 +1955,7 @@ function viewSearch() {
   <div class="grid c3">
     ${list.map(s => `<div class="card">
       <div class="row" style="gap:11px;align-items:flex-start">
-        <div class="brandbox">${esc(initials(s.name))}</div>
+        <div class="brandbox" data-avatar-id="${esc(s.id)}">${esc(initials(s.name))}</div>
         <div style="flex:1;min-width:0">
           <b style="font-size:13.5px">${esc(s.name)}</b>
           <div style="color:var(--muted);font-size:11.5px;margin-top:2px">${esc(s.major)}</div>
@@ -1984,7 +1985,8 @@ function viewInvites() {
       if (!st || !job) return '';
       const r = matchReport(job, st);
       return `<tr>
-        <td><div class="who"><b>${esc(st.name)}</b><small>${esc(st.major)} · ${st.course}. kurs</small></div></td>
+        <td><div class="row tight" style="flex-wrap:nowrap"><span class="avatar sm" data-avatar-id="${esc(i.studentId)}">${esc(initials(st.name))}</span>
+          <div class="who"><b>${esc(st.name)}</b><small>${esc(st.major)} · ${st.course}. kurs</small></div></div></td>
         <td style="font-size:12.5px">${esc(job.title)}</td>
         <td class="num">${r.score}%</td>
         <td class="num">${fmtDate(i.at)}</td>
@@ -2924,7 +2926,6 @@ const UI = {
   compareJob: null,
   candJob: null,
   candMin: 45,
-  theme: null,
   booting: true,
   publicView: 'landing',
   providers: {},
@@ -3054,7 +3055,7 @@ function render() {
       ${notificationCenter()}
       <div class="usermenu">
         <button class="userchip" data-act="user-menu" aria-expanded="${UI.userMenu}">
-          <span class="avatar">${esc(initials(user.name))}</span>
+          <span class="avatar" data-avatar-id="${esc(user.id)}">${esc(initials(user.name))}</span>
           <span class="who">
             <b>${esc(user.name)}</b>
             <small>${esc(ROLE_NAMES[role])}${pendingCo ? ' · təsdiq gözləyir' : ''}</small>
@@ -3068,7 +3069,6 @@ function render() {
             <span class="chip ${user.status === 'pending' ? 'warn' : 'good'}">${esc(ROLE_NAMES[role])}${user.status === 'pending' ? ' · gözləyir' : ''}</span>
           </div>
           ${VIEWS[role].profile ? '<button role="menuitem" data-act="go" data-view="profile">☰ Profil və hesab</button>' : ''}
-          <button role="menuitem" data-act="theme">◐ Açıq / tünd tema</button>
           <button role="menuitem" class="danger" data-act="logout">⏻ Çıxış</button>
         </div>` : ''}
       </div>
@@ -3238,13 +3238,6 @@ function applyModal(id) {
     </p>`);
 }
 
-function setTheme(t) {
-  UI.theme = t;
-  if (t) document.documentElement.setAttribute('data-theme', t);
-  else document.documentElement.removeAttribute('data-theme');
-  try { localStorage.setItem('asoiu-theme', t || ''); } catch (e) { /* ignore */ }
-}
-
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if (!t) return;
@@ -3302,14 +3295,6 @@ document.addEventListener('click', e => {
       if (S.view === 'network'  && UI.feed === null)     loadFeed();
       if (S.view === 'benefits' && UI.benefits === null) loadBenefits();
       EmployerTools.afterNavigate(S.view);
-      break;
-    }
-    case 'theme': {
-      const cur = document.documentElement.getAttribute('data-theme');
-      const isDark = cur ? cur === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(isDark ? 'light' : 'dark');
-      UI.userMenu = false;
-      rerender();
       break;
     }
     /* ---------------- Şəbəkə ---------------- */
@@ -4286,10 +4271,9 @@ async function probeBackend() {
 }
 
 (async function init() {
-  try {
-    const t = localStorage.getItem('asoiu-theme');
-    if (t) document.documentElement.setAttribute('data-theme', t);
-  } catch (e) { /* ignore */ }
+  /* Only the light theme ships; drop a dark choice saved by older versions. */
+  document.documentElement.removeAttribute('data-theme');
+  try { localStorage.removeItem('asoiu-theme'); } catch (e) { /* ignore */ }
 
   Store.load();
 

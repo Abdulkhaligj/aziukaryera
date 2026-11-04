@@ -3,8 +3,11 @@
   'use strict';
   const root = document.getElementById('root');
   if (!root) return;
-  const photo = {userId:null,last:0,pending:false,url:null,loading:false};
-  window.CareerSession.subscribe(()=>{photo.userId=null;photo.last=0;photo.pending=false;photo.url=null;photo.loading=false;});
+  const photo = {userId:null,last:0,pending:false,url:null,loading:false,path:null,pendingPath:null,poll:0};
+  window.CareerSession.subscribe(()=>{
+    clearTimeout(photo.poll);
+    Object.assign(photo,{userId:null,last:0,pending:false,url:null,loading:false,path:null,pendingPath:null,poll:0});
+  });
   function student() {
     try {
       const me = Auth.currentUser();
@@ -55,6 +58,8 @@
   function picture(url,pending) {
     const display=root.querySelector('[data-photo-preview]');
     if (!display) return;
+    const label=root.querySelector('.student-photo-label');
+    if (label) label.textContent=url ? 'Şəkli dəyiş' : 'Şəkil seç və yüklə';
     display.replaceChildren();
     if (!url) {
       const fallback=document.createElement('span');
@@ -93,12 +98,16 @@
         .select('avatar_path,avatar_pending_path,avatar_reason').eq('id',me.id).single();
       if (error) throw error;
       if(!window.CareerSession.matches(scope))return;
+      const wasPending=photo.userId===me.id && photo.pending;
       photo.userId=me.id;photo.pending=!!data.avatar_pending_path;
+      photo.path=data.avatar_path||null;photo.pendingPath=data.avatar_pending_path||null;
       photo.url=await signed(data.avatar_pending_path || data.avatar_path);
       if(!window.CareerSession.matches(scope))return;
       photo.last=Date.now();picture(photo.url,photo.pending);
       if (photo.pending) notify('Şəkil yoxlamadadır; təsdiqlənəndə profilinizdə görünəcək.');
       else if (data.avatar_reason) notify(String(data.avatar_reason),true);
+      else if (wasPending && photo.path) notify('Şəkil təsdiqləndi və profilinizdə görünür.');
+      if (!photo.pending && window.ProfilePhotos) window.ProfilePhotos.refresh(me.id);
     } catch {if(window.CareerSession.matches(scope))notify('Foto məlumatını oxumaq mümkün olmadı. Bir daha yoxlayın.',true);}
     finally {if(window.CareerSession.matches(scope))photo.loading=false;}
   }
@@ -121,6 +130,25 @@
         canvas.toBlob(blob=>blob?resolve(blob):reject(Error('Şəkil çevrilmədi.')),'image/webp',.82));
     } finally {URL.revokeObjectURL(url);}
   }
+  /* Replaced photos stay in the owner's folder, which holds at most 20 files.
+     Remove the unused ones; the database refuses to delete a referenced one. */
+  async function removeOldFiles(userId,keep) {
+    try {
+      const {data}=await Backend.sb.storage.from('avatars').list(userId,{limit:100});
+      const stale=(data||[]).map(item=>userId+'/'+item.name).filter(name=>!keep.includes(name));
+      if (stale.length) await Backend.sb.storage.from('avatars').remove(stale);
+    } catch {/* best effort */}
+  }
+  /* Moderation usually answers within a minute; refresh until it does. */
+  function watchApproval(userId,scope,tries=0) {
+    clearTimeout(photo.poll);
+    if (tries>=18) return;
+    photo.poll=setTimeout(async()=>{
+      if(!window.CareerSession.matches(scope)||photo.userId!==userId)return;
+      photo.last=0;await readCurrent();
+      if(photo.pending)watchApproval(userId,scope,tries+1);
+    },10000);
+  }
   async function upload(file,input) {
     const me=student();
     const scope=window.CareerSession.capture();if(!scope)return;
@@ -140,10 +168,12 @@
       const result=await Backend.sb.rpc('avatar_submit',{p_path:path});
       if (result.error || result.data?.status!=='pending') throw result.error || Error('Yoxlama sorğusu qəbul edilmədi.');
       if(!window.CareerSession.matches(scope))return;
-      photo.userId=me.id;photo.url=await signed(path);photo.pending=true;photo.last=Date.now();
+      photo.userId=me.id;photo.url=await signed(path);photo.pending=true;photo.pendingPath=path;photo.last=Date.now();
       if(!window.CareerSession.matches(scope))return;
       picture(photo.url,true);
       notify('Şəkil uğurla yükləndi, yoxlamadadır. Təsdiq olunduqdan sonra göstəriləcək.');
+      removeOldFiles(me.id,[path,photo.path]);
+      watchApproval(me.id,scope);
     } catch(error) {if(window.CareerSession.matches(scope))notify('Yükləmə xətası: '+String(error?.message||'Yenidən yoxlayın.'),true);}
     finally {input.disabled=false;input.value='';}
   }

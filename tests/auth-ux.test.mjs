@@ -11,7 +11,7 @@ test('auth screen loads the professional stylesheet and clips the brand decorati
   const index = read('student-web/index.html');
   const css = read('student-web/assets/css/auth-pro.css');
   assert.match(index, /auth-pro\.css\?v=20261029a/);
-  assert.match(index, /styles\.css\?v=20261029a/);
+  assert.match(index, /styles\.css\?v=20261104a/);
   assert.match(css, /\.auth-pane\[hidden\] \{ display: none; \}/);
   assert.match(css, /@media \(max-width: 860px\) \{\s*\.auth-brand \{ position: relative; overflow: hidden; \}/);
 });
