@@ -1,0 +1,19 @@
+{
+  "name": "asoiu-career-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MySQL-backed API that replaces Supabase for the ASOIU career platform",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "db:schema": "node tools/pg-to-mysql.mjs",
+    "db:setup": "node db/setup.mjs",
+    "db:import": "node db/import-from-supabase.mjs"
+  },
+  "dependencies": {
+    "mysql2": "3.24.6",
+    "pg": "8.23.1"
+  }
+}
