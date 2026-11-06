@@ -108,7 +108,6 @@ test('profile cards and photos: submit, moderate, read, remove', async () => {
   const noFile = await student.rpc('avatar_submit', { p_path: path });
   assert.equal(noFile.error?.message, 'Şəkil faylı tapılmadı. Yenidən yükləyin.');
   assert.equal(noFile.status, 500, 'no_data_found is a PL/pgSQL error code in PostgREST');
-  await exec(h.pool, `INSERT INTO storage_buckets (id, public) VALUES ('avatars', 0)`);
   await exec(h.pool, `INSERT INTO storage_objects (bucket_id, name, owner_id) VALUES ('avatars', ?, ?)`, [path, studentId]);
   const submitted = await student.rpc('avatar_submit', { p_path: path });
   assert.deepEqual(submitted.data, { status: 'pending', replaced: null });

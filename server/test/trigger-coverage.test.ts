@@ -1,4 +1,4 @@
-// Every Postgres trigger on a public table has a port with the same name,
+// Every Postgres trigger on a public table (and our two on storage.objects) has a port with the same name,
 // timing, events, UPDATE OF columns and function security (db/source/pg-triggers.json is the
 // schema-only export), and no port exists that Postgres does not have.
 import { test } from 'node:test';
@@ -12,7 +12,7 @@ const source = JSON.parse(readFileSync(new URL('../db/source/pg-triggers.json', 
 function expected() {
   const list: string[] = [];
   for (const { table, name, def, security } of source) {
-    const m = def.match(/ (BEFORE|AFTER) (.+?) ON public\.\S+ FOR EACH ROW/);
+    const m = def.match(/ (BEFORE|AFTER) (.+?) ON (?:public|storage)\.\S+ FOR EACH ROW/);
     assert.ok(m, `unparsed trigger ${table}.${name}`);
     for (const event of m[2].split(' OR ')) {
       const [, op, of] = event.match(/^(INSERT|UPDATE|DELETE)(?: OF (.+))?$/)!;
@@ -28,5 +28,6 @@ test('every Postgres trigger is ported with the same name, events, UPDATE OF col
   const want = expected();
   assert.deepEqual(want.filter(x => !ported.includes(x)), [], 'missing ports');
   assert.deepEqual(ported.filter(x => !want.includes(x)), [], 'ports without a Postgres trigger');
-  assert.equal(new Set(source.map(s => `${s.table}.${s.name}`)).size, 77);
+  // 77 on public tables, plus the 2 avatar triggers on storage.objects (Supabase's own storage triggers are not ours).
+  assert.equal(new Set(source.map(s => `${s.table}.${s.name}`)).size, 79);
 });

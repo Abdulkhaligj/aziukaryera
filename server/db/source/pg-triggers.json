@@ -460,5 +460,17 @@
     "name": "subscriptions_request_invoice",
     "def": "CREATE TRIGGER subscriptions_request_invoice AFTER INSERT OR UPDATE OF requested_plan_id ON public.subscriptions FOR EACH ROW EXECUTE FUNCTION private.subscriptions_request_invoice()",
     "security": "definer"
+  },
+  {
+    "table": "storage_objects",
+    "name": "security_avatar_generation",
+    "def": "CREATE TRIGGER security_avatar_generation BEFORE DELETE OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.avatar_generation_guard()",
+    "security": "definer"
+  },
+  {
+    "table": "storage_objects",
+    "name": "security_avatar_new_generation",
+    "def": "CREATE TRIGGER security_avatar_new_generation BEFORE INSERT ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.avatar_new_generation()",
+    "security": "definer"
   }
 ]

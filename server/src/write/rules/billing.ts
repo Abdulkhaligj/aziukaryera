@@ -3,13 +3,15 @@
 // (private.ensure_invoice), payment crediting (private.payments_apply),
 // package quotas (private.apply_company_quota / reserve_company_quota) and
 // usage sync (public.sync_company_subscription_usage).
-import { exec, one, rows, toMysqlDatetime, type Row } from '../../db.ts';
+import { exec, insertOnce, one, rows, toMysqlDatetime, type Row } from '../../db.ts';
 import { DbRuleError } from '../../errors.ts';
 import { after, before, insertRow, nowText, updateRow, type Op, type WriteEnv } from '../pipeline.ts';
 import { audited, bakuText, changed, companyHasFeature, isAdmin, notifyAdmins, notifyCompany } from './core.ts';
 
 const DAY = 86_400_000;
 const iso = (d: Date) => d.toISOString();
+/** numeric(10,2) as Postgres prints it in text: 50.00, 24.99. */
+export const money = (amount: unknown) => Number(amount).toFixed(2);
 /** private.quota_month: first day of the UTC month. */
 export const quotaMonth = (at: Date) => `${at.toISOString().slice(0, 7)}-01`;
 const FOREVER = '0001-01-01';
@@ -59,7 +61,7 @@ export async function ensureInvoice(env: WriteEnv, companyId: string, planId: st
     metadata: { plan_name: plan.name, company_name: company?.name ?? null }
   });
   await notifyAdmins(env, 'invoice_created', `Yeni hesab-faktura: ${invoice.invoice_number}`,
-    `${company?.name || 'Şirkət'} — ${plan.name}, ${invoice.amount} ${invoice.currency}. Ödəniş daxil olanda fakturanı "ödənildi" kimi qeyd edin.`);
+    `${company?.name || 'Şirkət'} — ${plan.name}, ${money(invoice.amount)} ${invoice.currency}. Ödəniş daxil olanda fakturanı "ödənildi" kimi qeyd edin.`);
   return invoice;
 }
 
@@ -89,10 +91,9 @@ before('payments', 'payments_apply', ['insert', 'update'], async (env, row, old)
   const plan = await one<{ name: string }>(env.tx, 'SELECT name FROM plans WHERE id = ?', [row.plan_id]);
   const months = Number(row.months);
   if (!plan || !(months >= 1 && months <= 12)) throw new DbRuleError('Invalid invoice plan or period');
-  const claim = await exec(env.tx, `INSERT INTO private_payment_entitlements (payment_id, company_id, plan_id, months, credited_at)
-      VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE payment_id = payment_id`,
-    [row.id, row.company_id, row.plan_id, months, toMysqlDatetime(env.now)]);
-  if (claim.affectedRows !== 1) return;
+  const claimed = await insertOnce(env.tx, `INSERT INTO private_payment_entitlements (payment_id, company_id, plan_id, months, credited_at)
+      VALUES (?, ?, ?, ?, ?)`, [row.id, row.company_id, row.plan_id, months, toMysqlDatetime(env.now)]);
+  if (!claimed) return;
   if (!await one(env.tx, 'SELECT id FROM subscriptions WHERE company_id = ? FOR UPDATE', [row.company_id])) {
     await insertRow(env, 'subscriptions', { company_id: row.company_id, plan_id: 'free', status: 'active' });
   }

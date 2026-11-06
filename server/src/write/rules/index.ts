@@ -5,4 +5,5 @@ import './checks.ts';
 import './content.ts';
 import './interviews.ts';
 import './moderation.ts';
+import './storage.ts';
 import './workflow.ts';

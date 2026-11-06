@@ -31,6 +31,12 @@ export interface Config {
   /** null → emails go to the in-memory/console outbox (development, tests). */
   smtp: SmtpConfig | null;
   storageDir: string;
+  /** supabase/functions: the Edge Function sources run by the API. */
+  functionsDir: string;
+  /** Environment the Edge Functions read with Deno.env.get (AI keys, webhook secret, …). */
+  functionEnv: Record<string, string | undefined>;
+  /** Run the scheduled jobs (pg_cron equivalents) in this process. */
+  jobs: boolean;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -67,6 +73,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       pass: env.SMTP_PASS || '',
       from: `${env.SMTP_SENDER_NAME || 'ADNSU Karyera Mərkəzi'} <${env.SMTP_ADMIN_EMAIL || 'career@asoiu.edu.az'}>`
     } : null,
-    storageDir: env.STORAGE_DIR || new URL('../storage/', import.meta.url).pathname
+    storageDir: env.STORAGE_DIR || new URL('../storage/', import.meta.url).pathname,
+    functionsDir: env.FUNCTIONS_DIR || new URL('../../supabase/functions/', import.meta.url).pathname,
+    functionEnv: { ...env },
+    jobs: (env.ENABLE_JOBS ?? 'true') === 'true'
   };
 }

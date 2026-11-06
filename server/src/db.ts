@@ -60,6 +60,18 @@ export async function exec(db: Pool | Tx, sql: string, params: unknown[] = []): 
   return result;
 }
 
+/** INSERT … ON CONFLICT DO NOTHING: true when the row was inserted. (The pool
+ *  uses FOUND_ROWS, so ON DUPLICATE KEY affectedRows cannot tell the cases apart.) */
+export async function insertOnce(db: Pool | Tx, sql: string, params: unknown[]): Promise<boolean> {
+  try {
+    await db.query(sql, params);
+    return true;
+  } catch (error) {
+    if ((error as { errno?: number }).errno === 1062) return false;
+    throw error;
+  }
+}
+
 type Task = () => Promise<unknown>;
 const afterCommit = new WeakMap<Tx, Task[]>();
 
