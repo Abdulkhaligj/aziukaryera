@@ -13,10 +13,22 @@ export interface Column {
   enumValues: string[] | null;
 }
 
+export interface ForeignKey {
+  name: string;
+  table: string;
+  columns: string[];
+  refTable: string;
+  refColumns: string[];
+}
+
 export interface Table {
   name: string;
   columns: Map<string, Column>;
   primaryKey: string[];
+  /** Foreign keys declared on this table (many-to-one). */
+  foreignKeys: ForeignKey[];
+  /** Foreign keys on other tables that point here (one-to-many). */
+  referencedBy: ForeignKey[];
 }
 
 export type Schema = Map<string, Table>;
@@ -28,7 +40,7 @@ export async function loadSchema(pool: Pool): Promise<Schema> {
        FROM information_schema.columns WHERE table_schema = DATABASE() ORDER BY table_name, ordinal_position`);
   const schema: Schema = new Map();
   for (const r of result) {
-    if (!schema.has(r.t)) schema.set(r.t, { name: r.t, columns: new Map(), primaryKey: [] });
+    if (!schema.has(r.t)) schema.set(r.t, { name: r.t, columns: new Map(), primaryKey: [], foreignKeys: [], referencedBy: [] });
     const table = schema.get(r.t)!;
     const enumValues = r.dt === 'enum' ? [...r.ct.matchAll(/'((?:[^']|'')*)'/g)].map(m => m[1].replace(/''/g, "'")) : null;
     table.columns.set(r.c, {
@@ -40,6 +52,22 @@ export async function loadSchema(pool: Pool): Promise<Schema> {
     `SELECT table_name AS t, column_name AS c FROM information_schema.key_column_usage
       WHERE table_schema = DATABASE() AND constraint_name = 'PRIMARY' ORDER BY table_name, ordinal_position`);
   for (const k of keys) schema.get(k.t)?.primaryKey.push(k.c);
+  const fks = await rows<{ n: string; t: string; c: string; rt: string; rc: string }>(pool,
+    `SELECT constraint_name AS n, table_name AS t, column_name AS c, referenced_table_name AS rt, referenced_column_name AS rc
+       FROM information_schema.key_column_usage
+      WHERE table_schema = DATABASE() AND referenced_table_name IS NOT NULL
+      ORDER BY table_name, constraint_name, ordinal_position`);
+  const byName = new Map<string, ForeignKey>();
+  for (const f of fks) {
+    const key = `${f.t}.${f.n}`;
+    if (!byName.has(key)) byName.set(key, { name: f.n, table: f.t, columns: [], refTable: f.rt, refColumns: [] });
+    byName.get(key)!.columns.push(f.c);
+    byName.get(key)!.refColumns.push(f.rc);
+  }
+  for (const fk of byName.values()) {
+    schema.get(fk.table)?.foreignKeys.push(fk);
+    schema.get(fk.refTable)?.referencedBy.push(fk);
+  }
   return schema;
 }
 

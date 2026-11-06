@@ -7,6 +7,7 @@ import type { Config } from './config.ts';
 import { AuthError } from './errors.ts';
 import type { Schema } from './schema.ts';
 import { authRoutes } from './auth/routes.ts';
+import { restRoutes } from './rest/routes.ts';
 import type { Mailer } from './auth/mailer.ts';
 import './write/rules/index.ts';
 
@@ -43,5 +44,6 @@ export async function buildApp(deps: AppDeps) {
   });
 
   await app.register(async scope => authRoutes(scope, deps), { prefix: '/auth/v1' });
+  await app.register(async scope => restRoutes(scope, deps), { prefix: '/rest/v1' });
   return app;
 }

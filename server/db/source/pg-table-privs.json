@@ -1,0 +1,554 @@
+[
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "admin_audit_logs"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "admin_audit_logs"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,SELECT,UPDATE",
+  "s": "public",
+  "t": "ads"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,REFERENCES,SELECT,TRIGGER,TRUNCATE",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "application_status_history"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "application_status_history"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "benefit_claims"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "benefit_claims"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "benefit_partners"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "benefit_partners"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "benefits"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "benefits"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "broadcast_notification_reads"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "broadcast_notification_reads"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "broadcast_notifications"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "broadcast_notifications"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "companies"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "companies"
+ },
+ {
+  "grantee": "anon",
+  "privs": "SELECT",
+  "s": "public",
+  "t": "company_awards"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,SELECT,UPDATE",
+  "s": "public",
+  "t": "company_awards"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,SELECT,UPDATE",
+  "s": "public",
+  "t": "company_interview_slots"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "company_members"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "company_members"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "INSERT,SELECT,UPDATE",
+  "s": "public",
+  "t": "company_partnership_requests"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "company_subscriptions"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "company_subscriptions"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "connections"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "connections"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "cv_documents"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "cv_documents"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "education"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "education"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "event_registrations"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "event_registrations"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "events"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "events"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "faculties"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "faculties"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "SELECT",
+  "s": "public",
+  "t": "interview_requests"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "interview_sessions"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "interview_sessions"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "invites"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "invites"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "majors"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "majors"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "mentor_requests"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "mentor_requests"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "messages"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "messages"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "moderation_allow"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "moderation_allow"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "moderation_logs"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "moderation_logs"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "moderation_terms"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "moderation_terms"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "notifications"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "notifications"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "plan_features"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "plan_features"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "plans"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "plans"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_comments"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_comments"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_likes"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_likes"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_media"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_media"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_saves"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "post_saves"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "reports"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "reports"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "saved_jobs"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "saved_jobs"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "site_content"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "site_content"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "subscription_usage"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "subscription_usage"
+ },
+ {
+  "grantee": "anon",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "subscriptions"
+ },
+ {
+  "grantee": "authenticated",
+  "privs": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE",
+  "s": "public",
+  "t": "subscriptions"
+ }
+]

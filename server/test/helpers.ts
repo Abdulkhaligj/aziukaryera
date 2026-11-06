@@ -37,11 +37,19 @@ export async function startHarness(env: Record<string, string> = {}): Promise<Ha
     ADDITIONAL_REDIRECT_URLS: 'https://asoiu-career-admin.vercel.app/**', ...env
   } as NodeJS.ProcessEnv);
   const pool = createPool(mysqlUrl);
-  await seed(pool);
   const mailer = createMailer(config);
-  // TEST_LOG=1 prints the API log, including errors hidden behind generic auth messages.
-  const app = await buildApp({ config, pool, schema: await loadSchema(pool), mailer, logger: process.env.TEST_LOG === '1' });
-  await app.listen({ host: '127.0.0.1', port: 0 });
+  let app: Awaited<ReturnType<typeof buildApp>>;
+  try {
+    await seed(pool);
+    // TEST_LOG=1 prints the API log, including errors hidden behind generic auth messages.
+    app = await buildApp({ config, pool, schema: await loadSchema(pool), mailer, logger: process.env.TEST_LOG === '1' });
+    await app.listen({ host: '127.0.0.1', port: 0 });
+  } catch (error) {
+    // A failed setup must not leave an open pool behind, or the runner never exits.
+    await pool.end();
+    await dropDatabase(mysqlUrl);
+    throw error;
+  }
   const address = app.server.address();
   const url = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
   config.publicUrl = url;

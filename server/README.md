@@ -20,7 +20,7 @@ Yalnız realtime (WebSocket) əvəzinə bildirişlər üçün qısa interval il�
 |---|---|---|
 | 1 | MySQL sxemi (55 cədvəl, 81 xarici açar, 84 CHECK), giriş və fayl cədvəlləri, data köçürmə + yoxlama | ✅ hazır, real data ilə sınanıb |
 | 2 | Giriş (GoTrue alt-dəsti): şifrə ilə giriş, refresh, çıxış, qeydiyyat, şifrə bərpası, `admin_role` claim-ləri; bcrypt hash-lar köçür | ✅ hazır, 15 test (`supabase-js 2.58.0` ilə) |
-| 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | — |
+| 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ◐ data API və 222 icazə qaydası hazır (11 test); 27 trigger funksiyası qalıb |
 | 4 | 15 RPC funksiyası (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, …) | — |
 | 5 | Fayllar (diskdə, imzalı linklər), Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər | — |
 | 6 | Sayt və admin panelin keçidi, bildirişlər üçün sorğu, real data ilə tam sınaq, universitet serveri üçün Docker dəsti (MySQL + API + Caddy) | — |
@@ -43,7 +43,17 @@ Xəta mətnləri GoTrue-nunkudur (`Invalid login credentials`, `User already reg
 
 Yazma qatı (`src/write/`): bütün sətir yazıları buradan keçir. Postgres trigger-lərinin ekvivalentləri bu qatda işləyir. İndiyə qədər qeydiyyat zəncirininkilər köçürülüb: admin limiti, avatar qoruması, audit, təhsil yoxlaması, abunə normallaşdırması, faktura, kvota və istifadə sinxronizasiyası. Qalan trigger-lər 3-cü mərhələdə gələcək.
 
+## Data API (`/rest/v1`)
+
+- **Sorğular:** `select` (sütunlar, `*`, alias, `rel!fk!inner(...)` birləşdirmə), `eq/neq/gt/gte/lt/lte/like/ilike/is/in/cs/cd`, `not.`, `order` (Postgres NULL sırası), `limit/offset`, `count=exact`, `HEAD`, `single`/`maybeSingle`.
+- **Yazma:** `insert` (tək və ya massiv), `upsert` (`on_conflict`, `merge`/`ignore-duplicates`), `update`, `delete`, `return=representation`.
+- **İcazələr:** `tools/policies-to-mysql.mjs` 222 RLS qaydasını MySQL fragmentlərinə çevirir (`src/rest/policies.generated.json`). Hamısı MySQL-də kompilyasiya olunaraq yoxlanılıb. Hər sorğudan əvvəl sessiya dəyişənləri qurulur (`@auth_uid`, `@is_admin`, `@admin_role`, …), köməkçi funksiyalar isə migration `0003`-dədir. Semantika Postgres-dəki kimidir: icazəverən qaydalar OR, məhdudlaşdıran qaydalar AND; UPDATE/DELETE üçün SELECT qaydası da tətbiq olunur; `service_role` RLS-i keçir.
+- **Xətalar:** PostgREST formatında və Postgres kodları ilə (`42501`, `23505`, `23503`, `23514`, `PGRST116`, …).
+
 ### Hələ bağlanmamış boşluqlar
+
+- 27 trigger funksiyası (803 sətir) hələ yazma qatına köçürülməyib. Ən böyükləri bildirişlər (`publish_content_notification`, `notify_core_workflow`), post moderasiyası, müsahibə vaxtlarının yoxlanması, `payments_apply` və status qoruyucularıdır. Onlar köçürülənə qədər data API bu cədvəllərə qaydalarsız yazar. Ona görə keçid bunlar bitmədən edilə bilməz.
+- `or=`/`and=` filtrləri və birləşdirilmiş cədvəl üzrə filtr dəstəklənmir. Sayt bunları istifadə etmir.
 
 - İstifadəçi silinəndə MySQL xarici açar kaskadları uşaq cədvəllərin yazma qaydalarını (audit, kvota sayğacları) işə salmır, Postgres-də isə trigger-lər işləyirdi. 3-cü mərhələdə silmə yazma qatından keçəcək.
 - `payments_apply`-ın "ödənildi" qolu (abunəni uzatma) hələ köçürülməyib. Bu yol yalnız admin əməliyyatlarında var.

@@ -8,8 +8,9 @@ export type Row = Record<string, unknown>;
 export type Tx = PoolConnection;
 
 export function createPool(url: string): Pool {
-  return mysql.createPool({
+  const pool = mysql.createPool({
     uri: url,
+    charset: 'UTF8MB4_0900_AI_CI',
     timezone: 'Z',
     connectionLimit: 10,
     decimalNumbers: true,
@@ -26,6 +27,11 @@ export function createPool(url: string): Pool {
       return next();
     }
   });
+  // Same collation as the columns, so literals and session variables compare
+  // without "Illegal mix of collations". (The handshake can only carry ids ≤ 255.)
+  (pool as unknown as { pool: { on(event: 'connection', cb: (c: { query(sql: string): void }) => void): void } })
+    .pool.on('connection', connection => connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_ci'));
+  return pool;
 }
 
 /** ISO-8601 (any offset) or Date → MySQL DATETIME(6) in UTC. */

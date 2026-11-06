@@ -57,7 +57,11 @@ export async function selectByKey(env: WriteEnv, tableName: string, row: Row, lo
   return one(env.tx, `SELECT * FROM ${q(tableName)} WHERE ${where}${lock ? ' FOR UPDATE' : ''}`, params);
 }
 
-export async function insertRow(env: WriteEnv, tableName: string, values: Row): Promise<Row> {
+/** Row-level WITH CHECK: runs on the stored row (defaults applied) before the
+ *  AFTER hooks; throwing rolls the whole statement back. */
+export interface WriteOptions { check?: (env: WriteEnv, stored: Row) => Promise<void> }
+
+export async function insertRow(env: WriteEnv, tableName: string, values: Row, options: WriteOptions = {}): Promise<Row> {
   const t = table(env.schema, tableName);
   const row: Row = { ...values };
   // UUID primary keys are generated here so the new row can be read back.
@@ -72,11 +76,12 @@ export async function insertRow(env: WriteEnv, tableName: string, values: Row): 
     cols.map(c => toParam(t.columns.get(c)!, row[c])));
   if (t.primaryKey.length === 1 && row[t.primaryKey[0]] === undefined) row[t.primaryKey[0]] = result.insertId;
   const stored = await selectByKey(env, tableName, row);
+  if (options.check) await options.check(env, stored!);
   for (const hook of hooks.after) await hook(env, stored, null);
   return stored!;
 }
 
-export async function updateRow(env: WriteEnv, tableName: string, key: Row, changes: Row): Promise<Row | null> {
+export async function updateRow(env: WriteEnv, tableName: string, key: Row, changes: Row, options: WriteOptions = {}): Promise<Row | null> {
   const t = table(env.schema, tableName);
   const old = await selectByKey(env, tableName, key, true);
   if (!old) return null;
@@ -90,6 +95,7 @@ export async function updateRow(env: WriteEnv, tableName: string, key: Row, chan
       [...cols.map(c => toParam(t.columns.get(c)!, row[c])), ...params]);
   }
   const stored = await selectByKey(env, tableName, row);
+  if (options.check && stored) await options.check(env, stored);
   for (const hook of hooks.after) await hook(env, stored, old);
   return stored;
 }
