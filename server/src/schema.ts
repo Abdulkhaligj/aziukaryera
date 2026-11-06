@@ -33,6 +33,8 @@ export interface ForeignKey {
   columns: string[];
   refTable: string;
   refColumns: string[];
+  /** ON DELETE action: CASCADE, SET NULL, RESTRICT, NO ACTION or SET DEFAULT. */
+  onDelete: string;
 }
 
 export interface Table {
@@ -92,10 +94,13 @@ export async function loadSchema(pool: Pool): Promise<Schema> {
        FROM information_schema.key_column_usage
       WHERE table_schema = DATABASE() AND referenced_table_name IS NOT NULL
       ORDER BY table_name, constraint_name, ordinal_position`);
+  const rules = new Map((await rows<{ t: string; n: string; d: string }>(pool,
+    `SELECT table_name AS t, constraint_name AS n, delete_rule AS d FROM information_schema.referential_constraints
+      WHERE constraint_schema = DATABASE()`)).map(r => [`${r.t}.${r.n}`, r.d]));
   const byName = new Map<string, ForeignKey>();
   for (const f of fks) {
     const key = `${f.t}.${f.n}`;
-    if (!byName.has(key)) byName.set(key, { name: f.n, table: f.t, columns: [], refTable: f.rt, refColumns: [] });
+    if (!byName.has(key)) byName.set(key, { name: f.n, table: f.t, columns: [], refTable: f.rt, refColumns: [], onDelete: rules.get(key) ?? 'NO ACTION' });
     byName.get(key)!.columns.push(f.c);
     byName.get(key)!.refColumns.push(f.rc);
   }

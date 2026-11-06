@@ -56,15 +56,15 @@ after('posts', 'posts_broadcast_notification', ['insert', 'update'], async (env,
 }, ['moderation_status']);
 
 // ads_touch → private.ads_touch; set_site_content_updated_at → touch_site_content_updated_at
-before('ads', 'ads_touch', ['update'], (env, row) => { row.updated_at = nowText(env); });
-before('site_content', 'set_site_content_updated_at', ['update'], (env, row) => { row.updated_at = nowText(env); });
+before('ads', 'ads_touch', ['update'], (env, row) => { row.updated_at = nowText(env); }, null, 'invoker');
+before('site_content', 'set_site_content_updated_at', ['update'], (env, row) => { row.updated_at = nowText(env); }, null, 'invoker');
 
 // company_awards_touch → private.company_awards_touch
 before('company_awards', 'company_awards_touch', ['insert', 'update'], (env, row) => {
   row.updated_at = nowText(env);
   row.nomination = pgTrim(row.nomination);
   row.company_name = pgTrim(row.company_name);
-});
+}, null, 'invoker');
 
 // DEFAULT auth.uid() (schema-followups.md).
 for (const tableName of ['ads', 'company_awards']) columnDefault(tableName, 'created_by', env => env.ctx.uid ?? null);

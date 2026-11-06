@@ -35,8 +35,8 @@ export async function privileged(env: WriteEnv): Promise<boolean> {
   return !env.ctx.uid || await isAdmin(env);
 }
 
-/** current_user not in ('authenticated','anon'): definer code and service role. */
-export const isTrusted = (env: WriteEnv) => env.ctx.role === 'system' || env.ctx.role === 'service_role';
+/** current_user not in ('authenticated','anon'): SECURITY DEFINER code, the service role and server internals. */
+export const isTrusted = (env: WriteEnv) => !!env.definer || env.ctx.role === 'system' || env.ctx.role === 'service_role';
 
 /** NEW.col IS DISTINCT FROM OLD.col (false for INSERT, where OLD is null). */
 export const changed = (row: Row, old: Row | null, ...columns: string[]) =>

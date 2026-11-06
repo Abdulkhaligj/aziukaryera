@@ -34,7 +34,10 @@ export const pgErrors = {
     `The result contains ${count} rows`),
   missingKey: () => new PgError(401, '', 'No API key found in request', null, 'No `apikey` request header or url param was found.'),
   badJwt: () => new PgError(401, 'PGRST301', 'JWT is invalid or expired'),
-  functionNotFound: (name: string) => new PgError(404, 'PGRST202', `Could not find the function public.${name} without parameters in the schema cache`)
+  functionNotFound: (name: string, args: string[] = []) => new PgError(404, 'PGRST202', args.length
+    ? `Could not find the function public.${name}(${[...args].sort().join(', ')}) in the schema cache`
+    : `Could not find the function public.${name} without parameters in the schema cache`),
+  functionPermission: (ctx: Context, name: string) => new PgError(deniedStatus(ctx), '42501', `permission denied for function ${name}`)
 };
 
 interface MysqlError { errno?: number; code?: string; sqlMessage?: string; sqlState?: string }
@@ -43,6 +46,10 @@ interface MysqlError { errno?: number; code?: string; sqlMessage?: string; sqlSt
 function statusFor(sqlState: string, ctx: Context | null): number {
   if (sqlState === '42501') return ctx ? deniedStatus(ctx) : 403;
   if (sqlState === '23503' || sqlState === '23505') return 409;
+  if (sqlState.startsWith('28')) return 403;
+  if (sqlState === '42883' || sqlState === '42P01') return 404;
+  // P0001 is a plain RAISE (400); other PL/pgSQL codes such as no_data_found are 500.
+  if (sqlState.startsWith('P0') && sqlState !== 'P0001') return 500;
   return 400;
 }
 

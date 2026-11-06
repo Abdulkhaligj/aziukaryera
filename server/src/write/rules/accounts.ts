@@ -15,7 +15,7 @@ before('profiles', 'profiles_admin_seat_limit', ['insert', 'update'], async (env
   const other = await one<{ n: number }>(env.tx,
     `SELECT COUNT(*) AS n FROM profiles WHERE role = 'admin' AND status = 'active' AND id <> ?`, [row.id]);
   if ((other?.n ?? 0) >= 5) throw new DbRuleError('Admin giriş limiti dolub (maksimum 5 aktiv hesab)', 'P0001');
-}, ['role', 'status']);
+}, ['role', 'status'], 'invoker');
 
 // profiles_avatar_guard → private.profile_avatar_guard: avatar state is server-owned for ordinary users.
 before('profiles', 'profiles_avatar_guard', ['insert', 'update'], async (env, row, old) => {
@@ -23,7 +23,7 @@ before('profiles', 'profiles_avatar_guard', ['insert', 'update'], async (env, ro
   for (const field of AVATAR_FIELDS) {
     row[field] = old ? old[field] : (field === 'avatar_attempts' || field === 'avatar_submit_count' ? 0 : null);
   }
-});
+}, null, 'invoker');
 
 // profiles_guard_privileges → public.guard_profile_privileges
 before('profiles', 'profiles_guard_privileges', ['update'], async (env, row, old) => {
@@ -39,13 +39,13 @@ audited('profiles');
 // security_education_verification → private.education_verification_guard:
 // only super_admin/manager verify education.
 before('education', 'security_education_verification', ['insert', 'update'], async (env, row, old) => {
-  if (env.ctx.role !== 'anon' && env.ctx.role !== 'authenticated') return;
+  if (isTrusted(env)) return;
   const role = await currentAdminRole(env.tx, env.ctx);
   if (role === 'super_admin' || role === 'manager') return;
   if ((!old && row.verified === true) || (old && row.verified !== old.verified)) {
     throw new DbRuleError('Education verification requires an authorized staff account', '42501');
   }
-});
+}, null, 'invoker');
 
 audited('education');
 

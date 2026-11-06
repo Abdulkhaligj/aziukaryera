@@ -11,6 +11,7 @@ import { AuthError, authErrors, DbRuleError } from '../errors.ts';
 import type { Schema } from '../schema.ts';
 import { composeMail, type Mailer, type MailKind } from './mailer.ts';
 import { handleNewUser } from './new-user.ts';
+import { deleteRow } from '../write/pipeline.ts';
 import { RateLimiter } from './rate-limit.ts';
 import { consumeOneTimeToken, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession } from './tokens.ts';
 import { findUserByEmail, findUserById, isBanned, mergeMetadata, normalizeEmail, toGoTrueUser, validEmail, type AuthUser } from './users.ts';
@@ -355,8 +356,9 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     await requireService(req);
     const user = await findUserById(pool, req.params.id);
     if (!user) throw authErrors.userNotFound();
-    // FK cascades remove the profile and its rows (see README, known gaps).
-    await exec(pool, 'DELETE FROM auth_users WHERE id = ?', [user.id]);
+    // Through the write pipeline: the profile and its rows go with their
+    // triggers (audit, quota counters), as the Postgres FK cascade did.
+    await transaction(pool, tx => deleteRow({ tx, ctx: systemContext, schema, now: new Date() }, 'auth_users', { id: user.id }));
     return toGoTrueUser(user);
   });
 

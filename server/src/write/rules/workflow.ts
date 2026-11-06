@@ -33,7 +33,7 @@ for (const [tableName, allowed] of Object.entries(LIMITED_FIELDS)) {
     } else if (tableName === 'mentor_requests') {
       row.updated_at = nowText(env);
     }
-  });
+  }, null, 'invoker');
 }
 
 // applications_update_guard → public.guard_application_update

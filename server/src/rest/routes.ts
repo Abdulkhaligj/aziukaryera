@@ -13,6 +13,8 @@ import { parseFilters, parseOrder, parseSelect } from './parse.ts';
 import { exposed, VIEW_BASE } from './policy.ts';
 import { filterSql, readRows } from './select.ts';
 import { applySession } from './session.ts';
+import { coerceArgs, findRpc } from '../rpc/registry.ts';
+import '../rpc/index.ts';
 
 export interface RestDeps { config: Config; pool: Pool; schema: Schema }
 type Query = Record<string, unknown>;
@@ -88,6 +90,33 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     return send(reply, req, 200, result.rows, { range });
   };
   // Fastify derives HEAD from GET; the handler answers it with headers only.
+  // POST /rpc/:name — named arguments in a JSON object, as supabase-js sends them.
+  app.post('/rpc/:name', async (req: FastifyRequest<{ Params: { name: string }; Body: unknown }>, reply) => {
+    const { name } = req.params;
+    const body = req.body ?? {};
+    if (typeof body !== 'object' || Array.isArray(body)) throw pgErrors.parse('Empty or invalid json');
+    const keys = Object.keys(body as object);
+    const def = findRpc(name);
+    if (!def || keys.some(k => !(k in def.args))) throw pgErrors.functionNotFound(name, keys);
+    const ctx = await context(req);
+    if (ctx.role !== 'service_role' && !def.roles.includes(ctx.role as 'anon' | 'authenticated')) throw pgErrors.functionPermission(ctx, name);
+    let result: unknown;
+    try {
+      const args = coerceArgs(def, body as Record<string, unknown>);
+      result = await transaction(pool, async tx => {
+        await applySession(tx, ctx);
+        return def.run({ tx, ctx, schema, now: new Date(), definer: def.security === 'definer' }, args);
+      });
+    } catch (error) {
+      const mapped = fromDatabase(error, name, ctx);
+      if (mapped) throw mapped;
+      throw error;
+    }
+    if (def.returns === 'void') return reply.code(204).send();
+    if (def.returns === 'rows') return send(reply, req, 200, result as Row[]);
+    return reply.code(200).type('application/json; charset=utf-8').send(JSON.stringify(result ?? null));
+  });
+
   app.get('/:table', read);
 
   app.post('/:table', async (req: FastifyRequest<{ Params: { table: string }; Querystring: Query; Body: unknown }>, reply) => {

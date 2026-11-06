@@ -21,7 +21,7 @@ Yalnız realtime (WebSocket) əvəzinə bildirişlər üçün qısa interval il�
 | 1 | MySQL sxemi (55 cədvəl, 81 xarici açar, 84 CHECK), giriş və fayl cədvəlləri, data köçürmə + yoxlama | ✅ hazır, real data ilə sınanıb |
 | 2 | Giriş (GoTrue alt-dəsti): şifrə ilə giriş, refresh, çıxış, qeydiyyat, şifrə bərpası, `admin_role` claim-ləri; bcrypt hash-lar köçür | ✅ hazır, 15 test (`supabase-js 2.58.0` ilə) |
 | 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ✅ data API, 222 icazə qaydası, bütün 77 trigger (32 test) |
-| 4 | 15 RPC funksiyası (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, …) | — |
+| 4 | RPC funksiyaları (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, AI büdcələri, moderasiya, sıfırlama) | ✅ saytın, admin panelin və Edge Function-ların çağırdığı 22 funksiyanın hamısı (12 test) |
 | 5 | Fayllar (diskdə, imzalı linklər), Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər | — |
 | 6 | Sayt və admin panelin keçidi, bildirişlər üçün sorğu, real data ilə tam sınaq, universitet serveri üçün Docker dəsti (MySQL + API + Caddy) | — |
 | 7 | Universitet serverində sınaq köçürməsi, sonra keçid günü | — |
@@ -55,6 +55,8 @@ Bütün sətir yazıları buradan keçir: data API, qeydiyyat, admin funksiyalar
 | `moderation.ts` | post/şərh moderasiyası (`moderation_guard`), söz filtri, moderasiya webhook-u (commit-dən sonra), söz siyahısının normallaşdırılması, paket üzrə media icazəsi |
 | `checks.ts` | MySQL-in qəbul etmədiyi CHECK-lər (`follows`, `messages`, `connections`) |
 
+Xarici açar əməliyyatları da yazma qatından keçir: sətir silinəndə `ON DELETE CASCADE` və `SET NULL` uşaq sətirlərə trigger-ləri ilə birlikdə tətbiq olunur (Postgres-in RI trigger-ləri kimi). Ona görə istifadəçi silmə də audit və kvota sayğaclarını düzgün yeniləyir.
+
 Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar BEFORE trigger-lərdən əvvəl doldurulur), eyni hadisənin trigger-ləri ad sırası ilə işləyir (`000_…` birinci), `UPDATE OF sütun` yalnız sütun UPDATE-in SET siyahısında olanda işləyir, iç-içə yazılar çağıranın `auth.uid()`-si ilə gedir. Söz filtri (`src/write/moderation-text.ts`) `private.mod_*` funksiyalarının simvol-simvol köçürməsidir və müqayisə dəqiqdir (MySQL kollasiyası ilə yox). Audit (`admin_audit_logs`) Postgres-dəki kimi 28 cədvəldə var.
 
 ## Data API (`/rest/v1`)
@@ -64,6 +66,23 @@ Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar B
 - **İcazələr:** `tools/policies-to-mysql.mjs` 222 RLS qaydasını MySQL fragmentlərinə çevirir (`src/rest/policies.generated.json`). Hamısı MySQL-də kompilyasiya olunaraq yoxlanılıb. Hər sorğudan əvvəl sessiya dəyişənləri qurulur (`@auth_uid`, `@is_admin`, `@admin_role`, …), köməkçi funksiyalar isə migration `0003`-dədir. Semantika Postgres-dəki kimidir: icazəverən qaydalar OR, məhdudlaşdıran qaydalar AND; UPDATE/DELETE üçün SELECT qaydası da tətbiq olunur; `service_role` RLS-i keçir.
 - **Xətalar:** PostgREST formatında və Postgres kodları ilə (`42501`, `23505`, `23503`, `23514`, `PGRST116`, …).
 
+## RPC (`/rest/v1/rpc/:name`)
+
+`src/rpc/` altında sayt, admin panel və Edge Function-ların `supabase.rpc(...)` ilə çağırdığı 22 funksiya var. `test/rpc-coverage.test.ts` repodakı bütün `.rpc('…')` çağırışlarını tapır və hər birinin köçürüldüyünü yoxlayır.
+
+| Fayl | Funksiyalar |
+|---|---|
+| `bootstrap.ts` | `career_bootstrap_v1`: girişdən sonra bütün məlumat bir sorğuda; SECURITY INVOKER, yəni çağıranın icazələri ilə |
+| `profiles.ts` | `candidate_profiles`, `profile_cards`, `profile_avatar_paths`, `avatar_submit`, `avatar_remove`, `ranked_jobs_for` (`match_score`) |
+| `interviews.ts` | `create_interview_request`, `respond_interview_request`, `cancel_interview_request` |
+| `billing.ts` | `select_company_plan` (faktura yaradılır; Free seçiləndə gözləyən faktura ləğv olunur) |
+| `content.ts` | `active_ads`, `ad_track`, `claim_benefit`, `redeem_benefit_code` |
+| `ai.ts` | `ai_request_context`, `ai_reserve_request`, `ai_consume_provider_attempt`, `ai_candidate_pack` (yalnız service key) |
+| `moderation.ts` | `moderation_claim`, `moderation_finish` (məzmun dəyişməyibsə qərar tətbiq olunur), avatar moderasiyası |
+| `admin.ts` | `admin_reset_platform_data`: yalnız aktiv Super Admin; adminlər qalır, qalan hər şey trigger-lərlə birlikdə silinir |
+
+PostgREST qaydaları saxlanılır: `EXECUTE` icazəsi (`anon`/`authenticated`; `service_role` hamısını çağıra bilər), adlı arqumentlər, tip yoxlaması (`22P02`), naməlum funksiya və ya arqument üçün `PGRST202`, `void` funksiyalar üçün 204. SECURITY DEFINER funksiyaların yazıları sahib (owner) adı ilə gedir, ona görə avatar və təhsil qoruyucuları onları Postgres-dəki kimi etibarlı sayır.
+
 ### Hələ bağlanmamış boşluqlar
 
 - Xəta ardıcıllığı: Postgres sətirdə əvvəl RLS `WITH CHECK`-i, sonra CHECK/NOT NULL-u yoxlayır, MySQL isə əvvəl öz məhdudiyyətlərini. Sorğu hər ikisini pozanda başqa xəta kodu qayıda bilər; nəticə (rədd) eynidir. Tamamilə icazəsiz cədvəllər üçün RLS xətası əvvəl qaytarılır.
@@ -71,8 +90,9 @@ Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar B
 - Upsert (`on_conflict`) mövcud sətirdə BEFORE INSERT trigger-lərini işə salmır (Postgres salırdı). Sayt və admin panel upsert-i yalnız BEFORE trigger-i olmayan cədvəllərdə (`broadcast_notification_reads`, `plan_features`) istifadə edir.
 - Moderasiya webhook-unun ünvanı hələ `*.supabase.co`-dadır (cədvəlin CHECK qaydası). 5-ci mərhələdə yeni API-nin funksiya ünvanına keçəcək.
 - `or=`/`and=` filtrləri və birləşdirilmiş cədvəl üzrə filtr dəstəklənmir. Sayt bunları istifadə etmir.
+- RPC nəticələrinə `select`/`order`/filtr tətbiq olunmur və GET ilə RPC çağırışı yoxdur. Sayt bunları istifadə etmir.
+- `admin_reset_platform_data`: Postgres-dəki `lock_timeout`/`statement_timeout` (5 s / 30 s) burada yoxdur.
 
-- İstifadəçi silinəndə MySQL xarici açar kaskadları uşaq cədvəllərin yazma qaydalarını (audit, kvota sayğacları) işə salmır, Postgres-də isə trigger-lər işləyirdi. Keçiddən əvvəl istifadəçi silmə yazma qatından keçəcək (6-cı mərhələ).
 - E-poçt dəyişikliyi (`PUT /user` `email`) dəstəklənmir. Sayt bunu istifadə etmir, admin isə `admin/users` ilə dəyişir.
 - Google/Microsoft girişi aktiv deyil, buludda da aktiv deyil. `/settings` yalnız e-poçtu göstərir.
 
@@ -103,6 +123,8 @@ server/
     app.ts, index.ts        Fastify tətbiqi və giriş nöqtəsi
     config.ts, db.ts, schema.ts, context.ts, errors.ts
     auth/                   GoTrue-uyğun giriş xidməti
+    rest/                   PostgREST-uyğun data API və icazə qatı
+    rpc/                    /rest/v1/rpc funksiyaları
     values.ts               sütun tipinə görə dəyər formatı (sorğu → bazanın qaytardığı forma)
     write/pipeline.ts       yazma qatı; write/rules/ — trigger ekvivalentləri; write/moderation-text.ts — söz filtri
   test/                     supabase-js ilə inteqrasiya testləri (müvəqqəti MySQL bazası)

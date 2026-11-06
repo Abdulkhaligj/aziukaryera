@@ -25,7 +25,7 @@ before('company_interview_slots', 'company_interview_slots_guard', ['update'], (
     throw new DbRuleError('Müsahibənin namizəd və müəllif məlumatı dəyişdirilə bilməz', 'P0001');
   }
   row.updated_at = nowText(env);
-});
+}, null, 'invoker');
 
 // company_interview_slots_validate → public.validate_company_interview_slot
 before('company_interview_slots', 'company_interview_slots_validate', ['insert', 'update'], async (env, row, old) => {
@@ -117,7 +117,7 @@ before('company_partnership_requests', 'company_partnership_requests_guard', ['u
     throw new DbRuleError('Əməkdaşlıq müraciətinin ilkin məlumatı dəyişdirilə bilməz', 'P0001');
   }
   row.updated_at = nowText(env);
-});
+}, null, 'invoker');
 
 // company_partnership_requests_notify → public.notify_company_partnership_event
 after('company_partnership_requests', 'company_partnership_requests_notify', ['insert', 'update'], async (env, row, old) => {
