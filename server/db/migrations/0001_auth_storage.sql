@@ -21,11 +21,12 @@ CREATE TABLE IF NOT EXISTS `auth_users` (
   UNIQUE KEY `auth_users_email_key` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_ci;
 
--- One row per signed-in device. Only a SHA-256 of the refresh token is kept.
+-- One row per signed-in device (the JWT session_id claim).
 CREATE TABLE IF NOT EXISTS `auth_sessions` (
   `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT (UUID()),
   `user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `refresh_token_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `aal` VARCHAR(8) NOT NULL DEFAULT 'aal1',
+  `amr_method` VARCHAR(32) NOT NULL DEFAULT 'password',
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `refreshed_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `expires_at` DATETIME(6) NOT NULL,
@@ -33,16 +34,32 @@ CREATE TABLE IF NOT EXISTS `auth_sessions` (
   `user_agent` VARCHAR(255) NULL,
   `ip` VARCHAR(64) NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `auth_sessions_refresh_token_hash_key` (`refresh_token_hash`),
   KEY `auth_sessions_user_idx` (`user_id`, `revoked_at`),
   CONSTRAINT `auth_sessions_user_fkey` FOREIGN KEY (`user_id`) REFERENCES `auth_users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_ci;
+
+-- Refresh-token family per session, as in GoTrue: each refresh revokes the
+-- presented token and issues a child. A revoked token is still honoured for a
+-- few seconds (two tabs refreshing at once); a later replay revokes the session.
+-- Only SHA-256 hashes are stored.
+CREATE TABLE IF NOT EXISTS `auth_refresh_tokens` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `session_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `token_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `parent_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `revoked_at` DATETIME(6) NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `auth_refresh_tokens_token_hash_key` (`token_hash`),
+  KEY `auth_refresh_tokens_session_idx` (`session_id`, `revoked_at`),
+  CONSTRAINT `auth_refresh_tokens_session_fkey` FOREIGN KEY (`session_id`) REFERENCES `auth_sessions` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_ci;
 
 -- Single-use codes and links: password recovery, email confirmation, invites.
 CREATE TABLE IF NOT EXISTS `auth_one_time_tokens` (
   `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT (UUID()),
   `user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  `purpose` ENUM('recovery','email_confirmation','invite','email_change') NOT NULL,
+  `purpose` ENUM('recovery','email_confirmation','invite','magic_link','email_change') NOT NULL,
   `token_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `expires_at` DATETIME(6) NOT NULL,

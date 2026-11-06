@@ -112,6 +112,12 @@ try {
     report.push({ table: job.to, source: rows.length });
     process.stdout.write(`${job.to}: ${rows.length}\n`);
   }
+  // Sequences that are not column identities continue from their Postgres value.
+  for (const seq of await src.rows(`select sequencename as name, coalesce(last_value, 0) as value
+      from pg_sequences where schemaname = 'private' and sequencename in ('invoice_seq')`)) {
+    await db.query('UPDATE `private_sequences` SET `value` = ? WHERE `name` = ?', [seq.value, seq.name]);
+    process.stdout.write(`sequence ${seq.name}: ${seq.value}\n`);
+  }
   await db.commit();
 } catch (error) {
   await db.rollback();

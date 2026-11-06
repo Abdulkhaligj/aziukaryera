@@ -122,7 +122,7 @@ CREATE TABLE `ads` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_ci;
 
 CREATE TABLE `ai_usage` (
-  `id` BIGINT NOT NULL,
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
   `profile_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin,
   `task` VARCHAR(191) NOT NULL,
   `provider` TEXT,

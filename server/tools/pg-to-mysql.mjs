@@ -129,7 +129,9 @@ for (const t of tables.values()) {
   const name = tableName(t.schema, t.table);
   for (const c of t.cols) {
     const type = columnType(c);
-    t.lines.push(`  ${q(c.col)} ${type}${c.nullable === 'NO' ? ' NOT NULL' : ''}${columnDefault(c, type)}`);
+    // Postgres identity columns (GENERATED … AS IDENTITY) have no column_default.
+    const tail = c.identity ? ' AUTO_INCREMENT' : columnDefault(c, type);
+    t.lines.push(`  ${q(c.col)} ${type}${c.nullable === 'NO' ? ' NOT NULL' : ''}${tail}`);
   }
   for (const c of constraints.filter(c => c.s === t.schema && c.t === t.table)) {
     let m;
