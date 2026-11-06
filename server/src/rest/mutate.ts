@@ -56,8 +56,8 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
       if (existing) {
         if (options.resolution === 'ignore') continue;
         if (!await rowPasses(tx, t, existing, usingSql(tableName, ctx, 'UPDATE'))) throw pgErrors.rlsUsing(ctx, tableName);
-        const changes = Object.fromEntries(Object.entries(values).filter(([c]) => !conflict.includes(c)));
-        const stored = await updateRow(env, tableName, keyOf(t, existing), changes, {
+        // PostgREST sets every payload column (conflict ones too), so all are UPDATE targets.
+        const stored = await updateRow(env, tableName, keyOf(t, existing), values, {
           check: async (_env, row) => { if (!await rowPasses(tx, t, row, updateCheck)) throw pgErrors.rls(ctx, tableName); }
         });
         keys.push(keyOf(t, stored!));

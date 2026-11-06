@@ -39,10 +39,17 @@ export const pgErrors = {
 
 interface MysqlError { errno?: number; code?: string; sqlMessage?: string; sqlState?: string }
 
+/** PostgREST's HTTP status for a SQLSTATE raised by the database. */
+function statusFor(sqlState: string, ctx: Context | null): number {
+  if (sqlState === '42501') return ctx ? deniedStatus(ctx) : 403;
+  if (sqlState === '23503' || sqlState === '23505') return 409;
+  return 400;
+}
+
 /** Translate a MySQL / rule error into the Postgres error a client expects. */
-export function fromDatabase(error: unknown, table: string): PgError | null {
+export function fromDatabase(error: unknown, table: string, ctx: Context | null = null): PgError | null {
   if (error instanceof PgError) return error;
-  if (error instanceof DbRuleError) return new PgError(error.sqlState === '42501' ? 403 : 400, error.sqlState, error.message);
+  if (error instanceof DbRuleError) return new PgError(statusFor(error.sqlState, ctx), error.sqlState, error.message);
   const e = error as MysqlError;
   if (!e || typeof e.errno !== 'number') return null;
   const msg = e.sqlMessage || '';

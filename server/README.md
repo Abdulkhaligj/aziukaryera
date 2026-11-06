@@ -20,7 +20,7 @@ Yalnız realtime (WebSocket) əvəzinə bildirişlər üçün qısa interval il�
 |---|---|---|
 | 1 | MySQL sxemi (55 cədvəl, 81 xarici açar, 84 CHECK), giriş və fayl cədvəlləri, data köçürmə + yoxlama | ✅ hazır, real data ilə sınanıb |
 | 2 | Giriş (GoTrue alt-dəsti): şifrə ilə giriş, refresh, çıxış, qeydiyyat, şifrə bərpası, `admin_role` claim-ləri; bcrypt hash-lar köçür | ✅ hazır, 15 test (`supabase-js 2.58.0` ilə) |
-| 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ◐ data API və 222 icazə qaydası hazır (11 test); 27 trigger funksiyası qalıb |
+| 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ✅ data API, 222 icazə qaydası, bütün 77 trigger (32 test) |
 | 4 | 15 RPC funksiyası (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, …) | — |
 | 5 | Fayllar (diskdə, imzalı linklər), Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər | — |
 | 6 | Sayt və admin panelin keçidi, bildirişlər üçün sorğu, real data ilə tam sınaq, universitet serveri üçün Docker dəsti (MySQL + API + Caddy) | — |
@@ -41,7 +41,21 @@ Saytın, admin panelin və Edge Function-ların çağırdığı GoTrue endpoint-
 
 Xəta mətnləri GoTrue-nunkudur (`Invalid login credentials`, `User already registered`, …), çünki saytın `Backend.translate()` funksiyası onlara görə Azərbaycan dilinə çevirir.
 
-Yazma qatı (`src/write/`): bütün sətir yazıları buradan keçir. Postgres trigger-lərinin ekvivalentləri bu qatda işləyir. İndiyə qədər qeydiyyat zəncirininkilər köçürülüb: admin limiti, avatar qoruması, audit, təhsil yoxlaması, abunə normallaşdırması, faktura, kvota və istifadə sinxronizasiyası. Qalan trigger-lər 3-cü mərhələdə gələcək.
+## Yazma qatı (`src/write/`)
+
+Bütün sətir yazıları buradan keçir: data API, qeydiyyat, admin funksiyaları. Postgres-in 33 cədvəldəki 77 trigger-i (33 funksiya) burada eyni adla işləyir, `src/write/rules/` altında:
+
+| Modul | Nə edir |
+|---|---|
+| `accounts.ts` | admin limiti (5), avatar qoruması, rol/status/məzun təsdiqi qoruması, təhsil təsdiqi, şirkət statusu yalnız Karyera Mərkəzi tərəfindən, sahibin profil statusunun sinxronu |
+| `workflow.ts` | reviewer/editor yalnız moderasiya sahələrini dəyişir, müraciət qoruması və status tarixçəsi, vakansiya statusu qoruması, iş axını bildirişləri |
+| `billing.ts` | abunə normallaşdırması, faktura (`KM-İL-NNNNN`), ödənişin paketi bir dəfə aktivləşdirməsi (`payments_apply`), vakansiya/üzv/aylıq paylaşım kvotaları, istifadə sinxronu |
+| `content.ts` | tədbir, vakansiya, güzəşt, sayt məzmunu və Karyera Mərkəzi paylaşımları üçün ümumi bildiriş (`broadcast_notifications`), `updated_at` yeniləmələri |
+| `interviews.ts` | müsahibə vaxtı yoxlaması və üst-üstə düşməmə qaydası (`EXCLUDE`), müraciətin "interview" mərhələsinə keçməsi, müsahibə sorğusu, əməkdaşlıq müraciətləri |
+| `moderation.ts` | post/şərh moderasiyası (`moderation_guard`), söz filtri, moderasiya webhook-u (commit-dən sonra), söz siyahısının normallaşdırılması, paket üzrə media icazəsi |
+| `checks.ts` | MySQL-in qəbul etmədiyi CHECK-lər (`follows`, `messages`, `connections`) |
+
+Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar BEFORE trigger-lərdən əvvəl doldurulur), eyni hadisənin trigger-ləri ad sırası ilə işləyir (`000_…` birinci), `UPDATE OF sütun` yalnız sütun UPDATE-in SET siyahısında olanda işləyir, iç-içə yazılar çağıranın `auth.uid()`-si ilə gedir. Söz filtri (`src/write/moderation-text.ts`) `private.mod_*` funksiyalarının simvol-simvol köçürməsidir və müqayisə dəqiqdir (MySQL kollasiyası ilə yox). Audit (`admin_audit_logs`) Postgres-dəki kimi 28 cədvəldə var.
 
 ## Data API (`/rest/v1`)
 
@@ -52,11 +66,13 @@ Yazma qatı (`src/write/`): bütün sətir yazıları buradan keçir. Postgres t
 
 ### Hələ bağlanmamış boşluqlar
 
-- 27 trigger funksiyası (803 sətir) hələ yazma qatına köçürülməyib. Ən böyükləri bildirişlər (`publish_content_notification`, `notify_core_workflow`), post moderasiyası, müsahibə vaxtlarının yoxlanması, `payments_apply` və status qoruyucularıdır. Onlar köçürülənə qədər data API bu cədvəllərə qaydalarsız yazar. Ona görə keçid bunlar bitmədən edilə bilməz.
+- Xəta ardıcıllığı: Postgres sətirdə əvvəl RLS `WITH CHECK`-i, sonra CHECK/NOT NULL-u yoxlayır, MySQL isə əvvəl öz məhdudiyyətlərini. Sorğu hər ikisini pozanda başqa xəta kodu qayıda bilər; nəticə (rədd) eynidir. Tamamilə icazəsiz cədvəllər üçün RLS xətası əvvəl qaytarılır.
+- AFTER trigger-lər hər sətirdən dərhal sonra işləyir, Postgres-də isə ifadənin sonunda. Çox sətirli PATCH-də nəticə eynidir, yalnız xətanın hansı sətirdə çıxdığı fərqlənə bilər.
+- Upsert (`on_conflict`) mövcud sətirdə BEFORE INSERT trigger-lərini işə salmır (Postgres salırdı). Sayt və admin panel upsert-i yalnız BEFORE trigger-i olmayan cədvəllərdə (`broadcast_notification_reads`, `plan_features`) istifadə edir.
+- Moderasiya webhook-unun ünvanı hələ `*.supabase.co`-dadır (cədvəlin CHECK qaydası). 5-ci mərhələdə yeni API-nin funksiya ünvanına keçəcək.
 - `or=`/`and=` filtrləri və birləşdirilmiş cədvəl üzrə filtr dəstəklənmir. Sayt bunları istifadə etmir.
 
-- İstifadəçi silinəndə MySQL xarici açar kaskadları uşaq cədvəllərin yazma qaydalarını (audit, kvota sayğacları) işə salmır, Postgres-də isə trigger-lər işləyirdi. 3-cü mərhələdə silmə yazma qatından keçəcək.
-- `payments_apply`-ın "ödənildi" qolu (abunəni uzatma) hələ köçürülməyib. Bu yol yalnız admin əməliyyatlarında var.
+- İstifadəçi silinəndə MySQL xarici açar kaskadları uşaq cədvəllərin yazma qaydalarını (audit, kvota sayğacları) işə salmır, Postgres-də isə trigger-lər işləyirdi. Keçiddən əvvəl istifadəçi silmə yazma qatından keçəcək (6-cı mərhələ).
 - E-poçt dəyişikliyi (`PUT /user` `email`) dəstəklənmir. Sayt bunu istifadə etmir, admin isə `admin/users` ilə dəyişir.
 - Google/Microsoft girişi aktiv deyil, buludda da aktiv deyil. `/settings` yalnız e-poçtu göstərir.
 
@@ -87,7 +103,8 @@ server/
     app.ts, index.ts        Fastify tətbiqi və giriş nöqtəsi
     config.ts, db.ts, schema.ts, context.ts, errors.ts
     auth/                   GoTrue-uyğun giriş xidməti
-    write/pipeline.ts       yazma qatı; write/rules/ — trigger ekvivalentləri
+    values.ts               sütun tipinə görə dəyər formatı (sorğu → bazanın qaytardığı forma)
+    write/pipeline.ts       yazma qatı; write/rules/ — trigger ekvivalentləri; write/moderation-text.ts — söz filtri
   test/                     supabase-js ilə inteqrasiya testləri (müvəqqəti MySQL bazası)
 ```
 

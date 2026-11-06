@@ -60,14 +60,31 @@ export async function exec(db: Pool | Tx, sql: string, params: unknown[] = []): 
   return result;
 }
 
+type Task = () => Promise<unknown>;
+const afterCommit = new WeakMap<Tx, Task[]>();
+
+/** Work that may only happen once the transaction is committed, such as
+ *  the moderation webhook (pg_net sent its queued requests the same way). */
+export function onCommit(tx: Tx, task: Task): void {
+  if (!afterCommit.has(tx)) afterCommit.set(tx, []);
+  afterCommit.get(tx)!.push(task);
+}
+
 export async function transaction<T>(pool: Pool, work: (tx: Tx) => Promise<T>): Promise<T> {
   const tx = await pool.getConnection();
+  afterCommit.delete(tx);
   try {
     await tx.beginTransaction();
     const result = await work(tx);
     await tx.commit();
+    const tasks = afterCommit.get(tx) ?? [];
+    afterCommit.delete(tx);
+    for (const task of tasks) {
+      task().catch(error => console.error('after-commit task failed:', error instanceof Error ? error.message : error));
+    }
     return result;
   } catch (error) {
+    afterCommit.delete(tx);
     await tx.rollback().catch(() => {});
     throw error;
   } finally {

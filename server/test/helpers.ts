@@ -66,6 +66,10 @@ export async function startHarness(env: Record<string, string> = {}): Promise<Ha
 async function seed(pool: ReturnType<typeof createPool>) {
   await exec(pool, `INSERT INTO plans (id, name, monthly_price, currency, active, sort_order) VALUES
     ('free', 'Free', 0, 'AZN', 1, 1), ('pro', 'Pro', 24.99, 'AZN', 1, 2)`);
+  // Test limits (small on purpose); post_media is a Pro feature.
   await exec(pool, `INSERT INTO plan_features (plan_id, feature_key, label, enabled, limit_value) VALUES
-    ('free', 'team_members', 'Komanda üzvləri', 1, 1), ('pro', 'team_members', 'Komanda üzvləri', 1, 3)`);
+    ('free', 'team_members', 'Komanda üzvləri', 1, 1), ('pro', 'team_members', 'Komanda üzvləri', 1, 3),
+    ('free', 'active_vacancies', 'Aktiv vakansiyalar', 1, 3), ('pro', 'active_vacancies', 'Aktiv vakansiyalar', 1, 10),
+    ('free', 'monthly_network_posts', 'Aylıq paylaşımlar', 1, 5), ('pro', 'monthly_network_posts', 'Aylıq paylaşımlar', 1, 30),
+    ('free', 'post_media', 'Şəkil və sənəd', 0, NULL), ('pro', 'post_media', 'Şəkil və sənəd', 1, NULL)`);
 }

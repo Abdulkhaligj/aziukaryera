@@ -35,9 +35,13 @@ before(async () => {
   await exec(h.pool, `UPDATE profiles SET status = 'active' WHERE id = ?`, [companyUser]);
   openJob = '33333333-3333-4333-8333-333333333333';
   pendingJob = '44444444-4444-4444-8444-444444444444';
-  await exec(h.pool, `INSERT INTO jobs (id, company_id, title, type, status, deadline, location) VALUES
-    (?, ?, 'Qazma mühəndisi', 'is', 'approved', CURRENT_DATE, 'Bakı'), (?, ?, 'Gizli vakansiya', 'tecrube', 'pending', CURRENT_DATE + INTERVAL 30 DAY, '')`,
-    [openJob, companyId, pendingJob, companyId]);
+  // Through the API, so the vacancy quota counts them (raw SQL would skip it).
+  const today = new Date().toISOString().slice(0, 10);
+  const later = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const jobs = await h.service().from('jobs').insert([
+    { id: openJob, company_id: companyId, title: 'Qazma mühəndisi', type: 'is', status: 'approved', deadline: today, location: 'Bakı' },
+    { id: pendingJob, company_id: companyId, title: 'Gizli vakansiya', type: 'tecrube', status: 'pending', deadline: later, location: '' }]);
+  if (jobs.error) throw jobs.error;
   admin = await staff('admin@asoiu.edu.az', 'super_admin');
   editor = await staff('editor@asoiu.edu.az', 'editor');
 });
@@ -135,8 +139,9 @@ test('upsert with onConflict marks a broadcast as read once', async () => {
   }
   const { data } = await student.from('broadcast_notification_reads').select('broadcast_id');
   assert.equal(data!.length, 1);
-  const visible = await student.from('broadcast_notifications').select('title');
-  assert.deepEqual(visible.data, [{ title: 'Elan' }], 'targeted by role through JSON_CONTAINS(target_roles, role)');
+  const visible = await student.from('broadcast_notifications').select('title').order('title');
+  // The approved job published its own broadcast (jobs_broadcast_notification).
+  assert.deepEqual(visible.data, [{ title: 'Elan' }, { title: 'Yeni vakansiya' }], 'targeted by role through JSON_CONTAINS(target_roles, role)');
   const companyView = await company.from('broadcast_notifications').select('title');
   assert.deepEqual(companyView.data, []);
 });

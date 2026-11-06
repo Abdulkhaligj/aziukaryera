@@ -60,7 +60,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     try {
       return await transaction(pool, async tx => { await applySession(tx, ctx); return work(tx, ctx); });
     } catch (error) {
-      const mapped = fromDatabase(error, tableName);
+      const mapped = fromDatabase(error, tableName, ctx);
       if (mapped) throw mapped;
       throw error;
     }
