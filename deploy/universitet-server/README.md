@@ -1,5 +1,7 @@
 # ASOIU Karyera — universitet serverinə köçürmə dəsti
 
+> **Qeyd (2026-11-06):** İT MySQL tələb etdiyi üçün universitet serverinə köçürmə indi [`deploy/universitet-mysql/`](../universitet-mysql/README.md) dəsti ilə edilir (MySQL 8.4 + Node.js API). Aşağıdakı self-hosted Supabase təlimatı yalnız arxiv üçün saxlanılır.
+
 Bu dəst platformanın backend-ini (baza, giriş sistemi, fayllar, Edge Functions, planlı işlər) Supabase buludundan universitetin öz serverinə köçürür. Server rəsmi **self-hosted Supabase**-dir (Docker), ona görə saytların və admin panelin kodu dəyişmir. Keçid günü yalnız ünvan və açar yenilənir.
 
 | | Bulud (indi) | Universitet serveri (sonra) |

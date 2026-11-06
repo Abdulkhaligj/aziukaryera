@@ -23,8 +23,8 @@ Yalnız realtime (WebSocket) əvəzinə bildirişlər üçün qısa interval il�
 | 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ✅ data API, 222 icazə qaydası, bütün 77 trigger (32 test) |
 | 4 | RPC funksiyaları (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, AI büdcələri, moderasiya, sıfırlama) | ✅ saytın, admin panelin və Edge Function-ların çağırdığı 22 funksiyanın hamısı (12 test) |
 | 5 | Fayllar (diskdə, imzalı linklər), Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər | ✅ Storage API, 5 funksiya dəyişmədən Node-da, 3 planlı iş (15 test) |
-| 6 | Sayt və admin panelin keçidi, bildirişlər üçün sorğu, real data ilə tam sınaq, universitet serveri üçün Docker dəsti (MySQL + API + Caddy) | — |
-| 7 | Universitet serverində sınaq köçürməsi, sonra keçid günü | — |
+| 6 | Sayt və admin panelin keçidi, bildirişlər üçün sorğu, real data ilə tam sınaq, universitet serveri üçün Docker dəsti (MySQL + API + Caddy) | ✅ bildirişlər sorğu ilə (API ünvanında avtomatik), Docker dəsti `deploy/universitet-mysql/`, əsl sayt lokal API ilə yoxlanılıb (giriş, kabinet, şəbəkə paylaşımı) |
+| 7 | Universitet serverində sınaq köçürməsi, sonra keçid günü | — İT serveri verəndə: `deploy/universitet-mysql/README.md` §3–5 |
 
 ## Giriş xidməti (`/auth/v1`)
 

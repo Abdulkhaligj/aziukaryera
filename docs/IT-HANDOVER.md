@@ -1,5 +1,7 @@
 # ADNSU Karyera Platforması — İT şöbəsi üçün təhvil sənədi
 
+> **Qeyd (2026-11-06):** İT MySQL tələb etdiyi üçün universitet serverinə köçürmə indi [`deploy/universitet-mysql/`](../deploy/universitet-mysql/README.md) dəsti ilə edilir (MySQL 8.4 + Node.js API). Aşağıdakı self-hosted Supabase təlimatı yalnız arxiv üçün saxlanılır.
+
 Tarix: 28 oktyabr 2026
 
 ## 1. Platforma nədən ibarətdir
