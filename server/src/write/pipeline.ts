@@ -18,6 +18,7 @@ import type { Context } from '../context.ts';
 import { exec, one, rows as selectRows, type Row, type Tx } from '../db.ts';
 import { table, type Column, type Schema, type Table } from '../schema.ts';
 import { canonical, distinct, timestampText, toParam } from '../values.ts';
+import { DbRuleError } from '../errors.ts';
 
 export { toParam };
 
@@ -135,11 +136,43 @@ async function runAfter(env: WriteEnv, hooks: Hooks, row: Row | null, old: Row |
 
 /** Row-level WITH CHECK: runs on the stored row (defaults applied) before the
  *  AFTER hooks; throwing rolls the whole statement back. */
-export interface WriteOptions { check?: (env: WriteEnv, stored: Row) => Promise<void> }
+export interface WriteOptions {
+  check?: (env: WriteEnv, stored: Row) => Promise<void>;
+  /** WITH CHECK on the row about to be written. Postgres checks policies before
+   *  constraints, so when the write fails on a constraint this runs first and
+   *  its error (row-level security) wins, as it would in Postgres. */
+  checkProposed?: (env: WriteEnv, row: Row) => Promise<void>;
+  /** Statement-level queue: AFTER ROW triggers fire when the statement ends. */
+  afterQueue?: (() => Promise<void>)[];
+}
+
+/** NOT NULL, CHECK, unique, foreign key and data errors raised by the write. */
+function constraintError(error: unknown): boolean {
+  if (error instanceof DbRuleError) return error.sqlState.startsWith('23');
+  const errno = (error as { errno?: number }).errno;
+  return [1048, 1062, 1265, 1292, 1364, 1366, 1406, 1451, 1452, 3819].includes(errno as number);
+}
+
+async function guarded<T>(env: WriteEnv, row: Row, options: WriteOptions, write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (options.checkProposed && constraintError(error)) await options.checkProposed(env, row);
+    throw error;
+  }
+}
+
+function fireAfter(env: WriteEnv, hooks: Hooks, row: Row | null, old: Row | null, event: TriggerEvent, options: WriteOptions) {
+  if (options.afterQueue) { options.afterQueue.push(() => runAfter(env, hooks, row, old, event)); return Promise.resolve(); }
+  return runAfter(env, hooks, row, old, event);
+}
 
 const NO_COLUMNS: ReadonlySet<string> = new Set();
 
-export async function insertRow(env: WriteEnv, tableName: string, values: Row, options: WriteOptions = {}): Promise<Row> {
+/** NEW for an INSERT: request values, then column defaults, then BEFORE INSERT triggers. */
+export interface PreparedInsert { table: string; row: Row }
+
+export async function prepareInsert(env: WriteEnv, tableName: string, values: Row): Promise<PreparedInsert> {
   const t = table(env.schema, tableName);
   const row: Row = { ...values };
   normalise(t, row);
@@ -149,18 +182,31 @@ export async function insertRow(env: WriteEnv, tableName: string, values: Row, o
     row[column.name] = custom?.has(column.name) ? custom.get(column.name)!(env) : defaultValue(env, column);
   }
   normalise(t, row);
+  await runBefore(env, t, hooksFor(tableName).insert, row, null, { op: 'insert', columns: NO_COLUMNS });
+  return { table: tableName, row };
+}
+
+/** Writes a prepared row: constraints, WITH CHECK, then AFTER INSERT triggers. */
+export async function insertPrepared(env: WriteEnv, prepared: PreparedInsert, options: WriteOptions = {}): Promise<Row> {
+  const { table: tableName, row } = prepared;
+  const t = table(env.schema, tableName);
   const hooks = hooksFor(tableName).insert;
-  const event: TriggerEvent = { op: 'insert', columns: NO_COLUMNS };
-  await runBefore(env, t, hooks, row, null, event);
-  const cols = Object.keys(row).filter(c => row[c] !== undefined && t.columns.has(c));
-  const result = await exec(env.tx, `INSERT INTO ${q(tableName)} (${cols.map(q).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
-    cols.map(c => toParam(t.columns.get(c)!, row[c])));
-  if (t.primaryKey.length === 1 && row[t.primaryKey[0]] === undefined) row[t.primaryKey[0]] = result.insertId;
-  const stored = (await selectByKey(env, tableName, row))!;
-  for (const check of hooks.constraints) await check.fn(env, stored, null);
+  const stored = await guarded(env, row, options, async () => {
+    const cols = Object.keys(row).filter(c => row[c] !== undefined && t.columns.has(c));
+    const result = await exec(env.tx, `INSERT INTO ${q(tableName)} (${cols.map(q).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+      cols.map(c => toParam(t.columns.get(c)!, row[c])));
+    if (t.primaryKey.length === 1 && row[t.primaryKey[0]] === undefined) row[t.primaryKey[0]] = result.insertId;
+    const written = (await selectByKey(env, tableName, row))!;
+    for (const check of hooks.constraints) await check.fn(env, written, null);
+    return written;
+  });
   if (options.check) await options.check(env, stored);
-  await runAfter(env, hooks, stored, null, event);
+  await fireAfter(env, hooks, stored, null, { op: 'insert', columns: NO_COLUMNS }, options);
   return stored;
+}
+
+export async function insertRow(env: WriteEnv, tableName: string, values: Row, options: WriteOptions = {}): Promise<Row> {
+  return insertPrepared(env, await prepareInsert(env, tableName, values), options);
 }
 
 export async function updateRow(env: WriteEnv, tableName: string, key: Row, changes: Row, options: WriteOptions = {}): Promise<Row | null> {
@@ -173,21 +219,24 @@ export async function updateRow(env: WriteEnv, tableName: string, key: Row, chan
   const hooks = hooksFor(tableName).update;
   const event: TriggerEvent = { op: 'update', columns: new Set(Object.keys(changes).filter(c => t.columns.has(c))) };
   await runBefore(env, t, hooks, row, old, event);
-  const cols = [...t.columns.keys()].filter(c => distinct(row[c], old[c]));
-  if (cols.length) {
-    const { where, params } = keyOf(t, old);
-    await exec(env.tx, `UPDATE ${q(tableName)} SET ${cols.map(c => `${q(c)} = ?`).join(', ')} WHERE ${where}`,
-      [...cols.map(c => toParam(t.columns.get(c)!, row[c])), ...params]);
-  }
-  const stored = await selectByKey(env, tableName, row);
+  const stored = await guarded(env, row, options, async () => {
+    const cols = [...t.columns.keys()].filter(c => distinct(row[c], old[c]));
+    if (cols.length) {
+      const { where, params } = keyOf(t, old);
+      await exec(env.tx, `UPDATE ${q(tableName)} SET ${cols.map(c => `${q(c)} = ?`).join(', ')} WHERE ${where}`,
+        [...cols.map(c => toParam(t.columns.get(c)!, row[c])), ...params]);
+    }
+    const written = await selectByKey(env, tableName, row);
+    if (written) for (const check of hooks.constraints) await check.fn(env, written, old);
+    return written;
+  });
   if (!stored) return null;
-  for (const check of hooks.constraints) await check.fn(env, stored, old);
   if (options.check) await options.check(env, stored);
-  await runAfter(env, hooks, stored, old, event);
+  await fireAfter(env, hooks, stored, old, event, options);
   return stored;
 }
 
-export async function deleteRow(env: WriteEnv, tableName: string, key: Row): Promise<Row | null> {
+export async function deleteRow(env: WriteEnv, tableName: string, key: Row, options: WriteOptions = {}): Promise<Row | null> {
   const t = table(env.schema, tableName);
   const old = await selectByKey(env, tableName, key, true);
   if (!old) return null;
@@ -198,7 +247,7 @@ export async function deleteRow(env: WriteEnv, tableName: string, key: Row): Pro
   await referentialActions(env, t, old);
   const { where, params } = keyOf(t, old);
   await exec(env.tx, `DELETE FROM ${q(tableName)} WHERE ${where}`, params);
-  await runAfter(env, hooks, null, old, event);
+  await fireAfter(env, hooks, null, old, event, options);
   return old;
 }
 

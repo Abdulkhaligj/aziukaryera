@@ -25,6 +25,8 @@ export interface Config {
   accessTokenTtl: number;
   refreshTokenTtlDays: number;
   mailerAutoconfirm: boolean;
+  /** Email change needs a link confirmed on both the current and the new address (GoTrue default). */
+  secureEmailChange: boolean;
   disableSignup: boolean;
   passwordMinLength: number;
   universityDomain: string;
@@ -63,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     accessTokenTtl: Number(env.JWT_EXPIRY || 3600),
     refreshTokenTtlDays: Number(env.REFRESH_TOKEN_TTL_DAYS || 30),
     mailerAutoconfirm: (env.ENABLE_EMAIL_AUTOCONFIRM ?? 'true') === 'true',
+    secureEmailChange: (env.SECURE_EMAIL_CHANGE ?? 'true') === 'true',
     disableSignup: env.DISABLE_SIGNUP === 'true',
     passwordMinLength: Number(env.PASSWORD_MIN_LENGTH || 6),
     universityDomain: env.UNIVERSITY_EMAIL_DOMAIN || 'asoiu.edu.az',

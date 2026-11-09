@@ -64,7 +64,7 @@ export async function aiRequestContext(env: WriteEnv, profileId: string, task: s
 }
 
 rpc({
-  name: 'ai_request_context', args: { p_profile_id: 'uuid', p_task: 'text', p_job_id: 'uuid' }, roles: [], security: 'definer', returns: 'value',
+  name: 'ai_request_context', readOnly: true, args: { p_profile_id: 'uuid', p_task: 'text', p_job_id: 'uuid' }, roles: [], security: 'definer', returns: 'value',
   run: (env, a) => aiRequestContext(env, a.p_profile_id, a.p_task, a.p_job_id)
 });
 
@@ -137,7 +137,7 @@ rpc({
 });
 
 rpc({
-  name: 'ai_candidate_pack', args: { p_job_id: 'uuid', p_limit: 'int', p_offset: 'int' }, roles: [], security: 'definer', returns: 'value',
+  name: 'ai_candidate_pack', readOnly: true, args: { p_job_id: 'uuid', p_limit: 'int', p_offset: 'int' }, roles: [], security: 'definer', returns: 'value',
   async run(env, a) {
     const job = await one<Row>(env.tx, 'SELECT * FROM jobs WHERE id = ?', [a.p_job_id]);
     const names = async (table: 'faculties' | 'majors', ids: unknown) => {

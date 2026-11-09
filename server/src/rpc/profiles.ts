@@ -29,7 +29,7 @@ export async function candidateProfiles(env: WriteEnv): Promise<Row[]> {
       FROM profiles p WHERE ${await candidateSql(env)}`);
 }
 
-rpc({ name: 'candidate_profiles', args: {}, roles: ['authenticated'], security: 'definer', returns: 'rows', run: env => candidateProfiles(env) });
+rpc({ name: 'candidate_profiles', readOnly: true, args: {}, roles: ['authenticated'], security: 'definer', returns: 'rows', run: env => candidateProfiles(env) });
 
 /** p_ids[1:500] */
 const firstIds = (ids: (string | null)[] | null) => (ids ?? []).slice(0, 500).filter((id): id is string => id != null);
@@ -37,7 +37,7 @@ const VISIBLE_AUTHOR = `EXISTS (SELECT 1 FROM posts po WHERE po.author_id = p.id
   OR EXISTS (SELECT 1 FROM post_comments pc WHERE pc.author_id = p.id AND pc.moderation_status = 'visible')`;
 
 rpc({
-  name: 'profile_cards', args: { p_ids: 'uuid[]' }, roles: ['authenticated'], security: 'definer', returns: 'rows',
+  name: 'profile_cards', readOnly: true, args: { p_ids: 'uuid[]' }, roles: ['authenticated'], security: 'definer', returns: 'rows',
   async run(env, a) {
     const ids = firstIds(a.p_ids);
     if (!env.ctx.uid || !ids.length) return [];
@@ -50,7 +50,7 @@ rpc({
 });
 
 rpc({
-  name: 'profile_avatar_paths', args: { p_ids: 'uuid[]' }, roles: ['authenticated'], security: 'definer', returns: 'rows',
+  name: 'profile_avatar_paths', readOnly: true, args: { p_ids: 'uuid[]' }, roles: ['authenticated'], security: 'definer', returns: 'rows',
   async run(env, a) {
     const ids = firstIds(a.p_ids);
     if (!env.ctx.uid || !ids.length) return [];
@@ -119,7 +119,7 @@ export function matchScore(jobFaculties: unknown, jobMajors: unknown, jobSkills:
 }
 
 rpc({
-  name: 'ranked_jobs_for', args: {}, roles: ['authenticated'], security: 'definer', returns: 'rows',
+  name: 'ranked_jobs_for', readOnly: true, args: {}, roles: ['authenticated'], security: 'definer', returns: 'rows',
   async run(env) {
     const me = env.ctx.uid ? await one<Row>(env.tx, 'SELECT faculty_id, major_id, skills FROM profiles WHERE id = ?', [env.ctx.uid]) : null;
     if (!me) return [];

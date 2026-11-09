@@ -4,14 +4,16 @@ import nodemailer from 'nodemailer';
 import type { Config } from '../config.ts';
 
 export interface Mail { to: string; subject: string; text: string; html: string; link: string; kind: MailKind }
-export type MailKind = 'confirmation' | 'recovery' | 'invite' | 'magic_link';
+export type MailKind = 'confirmation' | 'recovery' | 'invite' | 'magic_link' | 'email_change' | 'email_change_current';
 export interface Mailer { send(mail: Mail): Promise<void>; outbox?: Mail[] }
 
 const templates: Record<MailKind, { subject: string; intro: string; action: string }> = {
   confirmation: { subject: 'E-poçt ünvanınızı təsdiqləyin', intro: 'ADNSU Karyera Mərkəzində qeydiyyatı tamamlamaq üçün e-poçt ünvanınızı təsdiqləyin.', action: 'E-poçtu təsdiqlə' },
   recovery: { subject: 'Şifrənin bərpası', intro: 'Hesabınız üçün şifrə bərpası istənilib. Bunu siz etməmisinizsə, bu məktubu nəzərə almayın.', action: 'Yeni şifrə təyin et' },
   invite: { subject: 'ADNSU Karyera Mərkəzinə dəvət', intro: 'Sizi ADNSU Karyera Mərkəzinin platformasına dəvət ediblər.', action: 'Dəvəti qəbul et' },
-  magic_link: { subject: 'Giriş linkiniz', intro: 'ADNSU Karyera Mərkəzinə daxil olmaq üçün aşağıdakı linkə klikləyin.', action: 'Daxil ol' }
+  magic_link: { subject: 'Giriş linkiniz', intro: 'ADNSU Karyera Mərkəzinə daxil olmaq üçün aşağıdakı linkə klikləyin.', action: 'Daxil ol' },
+  email_change: { subject: 'Yeni e-poçt ünvanınızı təsdiqləyin', intro: 'Hesabınızın e-poçt ünvanını bu ünvana dəyişmək istənilib. Dəyişikliyi təsdiqləmək üçün linkə klikləyin.', action: 'Yeni ünvanı təsdiqlə' },
+  email_change_current: { subject: 'E-poçt ünvanının dəyişdirilməsi', intro: 'Hesabınızın e-poçt ünvanını dəyişmək istənilib. Bunu siz etmisinizsə, təsdiqləmək üçün linkə klikləyin; etməmisinizsə, bu məktubu nəzərə almayın.', action: 'Dəyişikliyi təsdiqlə' }
 };
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));

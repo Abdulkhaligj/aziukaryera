@@ -50,6 +50,8 @@ function statusFor(sqlState: string, ctx: Context | null): number {
   if (sqlState === '42883' || sqlState === '42P01') return 404;
   // P0001 is a plain RAISE (400); other PL/pgSQL codes such as no_data_found are 500.
   if (sqlState.startsWith('P0') && sqlState !== 'P0001') return 500;
+  if (sqlState === '25006') return 405;
+  if (/^(25|57)/.test(sqlState)) return 500;
   return 400;
 }
 

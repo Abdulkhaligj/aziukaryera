@@ -14,6 +14,10 @@ export interface AuthUser extends Row {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Pending new address (secure email change), and how many links were confirmed. */
+  email_change?: string | null;
+  email_change_confirm_status?: number;
+  email_change_sent_at?: string | null;
 }
 
 export const normalizeEmail = (email: unknown) => String(email ?? '').trim().toLowerCase();
@@ -53,6 +57,8 @@ export function toGoTrueUser(user: AuthUser) {
     created_at: user.created_at,
     updated_at: user.updated_at,
     banned_until: user.banned_until ?? undefined,
+    new_email: user.email_change || undefined,
+    email_change_sent_at: user.email_change ? user.email_change_sent_at ?? undefined : undefined,
     is_anonymous: false
   };
 }

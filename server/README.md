@@ -20,7 +20,7 @@ Yalnız realtime (WebSocket) əvəzinə bildirişlər üçün qısa interval il�
 |---|---|---|
 | 1 | MySQL sxemi (55 cədvəl, 81 xarici açar, 84 CHECK), giriş və fayl cədvəlləri, data köçürmə + yoxlama | ✅ hazır, real data ilə sınanıb |
 | 2 | Giriş (GoTrue alt-dəsti): şifrə ilə giriş, refresh, çıxış, qeydiyyat, şifrə bərpası, `admin_role` claim-ləri; bcrypt hash-lar köçür | ✅ hazır, 15 test (`supabase-js 2.58.0` ilə) |
-| 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ✅ data API, 222 icazə qaydası, bütün 77 trigger (32 test) |
+| 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ✅ data API, 222 icazə qaydası, bütün 77 trigger, Postgres xəta və trigger ardıcıllığı |
 | 4 | RPC funksiyaları (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, AI büdcələri, moderasiya, sıfırlama) | ✅ saytın, admin panelin və Edge Function-ların çağırdığı 22 funksiyanın hamısı (12 test) |
 | 5 | Fayllar (diskdə, imzalı linklər), Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər | ✅ Storage API, 5 funksiya dəyişmədən Node-da, 3 planlı iş (15 test) |
 | 6 | Sayt və admin panelin keçidi, bildirişlər üçün sorğu, real data ilə tam sınaq, universitet serveri üçün Docker dəsti (MySQL + API + Caddy) | ✅ bildirişlər sorğu ilə (API ünvanında avtomatik), Docker dəsti `deploy/universitet-mysql/`, əsl sayt lokal API ilə yoxlanılıb (giriş, kabinet, şəbəkə paylaşımı) |
@@ -104,17 +104,19 @@ Supabase Storage-in supabase-js-in istifadə etdiyi hissəsi: yükləmə (`uploa
 
 `src/jobs/` eyni adlarla və eyni cədvəllə (UTC): `avatar-moderation-retry` və `content-moderation-retry` hər dəqiqə, `subscription-lifecycle` hər saatın 7-ci dəqiqəsində (bitməyə 7 gün qalmış xatırlatma və faktura, sonra Free paketə keçid). Hər iş MySQL adlı kilidi (`GET_LOCK`) ilə işləyir, ona görə iki API prosesi eyni işi eyni anda görmür. `ENABLE_JOBS=false` planlayıcını söndürür.
 
-### Hələ bağlanmamış boşluqlar
+### Postgres-ə uyğunluq (bağlanmış boşluqlar)
 
-- Xəta ardıcıllığı: Postgres sətirdə əvvəl RLS `WITH CHECK`-i, sonra CHECK/NOT NULL-u yoxlayır, MySQL isə əvvəl öz məhdudiyyətlərini. Sorğu hər ikisini pozanda başqa xəta kodu qayıda bilər; nəticə (rədd) eynidir. Tamamilə icazəsiz cədvəllər üçün RLS xətası əvvəl qaytarılır.
-- AFTER trigger-lər hər sətirdən dərhal sonra işləyir, Postgres-də isə ifadənin sonunda. Çox sətirli PATCH-də nəticə eynidir, yalnız xətanın hansı sətirdə çıxdığı fərqlənə bilər.
-- Upsert (`on_conflict`) mövcud sətirdə BEFORE INSERT trigger-lərini işə salmır (Postgres salırdı). Sayt və admin panel upsert-i yalnız BEFORE trigger-i olmayan cədvəllərdə (`broadcast_notification_reads`, `plan_features`) istifadə edir.
-- Storage: şəkil transformasiyası (`render/image`) və `list-v2` yoxdur. Sayt bunları istifadə etmir. Fayl `metadata` sahəsi saxlanılmır.
-- `or=`/`and=` filtrləri və birləşdirilmiş cədvəl üzrə filtr dəstəklənmir. Sayt bunları istifadə etmir.
-- RPC nəticələrinə `select`/`order`/filtr tətbiq olunmur və GET ilə RPC çağırışı yoxdur. Sayt bunları istifadə etmir.
-- `admin_reset_platform_data`: Postgres-dəki `lock_timeout`/`statement_timeout` (5 s / 30 s) burada yoxdur.
+- **Xəta ardıcıllığı:** yazı həm icazə qaydasını, həm cədvəl məhdudiyyətini (NOT NULL, CHECK, unikal, xarici açar) pozanda Postgres-dəki kimi icazə xətası (`42501`) qaytarılır.
+- **AFTER trigger-lər** çox sətirli sorğuda ifadənin sonunda, bütün sətirlər yazılandan sonra işləyir.
+- **Upsert:** BEFORE INSERT trigger-ləri əvvəl işləyir, `on_conflict` onların dəyişdirdiyi dəyərlərlə müqayisə olunur, birləşdirmə də o dəyərlərlə (`EXCLUDED`) edilir.
+- **Filtrlər:** `or=`, `and=`, `not.or=` (iç-içə qruplar, dırnaqlı dəyərlər) və birləşdirilmiş cədvəl üzrə filtrlər (`profiles.full_name=eq.X`, `!inner` ilə ana sətri də süzür). Birləşdirilmiş cədvəlin öz sırası və limiti (`jobs.order=`, `jobs.limit=`, `order=jobs(title)`) hər ana sətir üçün ayrıca.
+- **RPC:** oxuyan (STABLE) funksiyalar GET ilə də çağırılır, yazan funksiyalar GET ilə `405` verir. Cədvəl qaytaran funksiyaların nəticəsinə `select`, filtr, `order`, `limit`/`offset` və dəqiq say tətbiq olunur.
+- **E-poçt dəyişikliyi** (`updateUser({ email })`): GoTrue-nun təhlükəsiz qaydası ilə link həm köhnə, həm yeni ünvana gedir, ünvan ikisi də təsdiqlənəndən sonra dəyişir (`SECURE_EMAIL_CHANGE=false` ilə yalnız yeni ünvan). `resend({ type: 'email_change' })` linkləri yeniləyir.
+- **`admin_reset_platform_data`:** 5 saniyəlik kilid gözləmə və 30 saniyəlik limit, Postgres-dəki kimi.
 
-- E-poçt dəyişikliyi (`PUT /user` `email`) dəstəklənmir. Sayt bunu istifadə etmir, admin isə `admin/users` ilə dəyişir.
+### Qalan fərqlər (sayt və admin panel istifadə etmir)
+
+- Storage: şəkil transformasiyası (`render/image`) və `list-v2` yoxdur, faylın istifadəçi `metadata`-sı saxlanılmır.
 - Google/Microsoft girişi aktiv deyil, buludda da aktiv deyil. `/settings` yalnız e-poçtu göstərir.
 
 ## API-ni işə salma

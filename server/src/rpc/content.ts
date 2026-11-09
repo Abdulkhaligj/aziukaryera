@@ -8,7 +8,7 @@ import { rpc } from './registry.ts';
 import { bakuDate, requireUid, utcDate } from './util.ts';
 
 rpc({
-  name: 'active_ads', args: { p_placement: 'text' }, roles: ['anon', 'authenticated'], security: 'definer', returns: 'rows',
+  name: 'active_ads', readOnly: true, args: { p_placement: 'text' }, roles: ['anon', 'authenticated'], security: 'definer', returns: 'rows',
   run: (env, a) => rows(env.tx, `SELECT id, title, advertiser, description, image_url, link_url, cta_label, placement, priority
       FROM ads WHERE status = 'active' AND ? BETWEEN starts_on AND ends_on AND (? IS NULL OR placement = ?)
      ORDER BY priority DESC, created_at DESC LIMIT 20`, [bakuDate(env.now), a.p_placement, a.p_placement])

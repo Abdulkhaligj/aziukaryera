@@ -19,7 +19,7 @@ async function visible(env: WriteEnv, table: string, options: { order?: OrderTer
 const time = (v: unknown) => (v == null ? null : new Date(v as string).getTime());
 
 rpc({
-  name: 'career_bootstrap_v1', args: {}, roles: ['authenticated'], security: 'invoker', returns: 'value',
+  name: 'career_bootstrap_v1', readOnly: true, args: {}, roles: ['authenticated'], security: 'invoker', returns: 'value',
   async run(env) {
     const me = env.ctx.uid;
     if (!me) throw new DbRuleError('Hesaba daxil olmaq tələb olunur.', '28000');

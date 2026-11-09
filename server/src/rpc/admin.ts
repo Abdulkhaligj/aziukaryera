@@ -1,6 +1,6 @@
 // public.admin_reset_platform_data → private.reset_career_platform: a super
 // admin empties the platform but keeps every administrator account.
-import { one, rows } from '../db.ts';
+import { exec, one, rows } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
 import { deleteWhere, insertRow } from '../write/pipeline.ts';
 import { currentAdminRole } from '../write/rules/core.ts';
@@ -23,11 +23,22 @@ rpc({
     if (await currentAdminRole(env.tx, env.ctx) !== 'super_admin') {
       throw new DbRuleError('Bu əməliyyatı yalnız aktiv Super Admin icra edə bilər', 'P0001');
     }
-    // Every row goes through the write pipeline, so triggers (and FK actions) run as in Postgres.
-    for (const table of TABLES) await deleteWhere(env, table);
-    // Deleting auth users removes their profiles; administrator seats are kept.
-    const removed = await deleteWhere(env, 'auth_users',
-      `NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth_users.id AND p.role = 'admin')`);
+    // set_config('lock_timeout', '5s', true) and set_config('statement_timeout', '30s', true).
+    const [[previous]] = await env.tx.query('SELECT @@SESSION.innodb_lock_wait_timeout AS t') as unknown as [[{ t: number }]];
+    await exec(env.tx, 'SET SESSION innodb_lock_wait_timeout = 5');
+    const deadline = Date.now() + 30_000;
+    const inTime = () => { if (Date.now() > deadline) throw new DbRuleError('canceling statement due to statement timeout', '57014'); };
+    let removed: number;
+    try {
+      // Every row goes through the write pipeline, so triggers (and FK actions) run as in Postgres.
+      for (const table of TABLES) { await deleteWhere(env, table); inTime(); }
+      // Deleting auth users removes their profiles; administrator seats are kept.
+      removed = await deleteWhere(env, 'auth_users',
+        `NOT EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth_users.id AND p.role = 'admin')`);
+      inTime();
+    } finally {
+      await exec(env.tx, 'SET SESSION innodb_lock_wait_timeout = ?', [Number(previous.t)]);
+    }
     const kept = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM profiles WHERE role = 'admin'`))!.n);
     for (const actor of await rows<{ id: string; full_name: string }>(env.tx, 'SELECT id, full_name FROM profiles WHERE id = ?', [env.ctx.uid])) {
       await insertRow(env, 'admin_audit_logs', { title: 'Platforma məlumatları sıfırlandı', resource: 'system', resource_id: null,

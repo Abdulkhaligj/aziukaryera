@@ -205,3 +205,39 @@ test('requests without an API key are refused like the Supabase gateway', async 
   assert.equal(settings.external.email, true);
   assert.equal(settings.mailer_autoconfirm, true);
 });
+
+test('email change: links to the current and the new address, both must confirm', async () => {
+  const client = h.anon();
+  const { data, error } = await client.auth.signUp({ email: 'kohne@asoiu.edu.az', password: 'Sifre2026!', options: { data: { role: 'student', full_name: 'Köhnə Ünvan' } } });
+  assert.equal(error, null);
+  const before = h.mailer.outbox!.length;
+  const changed = await client.auth.updateUser({ email: 'yeni@asoiu.edu.az' });
+  assert.equal(changed.error, null);
+  assert.equal(changed.data.user!.new_email, 'yeni@asoiu.edu.az');
+  assert.equal(changed.data.user!.email, 'kohne@asoiu.edu.az', 'nothing changes before the links are confirmed');
+  const mails = h.mailer.outbox!.slice(before);
+  assert.deepEqual(mails.map(m => [m.to, m.kind]).sort(), [['kohne@asoiu.edu.az', 'email_change_current'], ['yeni@asoiu.edu.az', 'email_change']]);
+
+  const first = await fetch(mails[0].link, { redirect: 'manual' });
+  assert.match(first.headers.get('location')!, /#message=Confirmation\+link\+accepted/);
+  const second = await fetch(mails[1].link, { redirect: 'manual' });
+  assert.match(second.headers.get('location')!, /#access_token=/);
+  const user = await h.service().auth.admin.getUserById(data.user!.id);
+  assert.equal(user.data.user!.email, 'yeni@asoiu.edu.az');
+  assert.equal(user.data.user!.new_email, undefined);
+
+  const taken = await client.auth.updateUser({ email: 'aysel.m@asoiu.edu.az' });
+  assert.equal(taken.error?.message, 'A user with this email address has already been registered');
+});
+
+test('resend for an email change follows the 60-second cooldown and ignores unknown addresses', async () => {
+  const client = h.anon();
+  await client.auth.signUp({ email: 'ikinci@asoiu.edu.az', password: 'Sifre2026!', options: { data: { role: 'student', full_name: 'İkinci Ünvan' } } });
+  assert.equal((await client.auth.updateUser({ email: 'ucuncu@asoiu.edu.az' })).error, null);
+  const soon = await client.auth.resend({ type: 'email_change', email: 'ucuncu@asoiu.edu.az' });
+  assert.equal(soon.error?.message, 'For security purposes, you can only request this after 60 seconds.');
+  const before = h.mailer.outbox!.length;
+  const unknown = await client.auth.resend({ type: 'email_change', email: 'hec-kim@asoiu.edu.az' });
+  assert.equal(unknown.error, null, 'no hint whether an address is pending');
+  assert.equal(h.mailer.outbox!.length, before);
+});

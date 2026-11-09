@@ -6,7 +6,7 @@ import { rows as queryRows, toMysqlDatetime, type Row, type Tx } from '../db.ts'
 import { table as tableOf, type Column, type ForeignKey, type Schema, type Table } from '../schema.ts';
 import { q } from '../write/pipeline.ts';
 import { pgErrors } from './errors.ts';
-import { parseList, type Filter, type OrderTerm, type SelectItem } from './parse.ts';
+import { isGroup, nodesAt, parseList, type EmbedOptions, type Filter, type FilterNode, type OrderTerm, type ScopedFilter, type SelectItem } from './parse.ts';
 import { exposed, granted, usingSql } from './policy.ts';
 
 export interface Where { sql: string[]; params: unknown[] }
@@ -30,44 +30,54 @@ function containsValue(raw: string): string {
   throw pgErrors.parse(`"failed to parse filter (cs.${raw})"`);
 }
 
-export function filterSql(t: Table, filters: Filter[]): Where {
-  const where = noWhere();
-  for (const f of filters) {
-    const column = t.columns.get(f.column);
-    if (!column) throw pgErrors.column(t.name, f.column);
-    const c = q(f.column);
-    let expr: string;
-    switch (f.op) {
-      case 'eq': case 'neq': case 'gt': case 'gte': case 'lt': case 'lte':
-        expr = `${c} ${{ eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=' }[f.op]} ?`;
-        where.params.push(filterValue(column, f.value));
-        break;
-      case 'like':
-        expr = `${c} LIKE ? COLLATE utf8mb4_0900_as_cs`;
-        where.params.push(f.value.replace(/\*/g, '%'));
-        break;
-      case 'ilike': // the column collation is case-insensitive already
-        expr = `${c} LIKE ?`;
-        where.params.push(f.value.replace(/\*/g, '%'));
-        break;
-      case 'is': {
-        const v = f.value.toLowerCase();
-        if (v !== 'null' && v !== 'true' && v !== 'false' && v !== 'unknown') throw pgErrors.parse(`"failed to parse filter (is.${f.value})"`);
-        expr = v === 'null' || v === 'unknown' ? `${c} IS NULL` : `${c} IS ${v.toUpperCase()}`;
-        break;
-      }
-      case 'in': {
-        const list = parseList(f.value);
-        expr = list.length ? `${c} IN (${list.map(() => '?').join(', ')})` : 'FALSE';
-        where.params.push(...list.map(v => filterValue(column, v)));
-        break;
-      }
-      default: // cs / cd on JSON (array) columns
-        expr = f.op === 'cs' ? `JSON_CONTAINS(${c}, CAST(? AS JSON))` : `JSON_CONTAINS(CAST(? AS JSON), ${c})`;
-        where.params.push(containsValue(f.value));
+function comparisonSql(t: Table, f: Filter, params: unknown[]): string {
+  const column = t.columns.get(f.column);
+  if (!column) throw pgErrors.column(t.name, f.column);
+  const c = q(f.column);
+  let expr: string;
+  switch (f.op) {
+    case 'eq': case 'neq': case 'gt': case 'gte': case 'lt': case 'lte':
+      expr = `${c} ${{ eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=' }[f.op]} ?`;
+      params.push(filterValue(column, f.value));
+      break;
+    case 'like':
+      expr = `${c} LIKE ? COLLATE utf8mb4_0900_as_cs`;
+      params.push(f.value.replace(/\*/g, '%'));
+      break;
+    case 'ilike': // the column collation is case-insensitive already
+      expr = `${c} LIKE ?`;
+      params.push(f.value.replace(/\*/g, '%'));
+      break;
+    case 'is': {
+      const v = f.value.toLowerCase();
+      if (v !== 'null' && v !== 'true' && v !== 'false' && v !== 'unknown') throw pgErrors.parse(`"failed to parse filter (is.${f.value})"`);
+      expr = v === 'null' || v === 'unknown' ? `${c} IS NULL` : `${c} IS ${v.toUpperCase()}`;
+      break;
     }
-    where.sql.push(f.negate ? `NOT (${expr})` : expr);
+    case 'in': {
+      const list = parseList(f.value);
+      expr = list.length ? `${c} IN (${list.map(() => '?').join(', ')})` : 'FALSE';
+      params.push(...list.map(v => filterValue(column, v)));
+      break;
+    }
+    default: // cs / cd on JSON (array) columns
+      expr = f.op === 'cs' ? `JSON_CONTAINS(${c}, CAST(? AS JSON))` : `JSON_CONTAINS(CAST(? AS JSON), ${c})`;
+      params.push(containsValue(f.value));
   }
+  return f.negate ? `NOT (${expr})` : expr;
+}
+
+function nodeSql(t: Table, node: FilterNode, params: unknown[]): string {
+  if (!isGroup(node)) return comparisonSql(t, node, params);
+  const parts = node.items.map(item => `(${nodeSql(t, item, params)})`);
+  const joined = parts.length ? parts.join(node.logic === 'or' ? ' OR ' : ' AND ') : node.logic === 'or' ? 'FALSE' : 'TRUE';
+  return node.negate ? `NOT (${joined})` : joined;
+}
+
+/** WHERE parts for the filters of one table (comparisons and or/and trees). */
+export function filterSql(t: Table, nodes: FilterNode[]): Where {
+  const where = noWhere();
+  for (const node of nodes) where.sql.push(nodeSql(t, node, where.params));
   return where;
 }
 
@@ -105,7 +115,13 @@ function tupleIn(columns: string[], tuples: unknown[][]): Where {
 }
 const tupleKey = (row: Row, columns: string[]) => JSON.stringify(columns.map(c => row[c]));
 
-export interface ReadOptions { where?: Where; order?: OrderTerm[]; limit?: number | null; offset?: number; count?: boolean }
+export interface ReadOptions {
+  where?: Where; order?: OrderTerm[]; limit?: number | null; offset?: number; count?: boolean;
+  /** Filters on embedded resources, by path relative to this table. */
+  embedded?: ScopedFilter[];
+  /** Order and paging of embedded resources, by path ("rel" or "rel.child"). */
+  embedShape?: Map<string, EmbedOptions>;
+}
 
 /** rows: shaped for the response; raw: the same rows with every fetched column. */
 export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: string, items: SelectItem[], options: ReadOptions = {})
@@ -135,8 +151,17 @@ export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: 
     const parentCols = rel.kind === 'one' ? rel.fk.columns : rel.fk.refColumns;
     const childCols = rel.kind === 'one' ? rel.fk.refColumns : rel.fk.columns;
     const tuples = [...new Map(raw.filter(r => parentCols.every(c => r[c] != null)).map(r => [tupleKey(r, parentCols), parentCols.map(c => r[c])])).values()];
+    // Filters written against this embed (by alias or relation name) narrow the children.
+    const name = embed.alias ?? embed.relation;
+    const scoped = (options.embedded ?? []).filter(f => f.path[0] === name).map(f => ({ path: f.path.slice(1), node: f.node }));
+    const childWhere = tupleIn(childCols, tuples);
+    const own = filterSql(tableOf(schema, rel.target), nodesAt(scoped));
+    const embedPaging = options.embedShape?.get(name) ?? {};
+    const deeper = new Map([...(options.embedShape ?? [])].filter(([k]) => k.startsWith(name + '.')).map(([k, v]) => [k.slice(name.length + 1), v]));
     const children = tuples.length
-      ? await readRows(tx, schema, ctx, rel.target, [...embed.items, ...childCols.map(name => ({ type: 'column' as const, name, alias: null }))], { where: tupleIn(childCols, tuples) })
+      ? await readRows(tx, schema, ctx, rel.target, [...embed.items, ...childCols.map(name => ({ type: 'column' as const, name, alias: null }))],
+        { where: { sql: [...childWhere.sql, ...own.sql], params: [...childWhere.params, ...own.params] }, embedded: scoped.filter(f => f.path.length),
+          order: embedPaging.order, embedShape: deeper })
       : { rows: [], raw: [] };
     const byKey = new Map<string, Row | Row[] | null>();
     children.raw.forEach((child, n) => {
@@ -145,6 +170,13 @@ export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: 
       if (rel.kind === 'one') byKey.set(key, shaped);
       else (byKey.get(key) as Row[] | undefined)?.push(shaped) ?? byKey.set(key, [shaped]);
     });
+    // rel.limit / rel.offset apply per parent row, as in PostgREST (a lateral join).
+    if (rel.kind === 'many' && (embedPaging.limit !== undefined || embedPaging.offset)) {
+      for (const [key, list] of byKey) {
+        const from = embedPaging.offset ?? 0;
+        byKey.set(key, (list as Row[]).slice(from, embedPaging.limit === undefined ? undefined : from + embedPaging.limit));
+      }
+    }
     attached.set(embed.alias ?? embed.relation, new Map(raw.map(r => {
       const key = tupleKey(r, parentCols);
       return [tupleKey(r, t.primaryKey.length ? t.primaryKey : [...wanted]), byKey.get(key) ?? (rel.kind === 'one' ? null : [])];

@@ -232,6 +232,19 @@ test('AI budgets and the candidate pack (service key)', async () => {
   assert.equal(pack.data.candidates[0].faculty, 'Neft-mexanika');
 });
 
+test('RPC: GET for read-only functions, and select/filter/order on set results', async () => {
+  const viaGet = await company.rpc('candidate_profiles', undefined, { get: true });
+  assert.equal(viaGet.error, null);
+  assert.deepEqual(viaGet.data.map((c: { id: string }) => c.id), [studentId]);
+  const shaped = await company.rpc('candidate_profiles').eq('faculty_id', 'neft').select('id,full_name').order('full_name');
+  assert.deepEqual(shaped.data, [{ id: studentId, full_name: 'Leyla Həsənova' }]);
+  assert.deepEqual((await company.rpc('candidate_profiles').eq('faculty_id', 'it')).data, []);
+  const counted = await company.rpc('candidate_profiles', undefined, { count: 'exact' }).limit(1);
+  assert.equal(counted.count, 1);
+  const volatile = await student.rpc('select_company_plan', { p_plan_id: 'pro' }, { get: true });
+  assert.equal(volatile.status, 405, 'functions that write cannot be called with GET');
+});
+
 test('admin_reset_platform_data empties the platform but keeps the admins', async () => {
   assert.equal((await admin.rpc('admin_reset_platform_data', { p_confirmation: 'yox' })).error?.message, 'Sıfırlama təsdiqi yanlışdır');
   assert.equal((await editor.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA' })).error?.message,

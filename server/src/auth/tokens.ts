@@ -94,17 +94,20 @@ export async function sessionIsActive(db: Tx | Pool, sessionId: string | undefin
 }
 
 /** One-time email token (recovery, confirmation, invite, magic link). */
-export async function createOneTimeToken(tx: Tx, userId: string, purpose: string, ttlMinutes = 60) {
+/** A new single-use link token; earlier unused ones of the same purpose (and
+ *  the same target address, for email changes) stop working. */
+export async function createOneTimeToken(tx: Tx, userId: string, purpose: string, ttlMinutes = 60, relatesTo: string | null = null) {
   const token = newSecret();
-  await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND purpose = ? AND used_at IS NULL`, [userId, purpose]);
-  await exec(tx, `INSERT INTO auth_one_time_tokens (id, user_id, purpose, token_hash, expires_at) VALUES (UUID(), ?, ?, ?, ?)`,
-    [userId, purpose, sha256(token), toMysqlDatetime(new Date(Date.now() + ttlMinutes * 60_000))]);
+  await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND purpose = ? AND used_at IS NULL
+      AND (relates_to <=> ?)`, [userId, purpose, relatesTo]);
+  await exec(tx, `INSERT INTO auth_one_time_tokens (id, user_id, purpose, token_hash, expires_at, relates_to) VALUES (UUID(), ?, ?, ?, ?, ?)`,
+    [userId, purpose, sha256(token), toMysqlDatetime(new Date(Date.now() + ttlMinutes * 60_000)), relatesTo]);
   return token;
 }
 
 export async function consumeOneTimeToken(tx: Tx, token: string, purposes: string[]) {
-  const row = await one<{ id: string; user_id: string; purpose: string }>(tx,
-    `SELECT id, user_id, purpose FROM auth_one_time_tokens WHERE token_hash = ? AND used_at IS NULL
+  const row = await one<{ id: string; user_id: string; purpose: string; relates_to: string | null }>(tx,
+    `SELECT id, user_id, purpose, relates_to FROM auth_one_time_tokens WHERE token_hash = ? AND used_at IS NULL
        AND expires_at > CURRENT_TIMESTAMP(6) FOR UPDATE`, [sha256(token)]);
   if (!row || !purposes.includes(row.purpose)) throw authErrors.otpExpired();
   await exec(tx, 'UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [row.id]);

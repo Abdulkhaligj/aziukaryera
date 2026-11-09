@@ -8,6 +8,11 @@ export type SelectItem =
   | { type: 'embed'; alias: string | null; relation: string; hint: string | null; inner: boolean; items: SelectItem[] };
 
 export interface Filter { column: string; op: string; negate: boolean; value: string }
+/** A comparison, or an or/and group of nodes (PostgREST logic trees). */
+export type FilterNode = Filter | { logic: 'or' | 'and'; negate: boolean; items: FilterNode[] };
+/** A filter and the embedded resource it applies to ([] = the main table). */
+export interface ScopedFilter { path: string[]; node: FilterNode }
+export const isGroup = (n: FilterNode): n is Extract<FilterNode, { logic: string }> => 'logic' in n;
 export interface OrderTerm { column: string; desc: boolean; nulls: 'first' | 'last' | null }
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -64,26 +69,77 @@ function parseItem(raw: string): SelectItem {
   return { type: 'column', name, alias };
 }
 
-export function parseFilters(query: Record<string, unknown>): Filter[] {
-  const filters: Filter[] = [];
+/** op.value or not.op.value → a comparison on `column`. */
+function comparison(column: string, raw: string): Filter {
+  if (!IDENT.test(column)) throw pgErrors.parse(`"failed to parse filter (${column})"`);
+  let rest = raw, negate = false;
+  if (rest.startsWith('not.')) { negate = true; rest = rest.slice(4); }
+  const dot = rest.indexOf('.');
+  const op = dot < 0 ? rest : rest.slice(0, dot);
+  if (!FILTER_OPS.has(op)) throw pgErrors.parse(`"failed to parse filter (${raw})"`, `unknown operator ${op}`);
+  let value = dot < 0 ? '' : rest.slice(dot + 1);
+  // Inside logic trees, values may be double-quoted to protect commas and parentheses.
+  if (op !== 'in' && /^".*"$/s.test(value)) value = value.slice(1, -1).replace(/\\(.)/g, '$1');
+  return { column, op, negate, value };
+}
+
+/** (a.eq.1,b.gt.2,and(c.lt.3,d.is.null)) → nodes. */
+function logicTree(logic: 'or' | 'and', negate: boolean, raw: string): FilterNode {
+  if (!raw.startsWith('(') || !raw.endsWith(')')) throw pgErrors.parse(`"failed to parse logic tree (${raw})"`);
+  const items: FilterNode[] = [];
+  for (const part of splitTerms(raw.slice(1, -1))) {
+    const term = part.trim();
+    const group = term.match(/^(not\.)?(and|or)(\(.*\))$/s);
+    if (group) { items.push(logicTree(group[2] as 'or' | 'and', !!group[1], group[3])); continue; }
+    const dot = term.indexOf('.');
+    if (dot <= 0) throw pgErrors.parse(`"failed to parse logic tree (${raw})"`);
+    items.push(comparison(term.slice(0, dot), term.slice(dot + 1)));
+  }
+  return { logic, negate, items };
+}
+
+/** Logic-tree terms: commas outside parentheses and double quotes (with \\ escapes). */
+function splitTerms(input: string): string[] {
+  const parts: string[] = [];
+  let depth = 0, quoted = false, current = '';
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '\\' && quoted && i + 1 < input.length) { current += ch + input[++i]; continue; }
+    if (ch === '"') quoted = !quoted;
+    else if (!quoted && ch === '(') depth++;
+    else if (!quoted && ch === ')') depth--;
+    if (ch === ',' && depth === 0 && !quoted) { parts.push(current); current = ''; continue; }
+    current += ch;
+  }
+  if (current !== '') parts.push(current);
+  return parts;
+}
+
+/** col=op.value, or=(…), and=(…), not.or=(…), and the same behind an
+ *  embedded resource path (profiles.full_name=eq.X, profiles.or=(…)). */
+export function parseFilters(query: Record<string, unknown>): ScopedFilter[] {
+  const filters: ScopedFilter[] = [];
   for (const [key, rawValue] of Object.entries(query)) {
     if (RESERVED.has(key)) continue;
     for (const raw of Array.isArray(rawValue) ? rawValue : [rawValue]) {
       if (typeof raw !== 'string') continue;
-      if (key === 'or' || key === 'and' || key.includes('.')) {
-        throw pgErrors.parse(`"${key}" filters are not supported by this API`, `${key}=${raw}`);
-      }
-      if (!IDENT.test(key)) throw pgErrors.parse(`"failed to parse filter (${key})"`);
-      let rest = raw, negate = false;
-      if (rest.startsWith('not.')) { negate = true; rest = rest.slice(4); }
-      const dot = rest.indexOf('.');
-      const op = dot < 0 ? rest : rest.slice(0, dot);
-      if (!FILTER_OPS.has(op)) throw pgErrors.parse(`"failed to parse filter (${raw})"`, `unknown operator ${op}`);
-      filters.push({ column: key, op, negate, value: dot < 0 ? '' : rest.slice(dot + 1) });
+      const segments = key.split('.');
+      // rel.order / rel.limit / rel.offset shape an embedded resource (see embedOptions).
+      if (segments.length > 1 && ['order', 'limit', 'offset'].includes(segments.at(-1)!)) continue;
+      const negatedLogic = segments.length >= 2 && segments.at(-2) === 'not' && ['or', 'and'].includes(segments.at(-1)!);
+      const path = segments.slice(0, negatedLogic ? -2 : -1);
+      const last = segments.at(-1)!;
+      if (path.some(p => !IDENT.test(p))) throw pgErrors.parse(`"failed to parse filter (${key})"`);
+      const node = last === 'or' || last === 'and' ? logicTree(last, negatedLogic, raw) : comparison(last, raw);
+      filters.push({ path, node });
     }
   }
   return filters;
 }
+
+/** The filters of one resource level. */
+export const nodesAt = (filters: ScopedFilter[], path: string[] = []) =>
+  filters.filter(f => f.path.length === path.length && f.path.every((p, i) => p === path[i])).map(f => f.node);
 
 /** in.(a,b,"c,d") → ['a', 'b', 'c,d'] */
 export function parseList(value: string): string[] {
@@ -112,4 +168,41 @@ export function parseOrder(value: unknown): OrderTerm[] {
     const nulls = mods.includes('nullsfirst') ? 'first' : mods.includes('nullslast') ? 'last' : null;
     return { column, desc, nulls };
   });
+}
+
+/** Ordering and paging of embedded resources: rel.order=col.desc, rel.limit=5,
+ *  rel.offset=10, and the older order=rel(col.desc). Keyed by the path "a.b". */
+export interface EmbedOptions { order?: OrderTerm[]; limit?: number; offset?: number }
+export function embedOptions(query: Record<string, unknown>): Map<string, EmbedOptions> {
+  const out = new Map<string, EmbedOptions>();
+  const at = (path: string) => { if (!out.has(path)) out.set(path, {}); return out.get(path)!; };
+  for (const [key, raw] of Object.entries(query)) {
+    const segments = key.split('.');
+    const last = segments.at(-1)!;
+    if (segments.length < 2 || !['order', 'limit', 'offset'].includes(last) || typeof raw !== 'string') continue;
+    const path = segments.slice(0, -1);
+    if (path.some(p => !IDENT.test(p))) throw pgErrors.parse(`"failed to parse ${last} (${key})"`);
+    if (last === 'order') at(path.join('.')).order = parseOrder(raw);
+    else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) throw pgErrors.parse(`"failed to parse ${last} (${raw})"`);
+      at(path.join('.'))[last as 'limit' | 'offset'] = n;
+    }
+  }
+  return out;
+}
+
+/** order=a.desc,rel(col.asc) → the top-level terms, with rel(...) moved to embedOptions. */
+export function splitOrder(value: unknown, embeds: Map<string, EmbedOptions>): OrderTerm[] {
+  if (typeof value !== 'string' || !value) return [];
+  const top: string[] = [];
+  for (const term of splitTerms(value)) {
+    const nested = term.match(/^([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$/s);
+    if (nested) {
+      const options = embeds.get(nested[1]) ?? {};
+      options.order = [...(options.order ?? []), ...parseOrder(nested[2])];
+      embeds.set(nested[1], options);
+    } else top.push(term);
+  }
+  return parseOrder(top.join(','));
 }

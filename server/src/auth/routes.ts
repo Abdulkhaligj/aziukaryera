@@ -6,7 +6,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import type { Config } from '../config.ts';
 import { contextFromHeaders, systemContext, verifyJwt, type Claims } from '../context.ts';
-import { exec, toMysqlDatetime, transaction, type Tx } from '../db.ts';
+import { exec, one, toMysqlDatetime, transaction, type Tx } from '../db.ts';
 import { AuthError, authErrors, DbRuleError } from '../errors.ts';
 import type { Schema } from '../schema.ts';
 import { composeMail, type Mailer, type MailKind } from './mailer.ts';
@@ -24,9 +24,10 @@ const BCRYPT_COST = 10;
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_COST);
 const PURPOSE: Record<string, string[]> = {
   signup: ['email_confirmation'], email: ['email_confirmation', 'magic_link'], magiclink: ['magic_link'],
-  recovery: ['recovery'], invite: ['invite']
+  recovery: ['recovery'], invite: ['invite'], email_change: ['email_change']
 };
-const AMR: Record<string, string> = { email_confirmation: 'otp', magic_link: 'otp', recovery: 'recovery', invite: 'invite' };
+const AMR: Record<string, string> = { email_confirmation: 'otp', magic_link: 'otp', recovery: 'recovery', invite: 'invite', email_change: 'email_change' };
+const HALF_CONFIRMED = 'Confirmation link accepted. Please proceed to confirm link sent to the other email';
 
 export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const { config, pool, schema, mailer } = deps;
@@ -180,13 +181,20 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   app.get('/user', async (req: FastifyRequest) => toGoTrueUser((await bearerUser(req)).user));
 
-  app.put('/user', async (req: FastifyRequest<{ Body: Body }>) => {
+  app.put('/user', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const { user } = await bearerUser(req);
     const body = req.body || {};
-    if (body.email !== undefined && normalizeEmail(body.email) !== user.email) {
-      throw new AuthError(422, 'email_change_not_supported', 'Email changes are made by the Career Centre');
-    }
+    const newEmail = body.email === undefined ? null : checkEmail(body.email);
+    let changeTokens: { to: string; kind: MailKind; token: string }[] = [];
     await transaction(pool, async tx => {
+      if (newEmail && newEmail !== user.email) {
+        // Secure email change: a link to the new address (and to the current one);
+        // the address changes once every link is confirmed.
+        const taken = await findUserByEmail(tx, newEmail);
+        if (taken && taken.id !== user.id) throw authErrors.emailExists();
+        cooldown(newEmail);
+        changeTokens = await startEmailChange(tx, user, newEmail);
+      }
       if (body.password !== undefined) {
         const password = checkPassword(body.password);
         if (user.encrypted_password && await bcrypt.compare(password, user.encrypted_password)) {
@@ -199,6 +207,11 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
           [JSON.stringify(mergeMetadata(user.raw_user_meta_data || {}, body.data)), user.id]);
       }
     });
+    const redirect = redirectTarget((req.query as Body | undefined)?.redirect_to);
+    for (const mail of changeTokens) {
+      if (!emailsPerIp.take(req.ip)) throw authErrors.rateLimited();
+      await mailer.send(composeMail(mail.kind, mail.to, verifyLink(mail.token, 'email_change', redirect)));
+    }
     return toGoTrueUser((await findUserById(pool, user.id))!);
   });
 
@@ -231,9 +244,38 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     return {};
   });
 
+  /** Fresh email-change links (the new address, and the current one when secure);
+   *  earlier links stop working and confirmation starts over. */
+  async function startEmailChange(tx: Tx, user: AuthUser, newEmail: string) {
+    await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND purpose = 'email_change' AND used_at IS NULL`, [user.id]);
+    await exec(tx, `UPDATE auth_users SET email_change = ?, email_change_confirm_status = 0, email_change_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`,
+      [newEmail, user.id]);
+    const tokens: { to: string; kind: MailKind; token: string }[] =
+      [{ to: newEmail, kind: 'email_change', token: await createOneTimeToken(tx, user.id, 'email_change', 24 * 60, newEmail) }];
+    if (config.secureEmailChange && user.email) {
+      tokens.push({ to: user.email, kind: 'email_change_current', token: await createOneTimeToken(tx, user.id, 'email_change', 24 * 60, user.email) });
+    }
+    return tokens;
+  }
+
   app.post('/resend', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const body = req.body || {};
-    if (body.type !== 'signup') throw authErrors.validation('Only signup confirmations can be resent');
+    if (body.type === 'email_change') {
+      // GoTrue: the email is the pending new address.
+      const pendingEmail = checkEmail(body.email);
+      cooldown(pendingEmail);
+      const user = await one<AuthUser>(pool, 'SELECT * FROM auth_users WHERE email_change = ? AND deleted_at IS NULL', [pendingEmail]);
+      if (user) {
+        const tokens = await transaction(pool, tx => startEmailChange(tx, user, pendingEmail));
+        const redirect = redirectTarget(req.query.redirect_to ?? body.options?.emailRedirectTo);
+        for (const mail of tokens) {
+          if (!emailsPerIp.take(req.ip)) throw authErrors.rateLimited();
+          await mailer.send(composeMail(mail.kind, mail.to, verifyLink(mail.token, 'email_change', redirect)));
+        }
+      }
+      return {};
+    }
+    if (body.type !== 'signup') throw authErrors.validation('Only signup and email_change links can be resent');
     const email = checkEmail(body.email);
     cooldown(email);
     const user = await findUserByEmail(pool, email);
@@ -244,12 +286,25 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     return {};
   });
 
-  /** Consumes an email token, confirms the address and opens a session. */
-  async function verify(token: string, type: string, req: FastifyRequest) {
+  /** Consumes an email token, confirms the address and opens a session. For an
+   *  email change confirmed on one of two addresses, returns the GoTrue message. */
+  async function verify(token: string, type: string, req: FastifyRequest): Promise<Awaited<ReturnType<typeof startSession>> | { msg: string }> {
     const purposes = PURPOSE[type];
     if (!purposes || !token) throw authErrors.otpExpired();
     return transaction(pool, async tx => {
       const used = await consumeOneTimeToken(tx, token, purposes);
+      if (used.purpose === 'email_change') {
+        const pending = await findUserById(tx, used.user_id, true);
+        if (!pending?.email_change || (used.relates_to !== pending.email_change && used.relates_to !== pending.email)) throw authErrors.otpExpired();
+        if (config.secureEmailChange && pending.email && pending.email_change_confirm_status === 0) {
+          await exec(tx, 'UPDATE auth_users SET email_change_confirm_status = 1 WHERE id = ?', [pending.id]);
+          return { msg: HALF_CONFIRMED };
+        }
+        const taken = await findUserByEmail(tx, pending.email_change);
+        if (taken && taken.id !== pending.id) throw authErrors.emailExists();
+        await exec(tx, `UPDATE auth_users SET email = email_change, email_change = NULL, email_change_confirm_status = 0,
+            email_confirmed_at = COALESCE(email_confirmed_at, CURRENT_TIMESTAMP(6)) WHERE id = ?`, [pending.id]);
+      }
       await exec(tx, 'UPDATE auth_users SET email_confirmed_at = COALESCE(email_confirmed_at, CURRENT_TIMESTAMP(6)) WHERE id = ?', [used.user_id]);
       const user = await findUserById(tx, used.user_id);
       if (!user) throw authErrors.otpExpired();
@@ -268,6 +323,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     const redirect = redirectTarget(req.query.redirect_to);
     try {
       const session = await verify(String(token ?? ''), String(type ?? ''), req);
+      if ('msg' in session) return reply.redirect(`${redirect}#${new URLSearchParams({ message: session.msg })}`, 303);
       const hash = new URLSearchParams({
         access_token: session.access_token, expires_at: String(session.expires_at), expires_in: String(session.expires_in),
         refresh_token: session.refresh_token, token_type: 'bearer', type: String(type)

@@ -156,3 +156,37 @@ test('filters: ilike, in, gte, is, neq and Postgres NULL ordering', async () => 
   assert.equal((await h.anon().from('jobs').select('id').is('location', null)).data!.length, 0);
   assert.equal((await h.anon().from('jobs').select('id').neq('status', 'approved')).data!.length, 0);
 });
+
+test('logic trees: or=, and= and not.or= filters', async () => {
+  const anon = h.anon();
+  assert.equal((await anon.from('jobs').select('id').or('title.ilike.*qazma*,location.eq.Gəncə')).data!.length, 1);
+  assert.equal((await anon.from('jobs').select('id').or('title.eq.Yoxdur,location.eq.Gəncə')).data!.length, 0);
+  assert.equal((await anon.from('jobs').select('id').or('and(title.ilike.*qazma*,location.eq.Bakı),title.eq.Yoxdur')).data!.length, 1);
+  assert.equal((await anon.from('jobs').select('id').not('or', '(title.ilike.*qazma*,location.eq.Gəncə)' as never, '' as never)).data?.length ?? 0, 0);
+  const quoted = await anon.from('jobs').select('id').or('title.eq."Qazma mühəndisi",title.in.("a,b",c)');
+  assert.equal(quoted.data!.length, 1, 'quoted values keep commas');
+});
+
+test('filters on embedded resources narrow the embed; with !inner they drop the parent', async () => {
+  const kept = await company.from('applications').select('id,jobs(title)').eq('jobs.title', 'Başqa vakansiya');
+  assert.equal(kept.data!.length, 1);
+  assert.equal((kept.data![0] as unknown as { jobs: null }).jobs, null, 'the parent stays, the embed is filtered out');
+  const inner = await company.from('applications').select('id,jobs!inner(title)').eq('jobs.title', 'Başqa vakansiya');
+  assert.deepEqual(inner.data, []);
+  const match = await company.from('applications').select('id,jobs!inner(title)').eq('jobs.title', 'Qazma mühəndisi');
+  assert.equal(match.data!.length, 1);
+  const write = await company.from('applications').update({ status: 'baxilir' }).eq('jobs.title', 'Qazma mühəndisi');
+  assert.equal(write.error?.code, 'PGRST100', 'embedded filters are for reads only');
+});
+
+test('embedded resources can be ordered and limited per parent row', async () => {
+  const extra = '66666666-6666-4666-8666-666666666666';
+  await exec(h.pool, `INSERT INTO jobs (id, company_id, title, type, status, deadline, location) VALUES (?, ?, 'Ab vakansiya', 'is', 'approved', CURRENT_DATE + INTERVAL 5 DAY, 'Bakı')`,
+    [extra, companyId]);
+  const asc = await h.anon().from('companies').select('name,jobs(title)').eq('id', companyId).order('title', { referencedTable: 'jobs' });
+  assert.deepEqual((asc.data![0] as unknown as { jobs: { title: string }[] }).jobs.map(j => j.title), ['Ab vakansiya', 'Qazma mühəndisi']);
+  const top = await h.anon().from('companies').select('name,jobs(title)').eq('id', companyId)
+    .order('title', { referencedTable: 'jobs', ascending: false }).limit(1, { referencedTable: 'jobs' });
+  assert.deepEqual((top.data![0] as unknown as { jobs: { title: string }[] }).jobs.map(j => j.title), ['Qazma mühəndisi']);
+  await exec(h.pool, 'DELETE FROM jobs WHERE id = ?', [extra]);
+});

@@ -15,6 +15,8 @@ export interface RpcFunction {
   args: Record<string, ArgType>;
   roles: ('anon' | 'authenticated')[];
   security: 'definer' | 'invoker';
+  /** STABLE / IMMUTABLE functions may also be called with GET. */
+  readOnly?: boolean;
   returns: Returns;
   run(env: WriteEnv, args: Args): Promise<unknown>;
 }
