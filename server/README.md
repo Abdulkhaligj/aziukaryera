@@ -57,7 +57,7 @@ Bütün sətir yazıları buradan keçir: data API, qeydiyyat, admin funksiyalar
 
 Xarici açar əməliyyatları da yazma qatından keçir: sətir silinəndə `ON DELETE CASCADE` və `SET NULL` uşaq sətirlərə trigger-ləri ilə birlikdə tətbiq olunur (Postgres-in RI trigger-ləri kimi). Ona görə istifadəçi silmə də audit və kvota sayğaclarını düzgün yeniləyir.
 
-Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar BEFORE trigger-lərdən əvvəl doldurulur), eyni hadisənin trigger-ləri ad sırası ilə işləyir (`000_…` birinci), `UPDATE OF sütun` yalnız sütun UPDATE-in SET siyahısında olanda işləyir, iç-içə yazılar çağıranın `auth.uid()`-si ilə gedir. Söz filtri (`src/write/moderation-text.ts`) `private.mod_*` funksiyalarının simvol-simvol köçürməsidir və müqayisə dəqiqdir (MySQL kollasiyası ilə yox). Audit (`admin_audit_logs`) Postgres-dəki kimi 28 cədvəldə var.
+Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar BEFORE trigger-lərdən əvvəl doldurulur), eyni hadisənin trigger-ləri ad sırası ilə işləyir (`000_…` birinci), `UPDATE OF sütun` yalnız sütun UPDATE-in SET siyahısında olanda işləyir, iç-içə yazılar çağıranın `auth.uid()`-si ilə gedir. Söz filtri (`src/write/moderation-text.ts`) `private.mod_*` funksiyalarının simvol-simvol köçürməsidir və müqayisə dəqiqdir (MySQL kollasiyası ilə yox). Lokal Postgres 17.6-da orijinal funksiyalarla real söz siyahısı üzərində 34 500 girişdə (sözlərin gizlədilmiş variantları və təsadüfi mətnlər) müqayisə edilib: tokenlər, namizədlər və bloklama qərarı hamısında eynidir. Audit (`admin_audit_logs`) Postgres-dəki kimi 28 cədvəldə var.
 
 ## Data API (`/rest/v1`)
 

@@ -51,8 +51,10 @@ function translator(from: string, to: string) {
 const TRANSLATE = Object.fromEntries(Object.entries(MAP).map(([k, [f, t]]) => [k, translator(f, t)])) as Record<Script, (s: string) => string>;
 const toMaskDots = translator('*#%?_\u{2022}\u{b7}', '\u{b7}'.repeat(7));
 
+// Postgres lower() maps letter by letter; JavaScript turns a word-final capital
+// sigma into the final form, so it is mapped to the plain sigma first.
 export const prep = (p: string | null) =>
-  (p ?? '').normalize('NFKC').replace(INVISIBLE, '').toLowerCase().normalize('NFD').replace(MARKS, '');
+  (p ?? '').normalize('NFKC').replace(INVISIBLE, '').replace(/\u{3a3}/gu, '\u{3c3}').toLowerCase().normalize('NFD').replace(MARKS, '');
 
 export const tokens = (p: string | null) => prep(p).split(SEPARATORS).map(x => x.replace(EDGES, '')).filter(t => t !== '');
 

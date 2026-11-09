@@ -11,6 +11,8 @@ test('tokens: NFKC, lower case, accents removed, split on spaces and punctuation
   assert.deepEqual(tokens('  «Neft»  və\u{200b}Sənaye; ＡＢＣ '), ['neft', 'vəsənaye', 'abc']);
   assert.deepEqual(tokens('İŞIQ'), ['isiq'], 'dotted capital I and cedillas lose their marks');
   assert.deepEqual(tokens('...'), []);
+  // Postgres lower() maps a final capital sigma to the plain sigma, not to the final form.
+  assert.deepEqual(tokens('\u{3a3}\u{39f}\u{3a6}\u{39f}\u{3a3}'), ['\u{3c3}\u{3bf}\u{3c6}\u{3bf}\u{3c3}']);
 });
 
 test('scripts: latin by default, cyrillic and arabic by letters', () => {
