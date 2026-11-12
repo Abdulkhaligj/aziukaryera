@@ -17,7 +17,7 @@ test('student Mentor dəstəyi page: request form, history and AI mentor are loa
   assert.match(mentor, /from\('mentor_requests'\)/);
   assert.match(mentor, /id:'mentor',label:'Mentor dəstəyi'/);
   assert.match(mentor, /VIEWS\.student\.mentor=viewMentorSupport/);
-  assert.doesNotMatch(mentor + ai, /service_role|supabaseKey|localStorage\.setItem\('sb-/);
+  assert.doesNotMatch(mentor + ai, /service_role|serviceRoleKey|localStorage\.setItem\('sb-/);
   /* AI mentor works without the AIDA widget exposing an API */
   assert.match(ai, /functions\.invoke\('aida-chat'/);
 });

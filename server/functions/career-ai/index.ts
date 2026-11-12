@@ -1,7 +1,6 @@
 import { readLimitedJson } from "../_shared/limits.ts";
 import { fence, looksLikeInjection } from "../_shared/untrusted.ts";
-import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient } from "../_shared/client.ts";
 
 /* ADNSU Career AI.
  * Deploy with verify_jwt = false: the caller's token is verified here with
@@ -73,7 +72,7 @@ const refusals: Record<string, string> = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CANDIDATE_INPUT_BUDGET = 56000;
 
-const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", {
+const db = createClient(Deno.env.get("API_URL") ?? "", Deno.env.get("SERVICE_ROLE_KEY") ?? "", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 

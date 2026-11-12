@@ -32,14 +32,14 @@ const EmployerTools = {
   async load(section, force = false) {
     this.resetSession();
     const scope=window.CareerSession?.capture();
-    if(Store.mode==='supabase'&&!scope)return;
+    if(Store.mode==='remote'&&!scope)return;
     if (!force && this.loaded[section]) return;
     this.ui.busy = true;
     this.ui.error = '';
     const isCalendar = section === 'calendar';
     let result;
     try {
-      result = Store.mode === 'supabase'
+      result = Store.mode === 'remote'
         ? await (isCalendar ? Backend.employerListInterviews() : Backend.employerListPartnerships())
         : { ok: true, rows: isCalendar
           ? (Store.state.demoInterviewSlots || [])
@@ -47,7 +47,7 @@ const EmployerTools = {
     } catch (error) {
       result = { ok:false, error:String(error?.message || 'Bağlantı xətası') };
     }
-    if(Store.mode==='supabase'&&!window.CareerSession.matches(scope))return;
+    if(Store.mode==='remote'&&!window.CareerSession.matches(scope))return;
     this.ui.busy = false;
     if (!result.ok) this.ui.error = result.error || 'Məlumatları yükləmək mümkün olmadı.';
     else {
@@ -260,7 +260,7 @@ function viewEmployerCalendar() {
     '<p>Vakansiyanıza müraciət etmiş namizəd üçün görüş vaxtı təyin edin. Bildiriş tələbəyə göndərilir.</p></div>'+
     '<button class="btn" data-em-refresh="calendar">Yenilə</button></div>'+
     (em.ui.error?'<div class="note warn">'+esc(em.ui.error)+'</div>':'')+
-    (Store.mode!=='supabase'?'<div class="note">Demo rejimi: vaxtlar yalnız bu brauzerdə saxlanılır, bildiriş göndərilmir.</div>':'')+
+    (Store.mode!=='remote'?'<div class="note">Demo rejimi: vaxtlar yalnız bu brauzerdə saxlanılır, bildiriş göndərilmir.</div>':'')+
     '<div class="em-calendar-layout"><section class="card em-panel"><div class="em-calendar-toolbar">'+
       '<h2>'+esc(title)+'</h2><div class="row tight"><button class="btn sm" data-em-month="-1" aria-label="Əvvəlki ay">←</button>'+
       '<button class="btn sm" data-em-month="1" aria-label="Sonrakı ay">→</button></div></div>'+
@@ -300,7 +300,7 @@ function viewEmployerPartnerships() {
     '<p>Karyera günü, seminar, təcrübə proqramı və real layihə təkliflərini Karyera Mərkəzinə göndərin.</p></div>'+
     '<button class="btn" data-em-refresh="partnerships">Yenilə</button></div>'+
     (em.ui.error?'<div class="note warn">'+esc(em.ui.error)+'</div>':'')+
-    (Store.mode!=='supabase'?'<div class="note">Demo rejimi: sorğular yalnız brauzerdə saxlanılır və universitetə göndərilmir.</div>':'')+
+    (Store.mode!=='remote'?'<div class="note">Demo rejimi: sorğular yalnız brauzerdə saxlanılır və universitetə göndərilmir.</div>':'')+
     '<div class="em-calendar-layout"><section class="card em-panel"><h2>Yeni əməkdaşlıq təklifi</h2>'+
     '<form data-em-form="partnership" class="em-form">'+
     '<label>Əməkdaşlıq növü<select name="category" required>'+Object.entries(EMP_PARTNERSHIP_CATEGORIES).map(row=>'<option value="'+row[0]+'">'+esc(row[1])+'</option>').join('')+'</select></label>'+
@@ -392,7 +392,7 @@ document.addEventListener('click',async e=>{
     EmployerTools.ui.busy=true;
     const id=node.dataset.id, status=node.dataset.emInterviewStatus;
     let res;
-    if(Store.mode==='supabase')res=await Backend.employerSetInterviewStatus(id,status);
+    if(Store.mode==='remote')res=await Backend.employerSetInterviewStatus(id,status);
     else {
       const row=EmployerTools.appointments.find(r=>String(r.id)===String(id));
       if(row)row.status=status;
@@ -426,7 +426,7 @@ document.addEventListener('submit',async e=>{
       const payload={application_id:v('application_id'),starts_at:when.toISOString(),
         duration_minutes:Number(v('duration_minutes'))||45,meeting_mode:v('meeting_mode'),
         location:v('location'),meeting_url:url,notes:v('notes')};
-      if(Store.mode==='supabase')result=await Backend.employerScheduleInterview(payload);
+      if(Store.mode==='remote')result=await Backend.employerScheduleInterview(payload);
       else{
         const row={...payload,id:'demo-'+Date.now(),status:'scheduled',created_at:new Date().toISOString()};
         Store.state.demoInterviewSlots=[...(Store.state.demoInterviewSlots||[]),row];
@@ -439,7 +439,7 @@ document.addEventListener('submit',async e=>{
       const payload={company_id:company.id,category:v('category'),title:v('title'),details:v('details'),
         preferred_date:v('preferred_date')||null,contact_email:v('contact_email')};
       if(payload.title.length<5||payload.details.length<20)throw new Error('Başlıq və təklifin təsvirini tam yazın.');
-      if(Store.mode==='supabase')result=await Backend.employerCreatePartnership(payload);
+      if(Store.mode==='remote')result=await Backend.employerCreatePartnership(payload);
       else{
         const row={...payload,id:'demo-'+Date.now(),status:'submitted',admin_note:'',created_at:new Date().toISOString()};
         Store.state.demoPartnershipRequests=[...(Store.state.demoPartnershipRequests||[]),row];
@@ -448,7 +448,7 @@ document.addEventListener('submit',async e=>{
       if(result.ok){form.reset();await EmployerTools.load('partnerships',true);}
     }else if(action==='review'){
       const payload={status:v('status'),admin_note:v('admin_note')};
-      if(Store.mode==='supabase')result=await Backend.employerReviewPartnership(form.dataset.id,payload);
+      if(Store.mode==='remote')result=await Backend.employerReviewPartnership(form.dataset.id,payload);
       else{
         const row=EmployerTools.partnerships.find(r=>String(r.id)===form.dataset.id);
         if(row)Object.assign(row,payload);

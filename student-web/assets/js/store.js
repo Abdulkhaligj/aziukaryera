@@ -115,15 +115,15 @@ const Store = {
   state: null,
 
   /**
-   * 'supabase' — real backend: sessiya serverdə, data RLS ilə qorunur.
+   * 'remote' — real backend: sessiya serverdə, data RLS ilə qorunur.
    * 'local'    — offline demo: localStorage + brauzer tərəfli auth.
    * Rejim boot zamanı əlçatanlıq yoxlamasına görə təyin olunur (app.js).
    */
   mode: 'local',
-  tax: null,        // fakültə/ixtisas taksonomiyası (Supabase rejimində)
+  tax: null,        // fakültə/ixtisas taksonomiyası (server rejimində)
 
   /* ---------------------------------------------------------------- *
-   * Supabase rejimi — serverdən gələn məlumatın yerləşdirilməsi
+   * Server rejimi — serverdən gələn məlumatın yerləşdirilməsi
    * ---------------------------------------------------------------- */
 
   /**
@@ -131,7 +131,7 @@ const Store = {
    * state-ə yerləşdirir. Render kodu bundan sonra sinxron işləyir.
    */
   hydrate(p) {
-    if (this.mode === 'supabase' && !window.CareerSession?.payloadMatches(p)) return false;
+    if (this.mode === 'remote' && !window.CareerSession?.payloadMatches(p)) return false;
     const tax = Adapt.taxonomy(p.faculties, p.majors);
     this.tax = tax;
 
@@ -274,8 +274,8 @@ const Store = {
   },
 
   save() {
-    /* Supabase rejimində həqiqət mənbəyi bazadır — localStorage-ə yazmırıq. */
-    if (this.mode === 'supabase') return;
+    /* Server rejimində həqiqət mənbəyi bazadır — localStorage-ə yazmırıq. */
+    if (this.mode === 'remote') return;
     try {
       const out = {};
       Object.keys(this.state).forEach(k => {
@@ -309,7 +309,7 @@ const Store = {
   },
 
   clearRemoteSession() {
-    if (!this.state || this.mode !== 'supabase') return;
+    if (!this.state || this.mode !== 'remote') return;
     this.state.session = null;
     this.state.users = [];
     this.state.profiles = {};
@@ -419,11 +419,11 @@ const Store = {
 
   /**
    * Write-through köməkçisi: yerli vəziyyət dərhal yenilənir (optimistik),
-   * Supabase rejimində isə sorğu arxa planda göndərilir. Xəta olarsa
+   * Server rejimində isə sorğu arxa planda göndərilir. Xəta olarsa
    * geri qaytarılır və istifadəçiyə bildirilir.
    */
   remote(fn, rollback) {
-    if (this.mode !== 'supabase') return;
+    if (this.mode !== 'remote') return;
     const scope = window.CareerSession?.capture();
     if (!scope) return;
     Promise.resolve(fn()).then(res => {
@@ -443,7 +443,7 @@ const Store = {
 
   apply(jobId, note = '') {
     if (this.isApplied(jobId)) return false;
-    const key = this.mode === 'supabase' ? String(jobId) : Number(jobId);
+    const key = this.mode === 'remote' ? String(jobId) : Number(jobId);
     this.state.applications.unshift({
       jobId: key,
       at: new Date().toISOString().slice(0, 10),
@@ -471,7 +471,7 @@ const Store = {
   },
 
   toggleSave(jobId) {
-    const id = this.mode === 'supabase' ? String(jobId) : Number(jobId);
+    const id = this.mode === 'remote' ? String(jobId) : Number(jobId);
     const i = this.state.saved.findIndex(x => String(x) === String(jobId));
     const wasOn = i >= 0;
     if (wasOn) this.state.saved.splice(i, 1); else this.state.saved.push(id);
@@ -486,14 +486,14 @@ const Store = {
     );
   },
 
-  /** Profil dəyişikliyi — Supabase rejimində bazaya yazılır. */
+  /** Profil dəyişikliyi — server rejimində bazaya yazılır. */
   pushProfile() {
-    if (this.mode !== 'supabase' || !this.state.student) return;
+    if (this.mode !== 'remote' || !this.state.student) return;
     this.remote(() => Backend.updateProfile(Adapt.profileToDb(this.state.student, this.tax)));
   },
 
   pushCompany() {
-    if (this.mode !== 'supabase' || !this.state.company) return;
+    if (this.mode !== 'remote' || !this.state.company) return;
     this.remote(() => Backend.updateCompany(this.state.company.id, {
       name: this.state.company.name, sector: this.state.company.sector,
       contact: this.state.company.contact, email: this.state.company.email,

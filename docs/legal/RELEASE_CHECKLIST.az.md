@@ -15,7 +15,7 @@
 - [ ] RLS: tələbə başqa tələbənin CV/müraciətini görmür; şirkət rəqibin namizədlərinə çıxmır; anon şəxs şəxsi məlumatları görə bilmir.
 - [ ] AI və məlumat paylaşımı sənədləri hüquq şöbəsində təsdiq olunub.
 - [ ] Vercel preview build READY; kritik istifadəçi axınları real test hesabları ilə sınaqdan keçirilib.
-- [ ] Supabase migrations və ilkin vəziyyət yoxlanılıb; məlum rollback üsulu hazırdır.
+- [ ] Baza migration-ları (server/db) və ilkin vəziyyət yoxlanılıb; məlum rollback üsulu hazırdır.
 - [ ] Production çıxışından sonra doğru domain, asset-lər, giriş, yeni funksiya yenidən yoxlanılıb.
 - [ ] Razılıq formasının hüquqi etibarlılığı ayrıca təsdiq edilib.
 

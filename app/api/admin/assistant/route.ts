@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     image_url: typeof body.image_url === 'string' ? body.image_url : '',
     history
   };
-  const { data, error } = await context.supabase.functions.invoke('admin-assistant', { body: payload });
+  const { data, error } = await context.db.functions.invoke('admin-assistant', { body: payload });
   if (error) {
     let message = 'AI cavab vermədi. Bir az sonra yenidən cəhd edin.';
     try {

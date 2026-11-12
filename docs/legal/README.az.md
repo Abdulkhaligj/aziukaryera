@@ -8,7 +8,7 @@ Bu paket universitetin hüquq şöbəsinin nəzərdən keçirməsi və texniki i
 1. Platformanın hüquqi sahibi, fərdi məlumatların mülkiyyətçisi və operatoru, səlahiyyətli imza sahibi; rəsmi əlaqə ünvanı və rekvizitlər.
 2. “Fərdi məlumatlar haqqında” Qanunun 15-ci maddəsinə görə sistemin dövlət qeydiyyatı tələb olunub-olunmaması və istisna əsası; qərarın yazılı sənədi.
 3. “Məşğulluq haqqında” Qanunun 14-cü maddəsinin platformanın faktiki fəaliyyətinə tətbiqi; işədüzəltmə vasitəçiliyi reyestrində qeydiyyat ehtiyacı.
-4. Vercel/Supabase/AI xidmətlərinə məlumat ötürülməsi, hostinq regionları, subpodratçılar və transsərhəd ötürmənin hüquqi əsası.
+4. Vercel/universitet serveri/AI xidmətlərinə məlumat ötürülməsi, hostinq regionları, subpodratçılar və transsərhəd ötürmənin hüquqi əsası.
 5. İşəgötürənlərə CV göndərilməsi üçün qanuni əsas və tələb olunan yazılı / elektron razılıq forması: tək checkbox-u avtomatik kifayət hesab etməyin.
 6. Məlumatların kateqoriyalar üzrə saxlanma müddətləri; tələbə, məzun və şirkət hesabları üçün konkret silinmə qrafiki.
 7. Ödənişli paketlərdən əldə olunan gəlirin hüquqi tərəfi, müqavilə tərəfi, vergi sənədləri, geri qaytarma qaydaları və mümkün ödəniş provayderi.
@@ -25,6 +25,5 @@ Bu paket universitetin hüquq şöbəsinin nəzərdən keçirməsi və texniki i
 - Fərdi məlumatlar haqqında: https://e-qanun.az/framework/19675
 - Məşğulluq haqqında: https://e-qanun.az/framework/39846
 - İşədüzəltmə vasitəçiləri: https://dma.gov.az/fealiyyet/funksional-istiqametler/mesgulluq-sahesinde-nezaret/iseduzeltme-vas-reyestr
-- RLS texniki nəzarəti: https://supabase.com/docs/guides/database/postgres/row-level-security
 
 **Qayda:** Buradakı mətnlərin heç biri qanuni razılıq alınmasının, müvafiq dövlət qeydiyyatının və ya müqavilənin yerini tutmur.

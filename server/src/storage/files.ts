@@ -5,7 +5,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 
-// Supabase Storage's key rule (storage-api isValidKey), plus no "." / ".." segments.
+// The storage key rule of the previous backend, plus no "." / ".." segments.
 const KEY = /^(\w|\/|!|-|\.|\*|'|\(|\)| |&|\$|@|=|;|:|\+|,|\?)*$/;
 export const validKey = (name: string) =>
   name.length > 0 && name.length <= 1024 && KEY.test(name) && !name.startsWith('/') && !name.split('/').some(s => s === '' || s === '.' || s === '..');

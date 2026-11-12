@@ -1,6 +1,6 @@
 /* ADNSU Career AI client.
  * Model credentials are never exposed in the browser. Requests are sent to the
- * Supabase Edge Function, which can use Gemini or Groq and return a safe,
+ * server function, which can use Gemini or Groq and return a safe,
  * structured response. Every caller keeps a deterministic local fallback.
  */
 

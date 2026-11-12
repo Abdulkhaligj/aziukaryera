@@ -1,4 +1,4 @@
-// Access tokens (HS256 JWT, same claims as Supabase) and refresh-token
+// Access tokens (HS256 JWT, same claims as before the move) and refresh-token
 // sessions. Only SHA-256 hashes of refresh and one-time tokens are stored.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { SignJWT } from 'jose';

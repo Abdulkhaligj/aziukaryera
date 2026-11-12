@@ -1,5 +1,5 @@
 /* AIDA — ADNSU Karyera assistant.
- * Uses the existing aida-chat Supabase Edge Function. No model keys in browser.
+ * Uses the existing aida-chat server function. No model keys in browser.
  * Chat history is kept only in memory during this page session. */
 (() => {
   'use strict';

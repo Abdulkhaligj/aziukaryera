@@ -1,11 +1,13 @@
 // Test harness: a throwaway MySQL database per test file and the API on a
-// random port, driven through the same supabase-js the portal uses.
+// random port, driven through the same data client the portal uses.
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SignJWT } from 'jose';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+export type ApiClient = SupabaseClient;
 import { buildApp } from '../src/app.ts';
 import type { Mailer } from '../src/auth/mailer.ts';
 import { createMailer } from '../src/auth/mailer.ts';
@@ -22,8 +24,8 @@ export interface Harness {
   config: Config;
   pool: ReturnType<typeof createPool>;
   mailer: Mailer;
-  anon(): SupabaseClient;
-  service(): SupabaseClient;
+  anon(): ApiClient;
+  service(): ApiClient;
   close(): Promise<void>;
 }
 

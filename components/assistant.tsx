@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImagePlus, LoaderCircle, Mic, Pencil, Rocket, Send, Sparkles, Square, X } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/backend/client';
 import { uploadPublicImage } from '@/components/image-field';
 import { can } from '@/lib/permissions';
 import type { AdminRole, AdminRow, ResourceKey } from '@/lib/types';
@@ -199,10 +199,10 @@ export default function Assistant({ open, onClose, role, userId, companies, comp
       let audio_path = '';
       let image_url = '';
       if (audio) {
-        const supabase = createClient();
-        if (!supabase) throw new Error('Bağlantı qurulmayıb');
+        const db = createClient();
+        if (!db) throw new Error('Bağlantı qurulmayıb');
         audio_path = `${userId}/${crypto.randomUUID()}.wav`;
-        const { error } = await supabase.storage.from('assistant-audio').upload(audio_path, audio, { contentType: 'audio/wav', upsert: false });
+        const { error } = await db.storage.from('assistant-audio').upload(audio_path, audio, { contentType: 'audio/wav', upsert: false });
         if (error) throw new Error('Səs yüklənmədi: ' + error.message);
       }
       if (attached) image_url = await uploadPublicImage(attached.file, 'assistant');

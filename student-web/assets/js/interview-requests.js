@@ -32,7 +32,7 @@
       this.reset();
       const scope=window.CareerSession.capture();if(!scope)return;
       if (this.loading || (!force && this.loaded)) return;
-      if (Store.mode !== 'supabase' || !Backend.init()) {
+      if (Store.mode !== 'remote' || !Backend.init()) {
         this.error='Serverə bağlı hesab tələb olunur. Demo rejimində sorğu göndərilmir.';
         this.loaded=true; this.repaint(); return;
       }
@@ -81,7 +81,7 @@
       if (['interview-requests','interview-inbox'].includes(view) && typeof render==='function') render();
     },
     async rpc(name,fields) {
-      if (this.saving || Store.mode!=='supabase' || !Backend.init()) return;
+      if (this.saving || Store.mode!=='remote' || !Backend.init()) return;
       const scope=window.CareerSession.capture();if(!scope)return;
       this.saving=true; this.error=''; this.repaint();
       try {
@@ -148,7 +148,7 @@
   const note=()=>{
     if(client.error) return '<div class="note warn" role="alert">'+E(client.error)+'</div>';
     if(client.loading) return '<div class="note">Məlumatlar yüklənir…</div>';
-    if(Store.mode!=='supabase')return '<div class="note warn">Müsahibə sorğuları yalnız giriş edilmiş real hesabla işləyir.</div>';
+    if(Store.mode!=='remote')return '<div class="note warn">Müsahibə sorğuları yalnız giriş edilmiş real hesabla işləyir.</div>';
     return '';
   };
   const jobName=a=>E(Store.jobById(a?.jobId)?.title||a?.jobTitle||'Vakansiya');
@@ -220,7 +220,7 @@
             (existing?.reply_note?'<p class="ir-reply"><b>Şirkətin cavabı:</b> '+E(existing.reply_note)+'</p>':'')+
             appointmentDetails(appointments)+
             (currentStatus==='scheduled'?'<p class="ir-success">Təyin edilmiş görüşlərin tam məlumatları yuxarıda göstərilib.</p>':'')+
-            (canRequest && Store.mode==='supabase'?'<form data-ir-form="student" class="ir-form">'+
+            (canRequest && Store.mode==='remote'?'<form data-ir-form="student" class="ir-form">'+
               '<input type="hidden" name="application_id" value="'+E(a.id)+'">'+
               '<label for="ir-'+E(a.id)+'">Şirkətə mesaj (istəyə bağlı)</label>'+
               '<textarea id="ir-'+E(a.id)+'" name="message" maxlength="1000" rows="3" placeholder="Bu vəzifə üzrə müsahibədə iştirak etmək istərdim."></textarea>'+

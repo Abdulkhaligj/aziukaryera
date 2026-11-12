@@ -21,7 +21,7 @@ var MentorUI = {
     if(this.loading||(!force&&this.loadedFor===key))return;
     this.loading=true;this.error='';
     try{
-      if(Store.mode!=='supabase'||!Backend.sb)throw Error('Müraciətlər üçün server bağlantısı tələb olunur.');
+      if(Store.mode!=='remote'||!Backend.sb)throw Error('Müraciətlər üçün server bağlantısı tələb olunur.');
       const {data,error}=await Backend.sb.from('mentor_requests')
         .select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at')
         .order('created_at',{ascending:false}).limit(150);
@@ -109,7 +109,7 @@ var MentorUI = {
     if(!this.types.some(x=>x[0]===p.category)||p.topic.length<5||p.topic.length>140||p.details.length<15||p.details.length>1800||p.preferred_time.length>180){
       toast('Müraciət məlumatlarını yoxla.');return;
     }
-    if(Store.mode!=='supabase'||!Backend.sb){toast('Serverə qoşulma tələb olunur.');return;}
+    if(Store.mode!=='remote'||!Backend.sb){toast('Serverə qoşulma tələb olunur.');return;}
     this.busy=true;form.querySelector('[type="submit"]').disabled=true;
     try{
       const {data:{user},error:authError}=await Backend.sb.auth.getUser();
@@ -123,7 +123,7 @@ var MentorUI = {
     finally{if(window.CareerSession.matches(scope)){this.busy=false;const b=document.querySelector('#mentor-request-form [type="submit"]');if(b)b.disabled=false;}}
   },
   async save(id){
-    if(this.busy||Auth.role()!=='admin'||Store.mode!=='supabase')return;
+    if(this.busy||Auth.role()!=='admin'||Store.mode!=='remote')return;
     const scope=window.CareerSession.capture();if(!scope)return;
     const el=k=>document.getElementById('mentor-'+k+'-'+id);
     const status=el('status')?.value,mentor_name=String(el('name')?.value||'').trim(),admin_note=String(el('note')?.value||'').trim();

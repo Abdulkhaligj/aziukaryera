@@ -1,6 +1,5 @@
 import { readLimitedJson, readLimitedBytes } from "../_shared/limits.ts";
-import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient } from "../_shared/client.ts";
 
 /* AI assistant for the admin panel (Gemini).
  * Staff type or speak a request ("sabah saat 15-də SOCAR ilə karyera
@@ -24,8 +23,8 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const RETRYABLE = /high demand|overloaded|unavailable|exhausted|rate limit|try again/i;
 const BLOCKED_FINISH = new Set(["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY"]);
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const db = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", {
+const API_URL = Deno.env.get("API_URL") ?? "";
+const db = createClient(API_URL, Deno.env.get("SERVICE_ROLE_KEY") ?? "", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
@@ -217,7 +216,7 @@ Deno.serve(async (req: Request) => {
       parts.push({ inlineData: { mimeType: "audio/wav", data: toBase64(bytes) } });
     }
     if (imageUrl) {
-      const prefix = `${SUPABASE_URL}/storage/v1/object/public/public-media/`;
+      const prefix = `${API_URL}/storage/v1/object/public/public-media/`;
       if (!imageUrl.startsWith(prefix)) return json({ ok: false, error: "Şəkil yalnız panelin öz yükləməsindən ola bilər" }, 400);
       const res = await fetch(imageUrl, { redirect: "error", signal: AbortSignal.timeout(12500) });
       const type = (res.headers.get("content-type") || "").split(";")[0];

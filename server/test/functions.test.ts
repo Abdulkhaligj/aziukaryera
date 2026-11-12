@@ -4,13 +4,13 @@
 // content-moderation → moderation_claim / moderation_finish.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 const SECRET = 'm'.repeat(40);
 let h: Harness;
-let student: SupabaseClient, studentId: string, studentToken: string;
+let student: ApiClient, studentId: string, studentToken: string;
 let verdict = { verdict: 'allow', categories: [] as string[], reason: '' };
 let geminiCalls = 0;
 

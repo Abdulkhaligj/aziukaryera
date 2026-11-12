@@ -1,11 +1,11 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one } from '../src/db.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
-let student: SupabaseClient, otherStudent: SupabaseClient, company: SupabaseClient, admin: SupabaseClient, editor: SupabaseClient;
+let student: ApiClient, otherStudent: ApiClient, company: ApiClient, admin: ApiClient, editor: ApiClient;
 let studentId: string, otherId: string, companyUser: string, companyId: string, openJob: string, pendingJob: string;
 
 async function signedIn(email: string, data: Record<string, unknown>) {

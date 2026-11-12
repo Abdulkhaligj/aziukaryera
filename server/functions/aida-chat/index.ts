@@ -1,7 +1,6 @@
 import { readLimitedJson } from "../_shared/limits.ts";
 import { fence } from "../_shared/untrusted.ts";
-import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient } from "../_shared/client.ts";
 
 /* AIDA — the career center's chat assistant on the main site (Gemini).
  * Open to everyone: visitors who are not signed in get a small daily limit
@@ -26,8 +25,8 @@ const RETRYABLE = /high demand|overloaded|unavailable|exhausted|rate limit|try a
 const BLOCKED_FINISH = new Set(["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"]);
 const LINK_TARGETS = new Set(["jobs", "events", "benefits", "awards", "cv", "interview", "roadmap", "profile", "applications", "register", "faq"]);
 
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", SERVICE_KEY, {
+const SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+const db = createClient(Deno.env.get("API_URL") ?? "", SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 

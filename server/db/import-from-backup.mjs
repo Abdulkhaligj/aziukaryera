@@ -1,6 +1,6 @@
-// Copies every row of the final backup of the old (Supabase, deleted on
-// 2026-11-12) Postgres database into the MySQL schema created by db/setup.mjs,
-// then checks row counts and foreign keys. The backup (supabase-full.dump) is
+// Copies every row of the final backup of the old Postgres database (taken
+// 2026-11-12) into the MySQL schema created by db/setup.mjs,
+// then checks row counts and foreign keys. The backup (full.dump) is
 // first restored into a throwaway Postgres; scripts/02-import.sh does that.
 //
 //   SOURCE_DB_URL=postgresql://…restored-backup… MYSQL_URL=mysql://… node db/import-from-backup.mjs

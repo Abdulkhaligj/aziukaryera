@@ -1,4 +1,4 @@
-// /storage/v1 — the Supabase Storage subset supabase-js uses: upload (POST,
+// /storage/v1 — the storage subset the data client uses: upload (POST,
 // x-upsert; PUT update), download, public and signed URLs, remove, list.
 // Rows live in storage_objects (with RLS from ./policy.ts and the
 // storage.objects triggers); bytes live on disk (./files.ts).
@@ -17,7 +17,7 @@ import { storageAllows } from './policy.ts';
 export interface StorageDeps { config: Config; pool: Pool; schema: Schema }
 const MAX_UPLOAD = 50 * 1024 * 1024;
 
-/** Supabase Storage error body: { statusCode, error, message }. */
+/** Storage error body: { statusCode, error, message }. */
 export class StorageError extends Error {
   readonly status: number;
   readonly error: string;

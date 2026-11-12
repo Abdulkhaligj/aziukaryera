@@ -50,7 +50,7 @@ test('company packages are hidden but active Talent Pool access remains', () => 
     NAV: { company: [{ id: 'dashboard' }, { id: 'subscription' }, { id: 'talent' }] },
     VIEWS: { company: { subscription: () => 'old package screen', talent: () => 'TALENT POOL' } },
     Auth: { currentUser: () => ({ role: 'company', status: 'active' }), role: () => 'company' },
-    Store: { mode: 'supabase', state: { session: { id: 'u1' }, company: { id: 'c1' }, view: 'subscription' } },
+    Store: { mode: 'remote', state: { session: { id: 'u1' }, company: { id: 'c1' }, view: 'subscription' } },
     companyCanUse: () => false,
     document: {
       createElement: () => ({}),

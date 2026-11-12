@@ -34,7 +34,7 @@
 
 ## Platforma
 
-- bir Supabase Auth və PostgreSQL bazası;
+- bir auth xidməti və MySQL bazası (universitet serveri);
 - RLS və foreign key-lər;
 - SQL migrations;
 - backend trigger-lərlə limit yoxlaması;

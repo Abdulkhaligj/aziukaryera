@@ -1,12 +1,12 @@
 # Portalın təhlükəsiz yerləşdirilməsi
 
-`assets/js/config.js` daxilində yalnız öz layihənizin ictimai Supabase URL və publishable açarını təyin edin. Service-role və secret açar burada saxlanmamalıdır. Əvvəlki sahibin layihəsi standart konfiqurasiyadan çıxarılıb. Əks halda `window.CAREER_CONFIG` obyektini bu fayldan əvvəl ayrıca yerli skriptlə verə bilərsiniz; CSP səbəbindən inline konfiqurasiya əlavə etməyin.
+`assets/js/config.js` daxilində yalnız öz layihənizin ictimai API ünvanını və açarını təyin edin. Service-role və secret açar burada saxlanmamalıdır. Əvvəlki sahibin layihəsi standart konfiqurasiyadan çıxarılıb. Əks halda `window.CAREER_CONFIG` obyektini bu fayldan əvvəl ayrıca yerli skriptlə verə bilərsiniz; CSP səbəbindən inline konfiqurasiya əlavə etməyin.
 
 Bağlantı olmadıqda giriş bağlı qalır. İnternetsiz nümayişi qəsdən açmaq üçün `demoMode: true` seçin; bu rejim real autentifikasiya deyil.
 
-Statik faylları istənilən HTTPS hostda yerləşdirin. Nginx üçün `nginx-security-headers.conf` faylını server/location blokuna include edin. Digər hostlarda eyni başlıqları tətbiq edin. `connect-src` daxilindəki Supabase wildcard-ını öz dəqiq Supabase origin-i ilə əvəz edin; custom domain varsa onu da dəqiq göstərin. Bu repo heç bir hosta avtomatik deploy etmir.
+Statik faylları istənilən HTTPS hostda yerləşdirin. Nginx üçün `nginx-security-headers.conf` faylını server/location blokuna include edin. Digər hostlarda eyni başlıqları tətbiq edin. `connect-src` keçid günü `deploy/universitet-mysql/scripts/05-switch-frontend.mjs` ilə API-nin dəqiq ünvanını alır; custom domain varsa onu da dəqiq göstərin. Bu repo heç bir hosta avtomatik deploy etmir.
 
-CSP HTML meta elementi hostdan asılı olmayaraq script icrasını məhdudlaşdırır; `frame-ancestors` və qalan cavab başlıqları isə hostda tətbiq olunmalıdır. CV qurucunun inline skriptini dəyişdikdən sonra `node scripts/update-security-policy.mjs` işlədin və regression testlərini keçirin. Xarici Supabase/React/QR kitabxanaları dəqiq versiyaya və SHA384 SRI dəyərinə bağlanıb. Yeni kitabxana versiyası üçün SRI-ni ayrıca yeniləmək lazımdır.
+CSP HTML meta elementi hostdan asılı olmayaraq script icrasını məhdudlaşdırır; `frame-ancestors` və qalan cavab başlıqları isə hostda tətbiq olunmalıdır. CV qurucunun inline skriptini dəyişdikdən sonra `node scripts/update-security-policy.mjs` işlədin və regression testlərini keçirin. Xarici React/QR kitabxanaları dəqiq versiyaya və SHA384 SRI dəyərinə bağlanıb. Yeni kitabxana versiyası üçün SRI-ni ayrıca yeniləmək lazımdır.
 
 DB migration-lar və Edge Functions də eyni düzəliş buraxılışı ilə yerləşdirilməlidir: namizəd siyahısı `candidate_profiles()` RPC-sini, şəbəkə müəllif kartları `profile_cards(uuid[])` RPC-sini istifadə edir. Natamam orijinal baseline tam bərpa edilmədən yalnız bu statik faylların yerləşdirilməsi tam sistemin qəbul sınağı sayılmır.
 

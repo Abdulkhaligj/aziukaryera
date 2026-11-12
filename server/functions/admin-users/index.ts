@@ -1,6 +1,5 @@
 import { readLimitedJson } from "../_shared/limits.ts";
-import "jsr:@supabase/functions-js@2.118.0/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient } from "../_shared/client.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -69,9 +68,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
-  const url = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const url = Deno.env.get("API_URL");
+  const anonKey = Deno.env.get("ANON_KEY");
+  const serviceKey = Deno.env.get("SERVICE_ROLE_KEY");
   const authorization = req.headers.get("authorization") || "";
   if (!url || !anonKey || !serviceKey || !authorization) return json({ ok: false, error: "İcazə yoxdur" }, 401);
 

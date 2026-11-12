@@ -3,7 +3,7 @@
  * These headers protect only the admin Next.js project; they do not modify
  * the independently deployed student website.
  */
-const backend = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+const backend = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 const backendWs = backend.replace(/^http/, 'ws');
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -16,7 +16,7 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${backend} ${backendWs} https://*.supabase.co wss://*.supabase.co`.trim(),
+  `connect-src 'self' ${backend} ${backendWs}`.trim(),
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

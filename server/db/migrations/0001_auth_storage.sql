@@ -1,5 +1,5 @@
--- Replaces Supabase Auth (auth.users, sessions, email tokens) and Storage
--- metadata. Ids keep their Supabase values so every foreign key and stored
+-- Auth (users, sessions, email tokens) and storage metadata tables.
+-- Ids keep their original values so every foreign key and stored
 -- path (avatar_path, …) stays valid after the data migration.
 SET NAMES utf8mb4;
 

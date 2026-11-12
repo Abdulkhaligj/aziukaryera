@@ -8,7 +8,7 @@ test('admin role validation uses fixed role allow-list', () => {
   const login = read('app/login/actions.ts');
   const guard = read('lib/admin-data.ts');
   assert.match(login, /allowedAdminRoles\.includes\(role\)/);
-  assert.match(login, /supabase\.auth\.signOut\(\)/);
+  assert.match(login, /db\.auth\.signOut\(\)/);
   assert.match(guard, /adminRoles\.includes\(requestedRole as AdminRole\)/);
   assert.match(guard, /profile\.role !== 'admin' \|\| profile\.status !== 'active'/);
 });

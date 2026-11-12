@@ -54,7 +54,7 @@ CREATE TABLE `private_moderation_webhook_config` (
   `endpoint` TEXT NOT NULL,
   `secret` TEXT NOT NULL,
   `enabled` TINYINT(1) NOT NULL DEFAULT 0,
-  CONSTRAINT `moderation_webhook_config_endpoint_check` CHECK (REGEXP_LIKE(`endpoint`, '^https://[a-z0-9]{20}\\.supabase\\.co/functions/v1/content-moderation$', 'c')),
+  CONSTRAINT `moderation_webhook_config_endpoint_check` CHECK (REGEXP_LIKE(`endpoint`, '^(https://[a-z0-9.-]+(:[0-9]+)?|http://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?)/functions/v1/content-moderation$', 'c')),
   PRIMARY KEY (`singleton`),
   CONSTRAINT `moderation_webhook_config_secret_check` CHECK ((CHAR_LENGTH(`secret`) >= 32)),
   CONSTRAINT `moderation_webhook_config_singleton_check` CHECK (`singleton` = 1)

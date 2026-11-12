@@ -1,4 +1,4 @@
-// Error bodies in the formats supabase-js parses. The messages are the exact
+// Error bodies in the formats the data client parses. The messages are the exact
 // GoTrue/PostgREST strings the portal's Backend.translate() matches on.
 
 /** GoTrue: { code, error_code, msg } */

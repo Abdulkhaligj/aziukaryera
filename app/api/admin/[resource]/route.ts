@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   /* Hesablar e-poçtsuz, müvəqqəti şifrə ilə yaradılır (SMTP tələb olunmur) */
   if (people.has(key)) {
-    const { data, error } = await context.supabase.functions.invoke('admin-users', {
+    const { data, error } = await context.db.functions.invoke('admin-users', {
       body: { ...body, action: 'create', resource: key }
     });
     if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'Hesab yaradılmadı') }, { status: 400 });
@@ -54,12 +54,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const companyId = text(body.company_id);
     let companyName = text(body.company_name);
     if (companyId) {
-      const { data: company } = await context.supabase.from('companies').select('name').eq('id', companyId).maybeSingle();
+      const { data: company } = await context.db.from('companies').select('name').eq('id', companyId).maybeSingle();
       if (company?.name) companyName = company.name;
     }
     if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
     const payload = { year, nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: httpsUrl(body.logo_url), citation: text(body.citation) || null, published: bool(body.published) };
-    const { data, error } = await context.supabase.from('company_awards').insert(payload).select('id').single();
+    const { data, error } = await context.db.from('company_awards').insert(payload).select('id').single();
     if (error) return NextResponse.json({ error: error.code === '23505' ? 'Bu şirkət həmin il və nominasiyada artıq var' : publicError(error) }, { status: 400 });
     const audited = await writeAudit(context, resource, data.id, 'create', `${companyName} — ${nomination} mükafatı əlavə edildi`);
     return NextResponse.json({ id: data.id, ...(audited ? {} : { warning: AUDIT_WARNING }) }, { status: 201 });
@@ -85,23 +85,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let partnerId = text(body.partner_id);
     const partnerName = text(body.partner_name);
     if (!partnerId && partnerName) {
-      const { data: existing } = await context.supabase.from('benefit_partners').select('id').ilike('name', escapeLike(partnerName)).maybeSingle();
+      const { data: existing } = await context.db.from('benefit_partners').select('id').ilike('name', escapeLike(partnerName)).maybeSingle();
       if (existing?.id) partnerId = existing.id;
       else {
-        const { data: created, error: partnerError } = await context.supabase.from('benefit_partners').insert({ name: partnerName, status: 'active', logo_url: httpsUrl(body.partner_logo_url) }).select('id').single();
+        const { data: created, error: partnerError } = await context.db.from('benefit_partners').insert({ name: partnerName, status: 'active', logo_url: httpsUrl(body.partner_logo_url) }).select('id').single();
         if (partnerError) return NextResponse.json({ error: publicError(partnerError) }, { status: 400 });
         partnerId = created.id;
       }
     }
     if (!partnerId) return NextResponse.json({ error: 'Tərəfdaş adı məcburidir' }, { status: 400 });
-    if (httpsUrl(body.partner_logo_url)) await context.supabase.from('benefit_partners').update({ logo_url: httpsUrl(body.partner_logo_url) }).eq('id', partnerId);
+    if (httpsUrl(body.partner_logo_url)) await context.db.from('benefit_partners').update({ logo_url: httpsUrl(body.partner_logo_url) }).eq('id', partnerId);
     payload = { partner_id: partnerId, title, description: text(body.description), discount_label: text(body.discount_label), valid_from: text(body.valid_from) || new Date().toISOString().slice(0, 10), valid_to: text(body.valid_to) || null, active: body.active !== false && body.active !== 'false' };
   } else {
     table = 'site_content';
     payload = { title, content_key: text(body.content_key), summary: text(body.summary), body: text(body.body), status: text(body.status) || 'Qaralama', updated_by: context.userId };
   }
 
-  const { data, error } = await context.supabase.from(table).insert(payload).select('id').single();
+  const { data, error } = await context.db.from(table).insert(payload).select('id').single();
   if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
   const audited = await writeAudit(context, resource, data.id, 'create', `${title} yaradıldı`);
   return NextResponse.json({ id: data.id, ...(audited ? {} : { warning: AUDIT_WARNING }) }, { status: 201 });

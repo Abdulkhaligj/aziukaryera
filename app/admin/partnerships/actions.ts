@@ -23,7 +23,7 @@ export async function reviewPartnership(formData: FormData): Promise<void> {
 
   // UPDATE can affect zero rows under RLS without returning an error.
   // Verify the exact row was updated before showing a success notice.
-  const { data, error } = await ctx.supabase.from('company_partnership_requests')
+  const { data, error } = await ctx.db.from('company_partnership_requests')
     .update({ status, admin_note: adminNote })
     .eq('id', id)
     .select('id')

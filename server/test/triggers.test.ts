@@ -1,13 +1,13 @@
-// The Postgres trigger ports, driven through supabase-js as the portal does.
+// The Postgres trigger ports, driven through the data client as the portal does.
 // Tests run in order and build on each other (one company, one student).
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
-let student: SupabaseClient, company: SupabaseClient, admin: SupabaseClient, reviewer: SupabaseClient;
+let student: ApiClient, company: ApiClient, admin: ApiClient, reviewer: ApiClient;
 let studentId: string, companyUser: string, companyId: string, adminId: string;
 let jobId: string, applicationId: string, slotId: string;
 

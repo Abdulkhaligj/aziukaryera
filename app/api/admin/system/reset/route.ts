@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Təsdiq sözü yanlışdır' }, { status: 400 });
   }
 
-  const { data, error } = await context.supabase.rpc('admin_reset_platform_data', { p_confirmation: body.confirmation });
+  const { data, error } = await context.db.rpc('admin_reset_platform_data', { p_confirmation: body.confirmation });
   if (error) return NextResponse.json({ error: publicError(error, 'Sıfırlama alınmadı') }, { status: 400 });
   return NextResponse.json(data);
 }

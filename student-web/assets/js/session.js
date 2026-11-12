@@ -115,7 +115,7 @@
       const from = sdk.storage.from.bind(sdk.storage);
       sdk.storage.from = (...args) => guarded(from(...args), snapshot());
     }
-    // Supabase exposes functions through a getter. Keep a single wrapped client
+    // The client exposes functions through a getter. Keep a single wrapped client
     // so compatibility wrappers cannot accidentally wrap a discarded instance.
     if (sdk.functions?.invoke) {
       const functions = sdk.functions, invoke = functions.invoke.bind(functions);

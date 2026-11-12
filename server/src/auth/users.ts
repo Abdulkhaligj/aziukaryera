@@ -1,4 +1,4 @@
-// auth_users rows and the GoTrue user object supabase-js expects.
+// auth_users rows and the GoTrue user object the data client expects.
 import { one, type Row, type Tx } from '../db.ts';
 import type { Pool } from 'mysql2/promise';
 

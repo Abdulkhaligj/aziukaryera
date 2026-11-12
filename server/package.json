@@ -2,7 +2,7 @@
   "name": "asoiu-career-api",
   "version": "0.1.0",
   "private": true,
-  "description": "MySQL-backed API that replaces Supabase for the ASOIU career platform",
+  "description": "MySQL-backed API for the ASOIU career platform",
   "type": "module",
   "engines": {
     "node": ">=22.18"

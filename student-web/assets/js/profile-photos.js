@@ -12,7 +12,7 @@
   window.CareerSession.subscribe(() => cache.clear());
 
   function signedIn() {
-    try { return !!Auth.currentUser() && Store.mode === 'supabase' && Backend.init() && !!Backend.sb; }
+    try { return !!Auth.currentUser() && Store.mode === 'remote' && Backend.init() && !!Backend.sb; }
     catch { return false; }
   }
   function fresh(id) {

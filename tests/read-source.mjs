@@ -5,8 +5,6 @@ export function readSource(path) {
   let url = new URL('../' + path, import.meta.url);
   if (!existsSync(url) && path.startsWith('student-web/')) {
     url = new URL('../../esas-sayt-student-web/' + path.slice('student-web/'.length), import.meta.url);
-  } else if (!existsSync(url) && path.startsWith('supabase/')) {
-    url = new URL('../../supabase-backend/' + path, import.meta.url);
   }
   return readFileSync(url, 'utf8');
 }

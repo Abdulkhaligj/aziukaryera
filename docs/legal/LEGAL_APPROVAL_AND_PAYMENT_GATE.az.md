@@ -5,7 +5,7 @@
 1. ADNSU və ya digər hüquqi şəxsin platformanın sahibi/operatoru olmasının təsdiqi.
 2. “Fərdi məlumatlar haqqında” qanunun 8 və 15-ci maddələri üzrə razılıq forması və informasiya sisteminin qeydiyyatı/tətbiq edilən istisnası barədə yazılı rəy.
 3. “Məşğulluq haqqında” Qanunun 14-cü maddəsi və işədüzəltmə vasitəçilərinin reyestri üzrə tətbiqin təsnifatı.
-4. Vercel / Supabase / AI provayderləri və transsərhəd məlumat axınları üzrə razılaşdırma.
+4. Vercel / universitet serveri / AI provayderləri və transsərhəd məlumat axınları üzrə razılaşdırma.
 5. Şirkət müqaviləsinin, məlumat təhlükəsizliyi öhdəliklərinin, ödəniş və qaytarma qaydasının təsdiqi.
 6. Çıxarılan bütün hüquqi mətnlərin versiya, qüvvəyə minmə tarixi, təsdiq edən şəxs və arxiv qeydlərinin saxlanması.
 

@@ -4,7 +4,7 @@ Tarix: 12 noyabr 2026
 
 > **Vəziyyət:**
 > - **Backend:** İT-nin tələbi ilə platformanın backend-i universitetin serverində **MySQL 8.4 + Node.js API** üzərində işləyəcək.
-> - **Supabase:** köhnə Supabase layihəsi 12.11.2026 silinib. Bütün data və fayllar ehtiyat nüsxədədir, nüsxə yoxlanılıb.
+> - **Köhnə baza:** 12.11.2026 bağlanıb. Bütün data və fayllar ehtiyat nüsxədədir, nüsxə yoxlanılıb.
 > - **Saytlar:** server qurulana qədər hər iki sayt "texniki işlər" səhifəsini göstərir.
 >
 > Quraşdırma və köçürmə: [`deploy/universitet-mysql/README.md`](../deploy/universitet-mysql/README.md).
@@ -22,7 +22,7 @@ Saytlar Vercel-dədir (`inspire5` komandası). Hər ikisi GitHub `Abdulkhaligj/a
 - `asoiu-career-main-v3`: Root Directory `student-web`.
 - `asoiu-career-admin`: repo kökü (Next.js).
 
-`main`-ə push hər iki saytı avtomatik yenidən yerləşdirir. API saytların istifadə etdiyi HTTP protokolunu verir (supabase-js kitabxanası ilə uyğundur), ona görə saytların kodu backend dəyişəndə dəyişmir.
+`main`-ə push hər iki saytı avtomatik yenidən yerləşdirir. API saytların istifadə etdiyi HTTP protokolunu verir, ona görə saytların kodu backend dəyişəndə dəyişmir.
 
 ## 2. Əsas funksiyalar
 
@@ -75,7 +75,7 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 - **Nümunə hesablar:** `assets/js/auth.js` daxilindəki 3 nümunə hesab yalnız backend qoşulmayan offline demo rejimindədir. Real hesab deyillər.
 
 ### 3.3 Admin panel
-- **Env dəyişənləri:** `NEXT_PUBLIC_SUPABASE_URL` və `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`.env.example`-ə bax). Adlar köhnədir, dəyərlər MySQL API-nin ünvanı və `ANON_KEY` açarıdır. Vercel-də də eyni dəyişənlər.
+- **Env dəyişənləri:** `NEXT_PUBLIC_API_URL` və `NEXT_PUBLIC_API_KEY` (`.env.example`-ə bax). Adlar köhnədir, dəyərlər MySQL API-nin ünvanı və `ANON_KEY` açarıdır. Vercel-də də eyni dəyişənlər.
 - **Texniki işlər rejimi:** `next.config.mjs`-dəki `MAINTENANCE` dəyişənidir.
 - **Qurma və işə salma:** `npm ci && npm run build && npm start` (Node 20+).
 - **Testlər:** `node --test tests/*.test.mjs` (85 test).
@@ -113,4 +113,4 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 ## 6. Əlaqə və məsul şəxslər
 - **Platforma sahibi:** ADNSU Karyera Mərkəzi (career@asoiu.edu.az).
 - **Hesablar:** Vercel `inspire5` və GitHub `Abdulkhaligj/aziukaryera`. Girişləri sahibi ayrıca təhvil verir.
-- **Ehtiyat nüsxə** (`supabase-final-backup-20261112`): layihə rəhbərindədir. Serverə köçürmə üçün ondan alınır.
+- **Ehtiyat nüsxə** (`db-final-backup-20261112`): layihə rəhbərindədir. Serverə köçürmə üçün ondan alınır.

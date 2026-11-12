@@ -33,7 +33,7 @@ function load(row, options = {}) {
   };
   const context = {
     createClient: () => db, Response, Request, Headers, TextDecoder, Uint8Array, AbortSignal, crypto: globalThis.crypto,
-    Deno: { serve: fn => { handler = fn; }, env: { get: key => ({ SUPABASE_URL: 'https://offline.invalid', SUPABASE_SERVICE_ROLE_KEY: 'fixture', GEMINI_API_KEY: 'fixture', MODERATION_WEBHOOK_SECRET: secret })[key] } },
+    Deno: { serve: fn => { handler = fn; }, env: { get: key => ({ API_URL: 'https://offline.invalid', SERVICE_ROLE_KEY: 'fixture', GEMINI_API_KEY: 'fixture', MODERATION_WEBHOOK_SECRET: secret })[key] } },
     fetch: async (url, init) => {
       assert.match(url, /^https:\/\/generativelanguage\.googleapis\.com\//);
       const body = JSON.parse(init.body);

@@ -77,13 +77,13 @@ const Auth = {
   },
 
   async logout() {
-    if (Store.mode === 'supabase') {
+    if (Store.mode === 'remote') {
       const result = await Backend.signOut();
       if (!result?.ok) return result || { ok: false, error: 'Çıxış tamamlanmadı.' };
     }
     window.CareerSession?.invalidate('logout');
     window.CVDrafts?.clear();
-    if (Store.mode === 'supabase' && typeof Store.clearRemoteSession === 'function') Store.clearRemoteSession();
+    if (Store.mode === 'remote' && typeof Store.clearRemoteSession === 'function') Store.clearRemoteSession();
     Store.state.session = null;
     Store.state.view = 'dashboard';
     Store.bind();
@@ -92,7 +92,7 @@ const Auth = {
   },
 
   /* ---------------------------------------------------------------- *
-   * Supabase rejimi
+   * Server rejimi
    * Rol, e-poçt domeni və icazələr SERVERDƏ yoxlanılır — aşağıdakı
    * yoxlamalar yalnız istifadəçiyə tez geri bildirim vermək üçündür.
    * ---------------------------------------------------------------- */
@@ -193,7 +193,7 @@ const Auth = {
     return { ok: true, user: this.currentUser() };
   },
 
-  /** Mövcud Supabase sessiyasını bərpa edir (səhifə yenilənəndə). */
+  /** Mövcud server sessiyasını bərpa edir (səhifə yenilənəndə). */
   async restoreRemote() {
     const session = await Backend.getSession();
     if (!session) return false;
@@ -355,8 +355,8 @@ const Auth = {
     if (pwErr0) return { ok: false, field: 'new', error: pwErr0 };
     if (newPw !== newPw2) return { ok: false, field: 'new2', error: 'Yeni şifrələr üst-üstə düşmür.' };
 
-    if (Store.mode === 'supabase') {
-      /* Supabase cari şifrəni yenidən yoxlamır — əvvəlcə onu təsdiqləyirik. */
+    if (Store.mode === 'remote') {
+      /* Server cari şifrəni yenidən yoxlamır — əvvəlcə onu təsdiqləyirik. */
       const scope = window.CareerSession.capture();
       const verify = await Backend.signIn(user.email, currentPw);
       if (!window.CareerSession.matches(scope)) return window.CareerSession.stale();
@@ -390,15 +390,15 @@ const Auth = {
     const u = Store.state.users.find(x => x.id === userId);
     if (u) { u.status = status; Store.save(); }
 
-    if (Store.mode === 'supabase') {
-      /* Supabase rejimində userId əslində companies.id-dir (bax: viewApprovals). */
+    if (Store.mode === 'remote') {
+      /* Server rejimində userId əslində companies.id-dir (bax: viewApprovals). */
       Store.remote(() => Backend.setCompanyStatus(userId, status));
     }
   },
 
-  /** Supabase rejimində təsdiq gözləyən şirkətlər companies cədvəlindən gəlir. */
+  /** Server rejimində təsdiq gözləyən şirkətlər companies cədvəlindən gəlir. */
   pendingCompanyRows() {
-    if (Store.mode !== 'supabase') {
+    if (Store.mode !== 'remote') {
       return this.pendingCompanies().map(u => ({
         id: u.id, name: u.name, email: u.email, createdAt: u.createdAt,
         sector: (Store.state.companyProfiles[u.id] || {}).sector || '',

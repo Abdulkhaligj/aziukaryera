@@ -847,7 +847,7 @@ function cvDesigner() {
       }
     };
     saveProfile();
-    if (Store.mode === 'supabase') void window.CVDrafts.connect(Backend.sb).then(saveProfile);
+    if (Store.mode === 'remote') void window.CVDrafts.connect(Backend.sb).then(saveProfile);
   }
   return `<div class="card cv-designer-head">
     <div>
@@ -1449,7 +1449,7 @@ function viewNetwork() {
     return p.kind === UI.feedFilter;
   });
 
-  if (Store.mode !== 'supabase') {
+  if (Store.mode !== 'remote') {
     return `<div class="page-head"><div><div class="eyebrow">Şəbəkə</div><h1>Peşəkar şəbəkə</h1></div></div>
       ${emptyState('Şəbəkə serverə qoşulmağı tələb edir',
         'Məlumat bazası müvəqqəti əlçatan deyil. Bir qədər sonra yenidən yoxlayın.')}`;
@@ -1556,7 +1556,7 @@ function viewNetwork() {
 function viewBenefits() {
   const data = UI.benefits;
 
-  if (Store.mode !== 'supabase') {
+  if (Store.mode !== 'remote') {
     return `<div class="page-head"><div><div class="eyebrow">Güzəştlər</div><h1>Tələbə güzəştləri</h1></div></div>
       ${emptyState('Güzəştlər serverə qoşulmağı tələb edir',
         'QR kodları yalnız real bazada yaradıla bilər. Saytı hostda açın.')}`;
@@ -2481,7 +2481,7 @@ function authScreen() {
         ${UI.auth.notice ? `<div class="note good" style="margin-bottom:16px"><span class="m">✓</span><span>${esc(UI.auth.notice)}</span></div>` : ''}
         ${err ? `<div class="note bad" style="margin-bottom:16px"><span class="m">×</span><span>${esc(err)}</span></div>` : ''}
 
-        ${Store.mode === 'supabase'
+        ${Store.mode === 'remote'
           ? (tab === 'login' ? authLoginForm(busy) : authRegisterForm(busy))
           : `<div class="empty"><b>Giriş xidməti müvəqqəti əlçatan deyil</b><span>Məlumat bazası yenidən aktiv olduqda burada daxil ola biləcəksiniz.</span><button class="btn" type="button" data-act="reload">Yenidən yoxla</button></div>`}
       </div>
@@ -2492,7 +2492,7 @@ function authScreen() {
 
 /* Universitet SSO düymələri aktiv provayderə görə göstərilir. */
 function ssoButtons(busy) {
-  if (Store.mode !== 'supabase') return '';
+  if (Store.mode !== 'remote') return '';
   const buttons = [];
   if (UI.providers.google === true) buttons.push(`
     <button type="button" class="btn-google btn-sso" data-act="google" ${busy ? 'disabled' : ''}>
@@ -2525,7 +2525,7 @@ const AUTH_ICONS = {
 };
 
 function authLoginForm(busy) {
-  const resend = (UI.auth.notice || /təsdiqlənməyib/i.test(UI.auth.error || '')) && Store.mode === 'supabase';
+  const resend = (UI.auth.notice || /təsdiqlənməyib/i.test(UI.auth.error || '')) && Store.mode === 'remote';
   return `<form class="auth-form" data-act="login-form" novalidate>
     <header class="auth-form-head">
       <h2 class="auth-h">Xoş gəlmisiniz</h2>
@@ -2963,7 +2963,7 @@ function clearPrivateSessionUI() {
 
 window.CareerSession?.subscribe(event => {
   if (event.reason === 'verified') return;
-  if (Store.mode === 'supabase') Store.clearRemoteSession();
+  if (Store.mode === 'remote') Store.clearRemoteSession();
   clearPrivateSessionUI();
   stopNotificationUpdates();
   const authenticating = event.reason === 'auth-start' || event.reason === 'auth-cancelled' || window.CareerSession.authPending();
@@ -2974,7 +2974,7 @@ window.CareerSession?.subscribe(event => {
 
 window.CVDrafts?.subscribe(scope => {
   const owner = Store.state?.session?.userId;
-  if (Store.mode !== 'supabase' || !owner || scope?.ownerId === owner) return;
+  if (Store.mode !== 'remote' || !owner || scope?.ownerId === owner) return;
   window.CareerSession?.invalidate('draft-owner-changed');
   Store.clearRemoteSession();
   clearPrivateSessionUI();
@@ -3274,7 +3274,7 @@ document.addEventListener('click', e => {
       const role = Auth.role();
       if (item.link && VIEWS[role] && VIEWS[role][item.link]) S.view = item.link;
       rerender();
-      if (Store.mode === 'supabase') Backend.markNotificationRead(item).then(result => { if (result?.stale) return;
+      if (Store.mode === 'remote') Backend.markNotificationRead(item).then(result => { if (result?.stale) return;
         if (!result.ok) refreshNotifications(false);
       });
       break;
@@ -3285,7 +3285,7 @@ document.addEventListener('click', e => {
       const now = new Date().toISOString();
       items.forEach(item => { if (!item.readAt) item.readAt = now; });
       rerender();
-      if (Store.mode === 'supabase') Backend.markAllNotificationsRead(unreadItems).then(result => { if (result?.stale) return;
+      if (Store.mode === 'remote') Backend.markAllNotificationsRead(unreadItems).then(result => { if (result?.stale) return;
         if (!result.ok) { toast(result.error || 'Bildirişlər yenilənmədi'); refreshNotifications(false); }
       });
       break;
@@ -3587,7 +3587,7 @@ document.addEventListener('click', e => {
         S.student.education = [...(S.student.education || []), entry];
         closeModal(); Store.save(); rerender(); toast('Təhsil əlavə edildi');
       };
-      if (Store.mode === 'supabase') {
+      if (Store.mode === 'remote') {
         Backend.addEducation({
           degree_type: entry.degreeType, university: entry.university, faculty: entry.faculty,
           specialty: entry.specialty, specialization: entry.specialization,
@@ -3602,7 +3602,7 @@ document.addEventListener('click', e => {
         S.student.education = (S.student.education || []).filter(e => String(e.id) !== String(t.dataset.id));
         Store.save(); rerender(); toast('Təhsil qeydi silindi');
       };
-      if (Store.mode === 'supabase') Backend.deleteEducation(t.dataset.id).then(res => res.ok ? remove() : toast(res.error));
+      if (Store.mode === 'remote') Backend.deleteEducation(t.dataset.id).then(res => res.ok ? remove() : toast(res.error));
       else remove();
       break;
     }
@@ -3614,7 +3614,7 @@ document.addEventListener('click', e => {
       UI.cvTab = 'analyze';
       const text = UI.cvText || cvToText(buildCVFromProfile(S.student));
       const analysis = analyzeCV(text);
-      if (Store.mode === 'supabase') {
+      if (Store.mode === 'remote') {
         Backend.saveCVAnalysis({ score: analysis.score }).then(res => { if (res?.stale) return;
           if (!res.ok) console.warn('CV nəticəsi saxlanmadı:', res.error);
         });
@@ -3633,7 +3633,7 @@ document.addEventListener('click', e => {
         UI.aiBusy = false;
         if (!res.ok) { toast(res.error || 'AI xidməti müvəqqəti əlçatan deyil'); rerender(); return; }
         UI.aiCvResult = res.result;
-        if (Store.mode === 'supabase') {
+        if (Store.mode === 'remote') {
           const score = analyzeCV(text).score;
           Backend.saveCVAnalysis({ title: 'AI CV analizi', score, feedback: res.result }).then(saved => {
             if (!saved.ok) console.warn('AI CV nəticəsi saxlanmadı:', saved.error);
@@ -3700,7 +3700,7 @@ document.addEventListener('click', e => {
         S.interview.aiLoading = false;
         if (res.ok) S.interview.aiResult = res.result;
         Store.save();
-        if (Store.mode === 'supabase') {
+        if (Store.mode === 'remote') {
           Backend.saveInterviewSession({ ...S.interview, major: S.student.major }).then(saved => {
             if (!saved.ok) console.warn('Müsahibə nəticəsi saxlanmadı:', saved.error);
           });
@@ -3731,7 +3731,7 @@ document.addEventListener('click', e => {
       if (!g('v-title')) { toast('Vəzifə adını yazın'); break; }
       const majors = [...(document.getElementById('v-majors') || { selectedOptions: [] }).selectedOptions].map(o => o.value);
 
-      if (Store.mode === 'supabase') {
+      if (Store.mode === 'remote') {
         const tax = Store.tax;
         Backend.createJob({
           company_id: S.company.id,
@@ -3912,7 +3912,7 @@ let notificationPollTimer = null;
 let knownUnreadNotifications = 0;
 
 async function refreshNotifications(announceNew = false) {
-  if (Store.mode !== 'supabase' || !Auth.isSignedIn()) return;
+  if (Store.mode !== 'remote' || !Auth.isSignedIn()) return;
   const scope = window.CareerSession.capture();
   const result = await Backend.notificationsFeed();
   if (!window.CareerSession.matches(scope)) return;
@@ -3926,7 +3926,7 @@ async function refreshNotifications(announceNew = false) {
 }
 
 function startNotificationUpdates() {
-  if (Store.mode !== 'supabase' || !Auth.isSignedIn()) return;
+  if (Store.mode !== 'remote' || !Auth.isSignedIn()) return;
   stopNotificationUpdates();
   knownUnreadNotifications = ((Store.state.notifications || []).filter(item => !item.readAt)).length;
   Backend.subscribeNotifications(() => refreshNotifications(true));
@@ -3940,7 +3940,7 @@ function stopNotificationUpdates() {
 }
 
 function loadFeed() {
-  if (Store.mode !== 'supabase') { UI.feed = []; render(); return; }
+  if (Store.mode !== 'remote') { UI.feed = []; render(); return; }
   const scope = window.CareerSession.capture();
   Backend.feed().then(res => { if (res?.stale) return;
     if (!window.CareerSession.matches(scope)) return;
@@ -3951,7 +3951,7 @@ function loadFeed() {
 }
 
 function loadBenefits() {
-  if (Store.mode !== 'supabase') { UI.benefits = { rows: [], claims: [], partners: [] }; render(); return; }
+  if (Store.mode !== 'remote') { UI.benefits = { rows: [], claims: [], partners: [] }; render(); return; }
   const scope = window.CareerSession.capture();
   Backend.benefits().then(res => { if (res?.stale) return;
     if (!window.CareerSession.matches(scope)) return;
@@ -4013,7 +4013,7 @@ function paintPasswordMatch() {
 /* Profil/şirkət dəyişiklikləri hər klavişdə deyil, yazma dayandıqdan sonra göndərilir. */
 const pushTimers = {};
 function schedulePush(what) {
-  if (Store.mode !== 'supabase') return;
+  if (Store.mode !== 'remote') return;
   clearTimeout(pushTimers[what]);
   pushTimers[what] = setTimeout(() => {
     if (what === 'profile') Store.pushProfile(); else Store.pushCompany();
@@ -4079,7 +4079,7 @@ document.addEventListener('submit', e => {
       EmployerTools.afterNavigate(Store.state.view);
       window.scrollTo(0, 0);
       toast(act === 'login-form' ? `Xoş gəldiniz, ${name}` : 'Hesabınız yaradıldı');
-      if (Store.mode === 'supabase') startNotificationUpdates();
+      if (Store.mode === 'remote') startNotificationUpdates();
     } else if (res.confirmation) {
       /* E-poçt təsdiqi gözlənilir — giriş tabına qaytarırıq. */
       const email = UI.auth.email;
@@ -4097,7 +4097,7 @@ document.addEventListener('submit', e => {
     }
   };
 
-  const remote = Store.mode === 'supabase';
+  const remote = Store.mode === 'remote';
 
   if (act === 'login-form') {
     (remote ? Auth.loginRemote(UI.auth.email, UI.auth.password)
@@ -4249,7 +4249,7 @@ document.addEventListener('change', () => {
  * Başlanğıc
  * ================================================================ */
 /**
- * Supabase əlçatandırmı? Şəbəkə bloklanıbsa (məs. artifact mühiti) və ya
+ * Server əlçatandırmı? Şəbəkə bloklanıbsa (məs. artifact mühiti) və ya
  * layihə söndürülübsə, offline demo rejiminə keçirik.
  */
 async function probeBackend() {
@@ -4259,8 +4259,8 @@ async function probeBackend() {
     /* 2.5 saniyə: sağlam bağlantı üçün kifayətdir, zəif bağlantıda isə
        istifadəçini yükləmə ekranında uzun saxlamır — offline rejimə keçirik. */
     const timer = setTimeout(() => ctrl.abort(), 2500);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/faculties?select=id&limit=1`, {
-      headers: { apikey: SUPABASE_PUBLISHABLE_KEY },
+    const res = await fetch(`${API_URL}/rest/v1/faculties?select=id&limit=1`, {
+      headers: { apikey: API_KEY },
       signal: ctrl.signal
     });
     clearTimeout(timer);
@@ -4282,14 +4282,14 @@ async function probeBackend() {
   /*
    * ÖNƏMLİ: rejim forma istifadəyə açılmazdan ƏVVƏL təyin olunmalıdır.
    * Əks halda qeydiyyat hələ `local` rejimdə gedir, yoxlama bitəndən sonra
-   * rejim `supabase`-ə keçir və giriş artıq serverdə axtarılır — hesab
+   * rejim `remote`-a keçir və giriş artıq serverdə axtarılır — hesab
    * "yoxa çıxmış" kimi görünür. Ona görə əvvəlcə yükləmə ekranı göstəririk.
    */
   UI.booting = true;
   render();
 
   const online = await probeBackend();
-  Store.mode = CAREER_DEMO_MODE ? 'local' : 'supabase';
+  Store.mode = CAREER_DEMO_MODE ? 'local' : 'remote';
   if (online) UI.providers = await Backend.providers();
 
   if (online) {

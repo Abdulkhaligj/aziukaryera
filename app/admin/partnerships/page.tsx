@@ -30,9 +30,9 @@ export default async function PartnershipAdminPage({
   if (!context) redirect('/login');
   if (context.mustChangePassword) redirect('/account/password');
   const [{data:requests,error},{data:companies},params] = await Promise.all([
-    context.supabase.from('company_partnership_requests').select('*')
+    context.db.from('company_partnership_requests').select('*')
       .order('created_at',{ascending:false}).limit(500),
-    context.supabase.from('companies').select('id,name'),
+    context.db.from('companies').select('id,name'),
     searchParams
   ]);
   const rows=(requests||[]) as Partnership[];

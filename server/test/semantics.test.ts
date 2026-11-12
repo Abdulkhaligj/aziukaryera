@@ -2,12 +2,12 @@
 // the end of the statement, and BEFORE INSERT triggers inside an upsert.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
-let student: SupabaseClient, studentId: string, otherId: string, admin: SupabaseClient;
+let student: ApiClient, studentId: string, otherId: string, admin: ApiClient;
 
 before(async () => {
   h = await startHarness();

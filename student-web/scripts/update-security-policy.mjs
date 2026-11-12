@@ -4,7 +4,6 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 const portal = new URL('../', import.meta.url);
 const hashes = new Set([
-  'sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4',
   'sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z',
   'sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1',
   'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU'
@@ -21,7 +20,7 @@ const policy = [
   "script-src 'self' " + [...hashes].map(value => "'" + value + "'").join(' '),
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com", "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self'",
   "frame-src 'self'", "worker-src 'self'", "form-action 'self'"
 ].join('; ');
 for (const name of ['index.html', 'cv-builder.html']) {
@@ -37,7 +36,7 @@ config.headers[0].headers = headers;
 writeFileSync(new URL('vercel.json', portal), JSON.stringify(config, null, 2) + '\n');
 writeFileSync(new URL('nginx-security-headers.conf', portal), [
   '# Include in the HTTPS server/location serving this static portal.',
-  '# Tighten connect-src to your exact Supabase origin/custom domain before release.',
+  '# connect-src gets the API origin at the cutover (deploy/universitet-mysql/scripts/05-switch-frontend.mjs).',
   'add_header Content-Security-Policy "' + policy + "; frame-ancestors 'self'\" always;",
   'add_header X-Content-Type-Options "nosniff" always;',
   'add_header Referrer-Policy "no-referrer" always;',

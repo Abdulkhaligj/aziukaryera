@@ -1,15 +1,15 @@
 // /rest/v1/rpc — the database functions the portal, the admin panel and the
-// Edge Functions call, through supabase-js. Tests run in order; the platform
+// Edge Functions call, through the data client. Tests run in order; the platform
 // reset is last.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
 import { matchScore } from '../src/rpc/profiles.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
-let student: SupabaseClient, company: SupabaseClient, admin: SupabaseClient, editor: SupabaseClient, service: SupabaseClient;
+let student: ApiClient, company: ApiClient, admin: ApiClient, editor: ApiClient, service: ApiClient;
 let studentId: string, companyUser: string, companyId: string, adminId: string;
 let jobId: string, applicationId: string, requestId: string;
 

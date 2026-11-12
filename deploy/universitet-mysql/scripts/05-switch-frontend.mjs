@@ -27,14 +27,16 @@ function replaceOnce(text, from, to, file) {
 
 const web = 'student-web';
 edit(`${web}/assets/js/runtime-config.js`, text => text
-  .replace(/supabaseUrl: '[^']*'/, `supabaseUrl: '${url}'`)
-  .replace(/supabasePublishableKey: '[^']*'/, `supabasePublishableKey: '${key}'`));
+  .replace(/apiUrl: '[^']*'/, `apiUrl: '${url}'`)
+  .replace(/apiKey: '[^']*'/, `apiKey: '${key}'`));
 
-const cloudCsp = "connect-src 'self' https://*.supabase.co wss://*.supabase.co";
+// Until the cutover the sites may only connect to themselves; now also to the API.
 const ownCsp = `connect-src 'self' https://${host} wss://${host}`;
-for (const file of ['index.html', 'cv-builder.html', 'vercel.json', 'nginx-security-headers.conf', 'scripts/update-security-policy.mjs']) {
-  edit(`${web}/${file}`, text => replaceOnce(text, cloudCsp, ownCsp, file));
+for (const file of ['index.html', 'cv-builder.html', 'vercel.json', 'nginx-security-headers.conf']) {
+  edit(`${web}/${file}`, text => replaceOnce(text, "connect-src 'self';", `${ownCsp};`, file));
 }
+edit(`${web}/scripts/update-security-policy.mjs`, text =>
+  replaceOnce(text, `"connect-src 'self'",`, `"${ownCsp}",`, 'scripts/update-security-policy.mjs'));
 
 const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '') + 's';
 for (const file of ['index.html', 'cv-builder.html']) {
@@ -53,8 +55,8 @@ console.log(`
 Növbəti addımlar:
   1. Admin panel (Vercel → asoiu-career-admin → Settings → Environment Variables, Production),
      push-dan ƏVVƏL:
-       NEXT_PUBLIC_SUPABASE_URL = ${url}
-       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = <ANON_KEY>
+       NEXT_PUBLIC_API_URL = ${url}
+       NEXT_PUBLIC_API_KEY = <ANON_KEY>
      (adlar köhnədir, dəyərlər yeni MySQL API-nin ünvanı və açarıdır)
   2. Testlər:  node --test tests/*.test.mjs
   3. Commit və push: git add -A && git commit -m "chore: switch the sites to ${host}" && git push origin main

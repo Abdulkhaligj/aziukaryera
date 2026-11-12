@@ -1,10 +1,10 @@
 /*!
  * ADNSU / ASOIU Career v2 — backend.js
- * Supabase data qatı.
+ * Server data qatı.
  *
  * DİZAYN QƏRARI: render kodu sinxron qalır.
  * Giriş anında bütün lazımi məlumat bir dəfə `Store.state`-ə yüklənir
- * (`Backend.loadAll`), mutasiyalar isə write-through olur: əvvəlcə Supabase-ə
+ * (`Backend.loadAll`), mutasiyalar isə write-through olur: əvvəlcə serverə
  * yazılır, uğurlu olarsa yerli vəziyyət yenilənir. Beləcə v2-nin bütün
  * görünüşləri (`app.js`) dəyişmədən işləyir.
  *
@@ -23,7 +23,7 @@ const Backend = {
    * ---------------------------------------------------------------- */
 
   available() {
-    return USE_SUPABASE && typeof window !== 'undefined' && !!window.supabase;
+    return USE_BACKEND && typeof window !== 'undefined' && !!window.ApiClient;
   },
 
   init(authOptions = {}) {
@@ -33,7 +33,7 @@ const Backend = {
       if (window.CVDrafts) void window.CVDrafts.connect(this.sb);
       return true;
     }
-    this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    this.sb = window.ApiClient.createClient(API_URL, API_KEY, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, ...authOptions }
     });
     window.CareerSession?.connect(this.sb);
@@ -52,7 +52,7 @@ const Backend = {
   },
 
   async signIn(email, password) {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { data, error } = await this.sb.auth.signInWithPassword({
       email: String(email).trim().toLowerCase(),
       password
@@ -80,7 +80,7 @@ const Backend = {
    * domenini yoxlayır. Buradakı dəyər yalnız "nə istədiyini" bildirir.
    */
   async signUp(p) {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { data, error } = await this.sb.auth.signUp({
       email: String(p.email).trim().toLowerCase(),
       password: p.password,
@@ -132,15 +132,15 @@ const Backend = {
   },
 
   /**
-   * Hansı OAuth provayderləri aktivdir? Supabase bunu açıq endpoint-də verir.
+   * Hansı OAuth provayderləri aktivdir? Server bunu açıq endpoint-də verir.
    * Beləcə sönülü provayderin düyməsini ümumiyyətlə göstərmirik —
    * istifadəçi işləməyən düyməyə basmır.
    */
   async providers() {
-    if (!USE_SUPABASE) return {};
+    if (!USE_BACKEND) return {};
     try {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, {
-        headers: { apikey: SUPABASE_PUBLISHABLE_KEY }
+      const res = await fetch(`${API_URL}/auth/v1/settings`, {
+        headers: { apikey: API_KEY }
       });
       if (!res.ok) return {};
       const j = await res.json();
@@ -154,7 +154,7 @@ const Backend = {
    * əsl məcburiyyət isə bazadakı trigger-dədir (klient tərəfə etibar edilmir).
    */
   async signInWithGoogle() {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { error } = await this.sb.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -168,7 +168,7 @@ const Backend = {
 
   /** Microsoft 365 / Entra ID ilə universitet girişi. */
   async signInWithAzure() {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { error } = await this.sb.auth.signInWithOAuth({
       provider: 'azure',
       options: {
@@ -207,7 +207,7 @@ const Backend = {
   },
 
   async resetPassword(email) {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { error } = await this.sb.auth.resetPasswordForEmail(
       String(email).trim().toLowerCase(),
       { redirectTo: `${window.location.origin}${window.location.pathname}` }
@@ -216,15 +216,15 @@ const Backend = {
   },
 
   async changePassword(newPassword) {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { error } = await this.sb.auth.updateUser({ password: newPassword });
     return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
   },
 
   /**
-   * Supabase xəta mətnlərinin Azərbaycan dilinə çevrilməsi.
+   * Server xəta mətnlərinin Azərbaycan dilinə çevrilməsi.
    *
-   * Qeyd: Supabase qeydiyyat trigger-indəki hər hansı xətanı eyni ümumi
+   * Qeyd: serverin qeydiyyat qaydasındakı hər hansı xətanı eyni ümumi
    * «Database error saving new user» mətni ilə örtür — əsl səbəbi göstərmir.
    * Bizim halda bunun praktiki olaraq yeganə səbəbi e-poçt domeninin
    * universitetə aid olmamasıdır, ona görə istifadəçiyə məhz bunu deyirik.
@@ -250,7 +250,7 @@ const Backend = {
     if (/Password should be at least|weak.?password/i.test(m)) return 'Şifrə ən azı 8 simvol olmalıdır.';
     if (/asoiu\.edu\.az/i.test(m)) return 'Tələbə qeydiyyatı üçün @asoiu.edu.az e-poçtu tələb olunur.';
     if (/over_email_send_rate_limit|rate limit|too many requests|429/i.test(m)) {
-      return 'E-poçt göndərmə limitinə çatıldı. Bir saat gözləyin və ya Supabase-də öz SMTP serverinizi qoşun.';
+      return 'E-poçt göndərmə limitinə çatıldı. Bir saat gözləyin.';
     }
     if (/duplicate key/i.test(m)) return 'Bu qeyd artıq mövcuddur.';
     if (/row-level security|insufficient_privilege|icazəsi yoxdur/i.test(m)) {
@@ -272,7 +272,7 @@ const Backend = {
 
   /** Təsdiq e-poçtunu yenidən göndərir. */
   async resendConfirmation(email) {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
     const { error } = await this.sb.auth.resend({
       type: 'signup',
       email: String(email).trim().toLowerCase(),
@@ -287,7 +287,7 @@ const Backend = {
 
   /** Bütün lazımi məlumatı bir dəfəyə yükləyib Store.state-ə yerləşdirir. */
   async loadAll() {
-    if (!this.init()) return { ok: false, error: 'Supabase konfiqurasiya olunmayıb.' };
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
 
     const session = await this.getSession();
     if (!session) return { ok: false, error: 'Sessiya yoxdur.' };
@@ -376,13 +376,12 @@ const Backend = {
     return failed || { ok: true, readAt: new Date().toISOString() };
   },
 
-  /* Supabase pushes new notifications over Realtime. The university API has
-   * no Realtime, so there the list is refreshed every 30 seconds and whenever
-   * the tab becomes visible again (CAREER_CONFIG.notificationPollSeconds). */
+  /* The API has no Realtime: the list is refreshed every 30 seconds and
+   * whenever the tab becomes visible again (CAREER_CONFIG.notificationPollSeconds). */
   notificationPollSeconds() {
     const configured = Number(CAREER_CONFIG.notificationPollSeconds);
     if (Number.isFinite(configured) && configured >= 0) return configured;
-    try { return /\.supabase\.co$/i.test(new URL(SUPABASE_URL).hostname) ? 0 : 30; } catch { return 30; }
+    return 30;
   },
 
   subscribeNotifications(onChange) {

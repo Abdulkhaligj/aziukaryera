@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Moves the data (with password hashes) and the files from the final backup of
-# the old database into MySQL. The old Supabase project was deleted on
-# 2026-11-12; everything it held is in that backup folder:
-#   supabase-full.dump   pg_dump (custom format) of the public, private, auth and storage schemas
+# the old database into MySQL. The old database was shut down on 2026-11-12;
+# everything it held is in that backup folder:
+#   full.dump            pg_dump (custom format) of the public, private, auth and storage schemas
 #   storage/<bucket>/…   every stored file
 # Needs, in the environment:
 #   IMPORT_BACKUP_DIR    path to that folder on this server
 . "$(dirname "$0")/lib.sh"
 load_env
-[ -n "${IMPORT_BACKUP_DIR:-}" ] || die "IMPORT_BACKUP_DIR lazımdır: supabase-full.dump və storage/ olan qovluq."
+[ -n "${IMPORT_BACKUP_DIR:-}" ] || die "IMPORT_BACKUP_DIR lazımdır: full.dump və storage/ olan qovluq."
 IMPORT_BACKUP_DIR="$(cd "$IMPORT_BACKUP_DIR" && pwd)" || die "IMPORT_BACKUP_DIR tapılmadı."
-[ -f "$IMPORT_BACKUP_DIR/supabase-full.dump" ] || die "$IMPORT_BACKUP_DIR/supabase-full.dump yoxdur."
+[ -f "$IMPORT_BACKUP_DIR/full.dump" ] || die "$IMPORT_BACKUP_DIR/full.dump yoxdur."
 [ -d "$IMPORT_BACKUP_DIR/storage" ] || die "$IMPORT_BACKUP_DIR/storage qovluğu yoxdur."
 export IMPORT_BACKUP_DIR
 
@@ -26,8 +26,7 @@ dc exec -T pgrestore pg_isready -U postgres -q || die "Müvəqqəti Postgres ba�
 # Roles and extensions the dump refers to, so every table, view and index restores.
 dc exec -T pgrestore psql -q -U postgres -v ON_ERROR_STOP=1 -c "
   do \$\$ declare r text; begin
-    foreach r in array array['anon','authenticated','service_role','supabase_auth_admin','supabase_storage_admin',
-      'authenticator','supabase_admin','dashboard_user','pgbouncer','supabase_realtime_admin','supabase_replication_admin','supabase_read_only_user'] loop
+    foreach r in array array['anon','authenticated','service_role'] loop
       if not exists (select 1 from pg_roles where rolname = r) then execute format('create role %I', r); end if;
     end loop; end \$\$;
   create schema if not exists extensions;
@@ -36,7 +35,7 @@ dc exec -T pgrestore psql -q -U postgres -v ON_ERROR_STOP=1 -c "
   create extension if not exists btree_gist with schema extensions;"
 # "schema public already exists" is the one expected message; the row-count
 # check of the import below catches anything that did not restore.
-dc exec -T pgrestore pg_restore -U postgres -d postgres --no-owner --no-privileges /backup/supabase-full.dump || true
+dc exec -T pgrestore pg_restore -U postgres -d postgres --no-owner --no-privileges /backup/full.dump || true
 
 step "Sxem yenidən qurulur (boş baza)"
 dc stop api >/dev/null 2>&1 || true

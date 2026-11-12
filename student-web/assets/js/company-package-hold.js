@@ -2,7 +2,7 @@
  * ADNSU Karyera — temporary package marketing hold.
  * Hides company price/package selection ONLY. Candidate search, Talent Pool,
  * candidate comparison, HR analysis, interviews and other modules stay open.
- * Pilot search shows only profiles already authorized by Supabase RLS.
+ * Pilot search shows only profiles already authorized by the server access rules.
  * No database, subscription, payment, or security-policy changes.
  * To restore package UI later, remove this script from index.html.
  */
@@ -19,7 +19,7 @@
   </div>`;
 
   // Temporary pilot access: active, signed-in employers may use search and
-  // Talent Pool screens. This is UI-only: Supabase RLS still limits students
+  // Talent Pool screens. This is UI-only: the server access rules still limit students
   // to company applicants or records this employer is entitled to see.
   // AI ranking and all other paid-feature checks remain server-controlled.
   if (typeof companyCanUse === 'function') {
@@ -28,7 +28,7 @@
       if (feature !== 'candidate_search') return originalCanUse(feature);
       const user = typeof Auth !== 'undefined' && Auth.currentUser();
       return !!(user && user.role === 'company' && user.status === 'active' &&
-        Store.mode === 'supabase' && Store.state?.company);
+        Store.mode === 'remote' && Store.state?.company);
     };
   }
 

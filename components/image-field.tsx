@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ImagePlus, LoaderCircle, Trash2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/backend/client';
 
 /* Şəkli brauzerdə kiçildib yenidən kodlayır: fayl yüngülləşir, EXIF/GPS silinir.
    Şəffaf loqolar üçün WebP (alfa kanalı saxlanır); WebP yaza bilməyən brauzerdə PNG/JPEG. */
@@ -31,14 +31,14 @@ async function resizeImage(file: File, max: number): Promise<Blob> {
 export async function uploadPublicImage(file: File, folder: string): Promise<string> {
   if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('Yalnız PNG, JPG və ya WebP şəkil seçin');
   if (file.size > 15 * 1024 * 1024) throw new Error('Şəkil 15 MB-dan böyük olmamalıdır');
-  const supabase = createClient();
-  if (!supabase) throw new Error('Bağlantı qurulmayıb');
+  const db = createClient();
+  if (!db) throw new Error('Bağlantı qurulmayıb');
   const blob = await resizeImage(file, 1600);
   const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
   const path = `${folder}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('public-media').upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
+  const { error } = await db.storage.from('public-media').upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
   if (error) throw new Error(/row-level|unauthor/i.test(error.message) ? 'Şəkil yükləməyə icazəniz yoxdur' : error.message);
-  return supabase.storage.from('public-media').getPublicUrl(path).data.publicUrl;
+  return db.storage.from('public-media').getPublicUrl(path).data.publicUrl;
 }
 
 export default function ImageField({ name, label, defaultValue, folder, hint, wide = false }: { name: string; label: string; defaultValue?: string; folder: string; hint?: string; wide?: boolean }) {

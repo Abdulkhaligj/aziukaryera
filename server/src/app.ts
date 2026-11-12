@@ -1,4 +1,4 @@
-// Assembles the API. Routes follow the Supabase URL layout so supabase-js
+// Assembles the API. Routes follow the URL layout the sites' data client
 // clients only need a different base URL.
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
@@ -29,7 +29,7 @@ export async function buildApp(deps: AppDeps) {
     maxAge: 86400
   });
 
-  // supabase-js sends some POSTs (e.g. /logout) with a JSON content type and
+  // The data client sends some POSTs (e.g. /logout) with a JSON content type and
   // no body; GoTrue and PostgREST accept that, so an empty body means {}.
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
