@@ -35,9 +35,22 @@ const securityHeaders = [
 
 const noStore = [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }];
 
+// The backend is moving to the university's MySQL server and the old one is
+// gone. While this is true every page shows /maintenance. Set it to false
+// once the MySQL API is live (see deploy/universitet-mysql/README.md).
+const MAINTENANCE = true;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    if (!MAINTENANCE) return [];
+    return [{
+      source: '/((?!maintenance|_next/|icons/|favicon|manifest\\.webmanifest).*)',
+      destination: '/maintenance',
+      permanent: false
+    }];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },
