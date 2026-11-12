@@ -94,7 +94,7 @@ Storage protokolunun data kitabxanasının istifadə etdiyi hissəsi: yükləmə
 
 ## Edge Functions (`/functions/v1/:name`)
 
-`functions/*` altındakı 5 funksiya **dəyişdirilmədən** API prosesinin içində işləyir. `src/functions/runtime.ts` kiçik bir Deno əvəzi verir (`Deno.serve`, `Deno.env.get`), `npm:`/`jsr:` importlarını da serverin paketlərinə yönləndirir. Funksiyalar API-nin özünə data kitabxanası ilə müraciət edir (`API_URL` = API-nin ünvanı). Ona görə kod bir yerdə qalır və keçid gününə qədər Supabase-də də işləyir.
+`functions/*` altındakı 5 funksiya **dəyişdirilmədən** API prosesinin içində işləyir. `src/functions/runtime.ts` kiçik bir Deno əvəzi verir (`Deno.serve`, `Deno.env.get`), `npm:`/`jsr:` importlarını da serverin paketlərinə yönləndirir. Funksiyalar API-nin özünə data kitabxanası ilə müraciət edir (`API_URL` = API-nin ünvanı).
 
 - JWT yoxlaması köhnə gateway-dəki kimidir: yalnız `admin-users` üçün (`verify_jwt = true`). Qalanları çağıranı özləri yoxlayır.
 - Funksiyaların açarları API-nin mühitindən oxunur: `GEMINI_API_KEY`, `GROQ_API_KEY`, `GEMINI_*_MODEL`, `MODERATION_WEBHOOK_SECRET`, `PUBLIC_SITE_URL`.
