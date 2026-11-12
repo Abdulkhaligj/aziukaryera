@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 

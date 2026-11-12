@@ -1,5 +1,6 @@
 // Server-side helpers for the admin API routes: input normalisation, safe
 // error messages and a same-origin check for state-changing requests.
+import 'server-only';
 
 /** A clickable web link: http(s) only (no javascript:, data: …). */
 export function webUrl(value: unknown): string | null {
