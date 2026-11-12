@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/((?!maintenance|service-worker\\.js|favicon|manifest\\.webmanifest|assets/).*)",
+      "destination": "/maintenance",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/jobs/:path*",
