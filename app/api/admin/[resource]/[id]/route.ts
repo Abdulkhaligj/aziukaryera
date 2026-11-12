@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       update.approved_by = context.userId;
       update.approved_at = new Date().toISOString();
     }
-    const { data, error } = await context.supabase.from('jobs')
+    const { data, error } = await context.db.from('jobs')
       .update(update).eq('id', id).select('id,status').maybeSingle();
     if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
     if (!data) return NextResponse.json({ error: 'Vakansiya tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     /* "Şifrəni sıfırla": yeni müvəqqəti şifrə qaytarılır (yalnız hesab yaratmaq hüququ olanlar) */
     const action = body.__action === 'reset_password' ? 'reset_password' : 'update';
     if (action === 'reset_password' && !can(context.role, 'create', key)) return NextResponse.json({ error: 'Şifrəni sıfırlamağa icazəniz yoxdur' }, { status: 403 });
-    const { data, error } = await context.supabase.functions.invoke('admin-users', {
+    const { data, error } = await context.db.functions.invoke('admin-users', {
       body: { ...body, action, resource: key, id }
     });
     if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'İstifadəçi yenilənmədi') }, { status: 400 });
@@ -81,16 +81,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     let partnerId = text(body.partner_id);
     const partnerName = text(body.partner_name);
     if (partnerName) {
-      const { data: partner } = await context.supabase.from('benefit_partners').select('id').ilike('name', escapeLike(partnerName)).maybeSingle();
+      const { data: partner } = await context.db.from('benefit_partners').select('id').ilike('name', escapeLike(partnerName)).maybeSingle();
       if (partner?.id) partnerId = partner.id;
       else {
-        const { data: created, error: partnerError } = await context.supabase.from('benefit_partners').insert({ name: partnerName, status: 'active', logo_url: httpsUrl(body.partner_logo_url) }).select('id').single();
+        const { data: created, error: partnerError } = await context.db.from('benefit_partners').insert({ name: partnerName, status: 'active', logo_url: httpsUrl(body.partner_logo_url) }).select('id').single();
         if (partnerError) return NextResponse.json({ error: publicError(partnerError) }, { status: 400 });
         partnerId = created.id;
       }
     }
     if (!partnerId) return NextResponse.json({ error: 'Tərəfdaş adı məcburidir' }, { status: 400 });
-    if (httpsUrl(body.partner_logo_url)) await context.supabase.from('benefit_partners').update({ logo_url: httpsUrl(body.partner_logo_url) }).eq('id', partnerId);
+    if (httpsUrl(body.partner_logo_url)) await context.db.from('benefit_partners').update({ logo_url: httpsUrl(body.partner_logo_url) }).eq('id', partnerId);
     payload = { partner_id: partnerId, title: text(body.title), description: text(body.description), discount_label: text(body.discount_label), valid_from: text(body.valid_from), valid_to: text(body.valid_to) || null, active: body.active !== false };
   }
   else if (resource === 'applications') payload = { status: text(body.status), note: text(body.note) };
@@ -107,7 +107,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const companyId = text(body.company_id);
     let companyName = text(body.company_name);
     if (companyId) {
-      const { data: company } = await context.supabase.from('companies').select('name').eq('id', companyId).maybeSingle();
+      const { data: company } = await context.db.from('companies').select('name').eq('id', companyId).maybeSingle();
       if (company?.name) companyName = company.name;
     }
     if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
@@ -133,7 +133,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       { feature_key: 'monthly_network_posts', enabled: true, limit_value: nullableNumber(body.monthly_network_posts), label: 'Aylıq şirkət paylaşımları' },
       ...[['candidate_search','Namizəd axtarışı'],['ai_candidate_matching','AI namizəd uyğunluğu'],['ai_cv_ranking','AI CV sıralaması'],['advanced_analytics','Qabaqcıl analitika'],['bulk_messaging','Kütləvi mesajlaşma'],['premium_branding','Premium şirkət səhifəsi']].map(([feature_key, label]) => ({ feature_key, label, enabled: body[feature_key] === true || body[feature_key] === 'true', limit_value: body[feature_key] === true || body[feature_key] === 'true' ? null : 0 }))
     ];
-    const { error: featureError } = await context.supabase.from('plan_features').upsert(features.map(feature => ({ ...feature, plan_id: id, updated_at: new Date().toISOString() })), { onConflict: 'plan_id,feature_key' });
+    const { error: featureError } = await context.db.from('plan_features').upsert(features.map(feature => ({ ...feature, plan_id: id, updated_at: new Date().toISOString() })), { onConflict: 'plan_id,feature_key' });
     if (featureError) return NextResponse.json({ error: publicError(featureError) }, { status: 400 });
   }
   else { table = 'site_content'; payload = { title: text(body.title), content_key: text(body.content_key), summary: text(body.summary), body: text(body.body), status: text(body.status), updated_by: context.userId }; }
@@ -147,12 +147,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       derived.has(field) || sent(body, sourceField[field] ?? field) || (field === 'rejection_reason' && sent(body, 'status'))));
   }
   if (Object.keys(payload).length) {
-    const { error } = await context.supabase.from(table).update(payload).eq('id', id);
+    const { error } = await context.db.from(table).update(payload).eq('id', id);
     if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
   }
   const audited = await writeAudit(context, resource, id, 'update', `${text(body.title) || resource} yeniləndi`);
   if (resource === 'network') {
-    await context.supabase.from('moderation_logs').insert({ target_type: 'post', target_id: id, action: text(body.moderation_status) === 'hidden' ? 'hide' : 'approve', actor_id: context.userId, reason: 'Admin panelindən moderasiya' });
+    await context.db.from('moderation_logs').insert({ target_type: 'post', target_id: id, action: text(body.moderation_status) === 'hidden' ? 'hide' : 'approve', actor_id: context.userId, reason: 'Admin panelindən moderasiya' });
   }
   return NextResponse.json({ ok: true, ...(audited ? {} : { warning: AUDIT_WARNING }) });
 }
@@ -166,7 +166,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!can(context.role, 'delete', key)) return NextResponse.json({ error: 'Silməyə icazəniz yoxdur' }, { status: 403 });
 
   if (people.has(key)) {
-    const { data, error } = await context.supabase.functions.invoke('admin-users', {
+    const { data, error } = await context.db.functions.invoke('admin-users', {
       body: { action: 'delete', resource: key, id }
     });
     if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'İstifadəçi silinmədi') }, { status: 400 });
@@ -178,7 +178,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     interview_analytics: 'interview_sessions', ai_usage: 'ai_usage'
   };
   const target = table[resource] || resource;
-  const { error } = await context.supabase.from(target).delete().eq('id', id);
+  const { error } = await context.db.from(target).delete().eq('id', id);
   if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
   const audited = await writeAudit(context, resource, id, 'delete', `${resource} qeydi silindi`);
   return NextResponse.json({ ok: true, ...(audited ? {} : { warning: AUDIT_WARNING }) });

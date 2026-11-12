@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const jobId = request.nextUrl.searchParams.get('job_id') || '';
   if (!uuid.test(jobId)) return NextResponse.json({ error: 'Vakansiya identifikatoru yanlışdır.' }, { status: 400 });
 
-  const { data, error } = await context.supabase
+  const { data, error } = await context.db
     .from('admin_audit_logs')
     .select('id,title,actor_name,created_at')
     .eq('resource', 'pending_jobs')
@@ -38,11 +38,11 @@ export async function POST(request: NextRequest) {
   if (!note || note.length > 1200)
     return NextResponse.json({ error: 'Qeyd 1–1200 simvol arasında olmalıdır.' }, { status: 400 });
 
-  const { data: job, error: jobError } = await context.supabase.from('jobs').select('id').eq('id', jobId).maybeSingle();
+  const { data: job, error: jobError } = await context.db.from('jobs').select('id').eq('id', jobId).maybeSingle();
   if (jobError || !job) return NextResponse.json({ error: 'Vakansiya tapılmadı.' }, { status: 404 });
 
   // Internal audit history; never publish the note to employers or student profiles.
-  const { data, error } = await context.supabase.from('admin_audit_logs')
+  const { data, error } = await context.db.from('admin_audit_logs')
     .insert({
       title: note,
       resource: 'pending_jobs',

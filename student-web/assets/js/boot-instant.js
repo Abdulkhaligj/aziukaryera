@@ -38,9 +38,9 @@
   }, true);
 
   // A background recovery is allowed to activate the user only after
-  // legitimate Supabase Auth and RLS data reads have succeeded.
+  // legitimate server auth and access-rule data reads have succeeded.
   Auth.restoreRemote = function () {
-    if (Store.mode !== 'supabase') return Promise.resolve(false);
+    if (Store.mode !== 'remote') return Promise.resolve(false);
     Store.state.session = null;
     Store.bind();
     void (async () => {
@@ -66,8 +66,8 @@
   // probe. Do not block navigation on the full-screen loading indicator.
   setTimeout(() => {
     if (typeof UI === 'undefined' || !UI.booting) return;
-    if (typeof USE_SUPABASE !== 'undefined' && USE_SUPABASE) {
-      Store.mode = 'supabase';
+    if (typeof USE_BACKEND !== 'undefined' && USE_BACKEND) {
+      Store.mode = 'remote';
       Store.state.session = null;
       Store.bind();
     }

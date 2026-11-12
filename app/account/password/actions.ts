@@ -1,6 +1,6 @@
 'use server';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/backend/server';
 import { getAdminContext } from '@/lib/admin-data';
 
 const fail = (message: string) => redirect('/account/password?error=' + encodeURIComponent(message));
@@ -8,9 +8,9 @@ const fail = (message: string) => redirect('/account/password?error=' + encodeUR
 export async function changePassword(formData: FormData) {
   const context = await getAdminContext({ allowPasswordChange: true });
   if (!context) redirect('/login');
-  const supabase = await createClient();
-  if (!supabase) redirect('/login');
-  const { data: auth } = await supabase.auth.getUser();
+  const db = await createClient();
+  if (!db) redirect('/login');
+  const { data: auth } = await db.auth.getUser();
   if (!auth.user) redirect('/login');
 
   const password = String(formData.get('password') || '');
@@ -21,9 +21,9 @@ export async function changePassword(formData: FormData) {
 
   // The trusted handler changes the password before clearing the onboarding
   // flag. A separate client assertion can never clear it.
-  const { data, error } = await supabase.functions.invoke('admin-users', { body: { action: 'change_password', password } });
+  const { data, error } = await db.functions.invoke('admin-users', { body: { action: 'change_password', password } });
   if (error || !data?.ok) fail('Şifrə dəyişmədi. Yeni şifrənin əvvəlkindən fərqli olduğunu yoxlayın və yenidən cəhd edin.');
-  const { error: refreshError } = await supabase.auth.refreshSession();
+  const { error: refreshError } = await db.auth.refreshSession();
   if (refreshError) redirect('/login?notice=' + encodeURIComponent('Şifrəniz yeniləndi. Yeni şifrə ilə daxil olun.'));
   redirect('/admin?notice=' + encodeURIComponent('Şifrəniz yeniləndi.'));
 }

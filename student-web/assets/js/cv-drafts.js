@@ -66,14 +66,14 @@
   }
   function connect(authClient) {
     if (connected) return connected.then(() => snapshot());
-    if (typeof USE_SUPABASE === 'undefined' || !USE_SUPABASE || !window.supabase) {
+    if (typeof USE_BACKEND === 'undefined' || !USE_BACKEND || !window.ApiClient) {
       if (typeof CAREER_DEMO_MODE !== 'undefined' && CAREER_DEMO_MODE) {
         const saved = readSession();
         if (saved?.ownerId) scope = saved;
       }
       return Promise.resolve(snapshot());
     }
-    client = authClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    client = authClient || window.ApiClient.createClient(API_URL, API_KEY, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
     });
     // Never restore private drafts from an unverified localStorage user object.

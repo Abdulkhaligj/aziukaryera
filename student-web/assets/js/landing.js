@@ -1,7 +1,7 @@
 /*!
  * ADNSU Karyera — açıq açılış səhifəsi.
  *
- * Qonaq (hesabsız ziyarətçi) üçün. Məlumat UYDURMA DEYİL — Supabase-dən
+ * Qonaq (hesabsız ziyarətçi) üçün. Məlumat UYDURMA DEYİL — serverdən
  * gəlir: elanlar, şirkətlər, tədbirlər və güzəştlər `anon` rolu üçün açıq
  * oxumaya icazə verilmiş real cədvəllərdir (bax: 0007 migrasiyası).
  * Offline rejimdə data.js-dəki demo məzmun göstərilir.
@@ -23,7 +23,7 @@ const Landing = {
    * ---------------------------------------------------------------- */
   async load() {
     const today = new Date().toISOString().slice(0, 10);
-    if (Store.mode !== 'supabase') {
+    if (Store.mode !== 'remote') {
       /* Offline: data.js-dəki demo məzmun */
       this.data = {
         jobs: OPPORTUNITIES.filter(j => j.status === 'approved' && j.deadline >= today),
@@ -35,7 +35,7 @@ const Landing = {
       return;
     }
     try {
-      const sb = Backend.init() ? Backend.sb : window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      const sb = Backend.init() ? Backend.sb : window.ApiClient.createClient(API_URL, API_KEY);
       const [jobs, cos, evs, bens, parts, facs, majs, awards] = await Promise.all([
         sb.from('jobs').select('*').eq('status', 'approved').gte('deadline', today).order('deadline'),
         sb.from('companies').select('*').eq('status', 'active').order('name'),

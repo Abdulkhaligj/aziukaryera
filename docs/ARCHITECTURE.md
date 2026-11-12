@@ -6,11 +6,11 @@ ADNSU Career Center iki ayrıca interfeysdən və bir ortaq backend-dən ibarət
 
 ```text
 Tələbə / Şirkət portalı ─┐
-                         ├─ Supabase Auth + PostgreSQL + RLS + Edge Functions
+                         ├─ MySQL API (giriş, data, icazə qatı, funksiyalar) — universitet serveri
 Admin paneli ────────────┘
 ```
 
-Əsas portal `student-web/` qovluğundakı mövcud ADNSU kabinet dizaynını saxlayır. Admin panel Next.js üzərində işləyir. Hər iki tətbiq eyni Supabase layihəsinə qoşulur; ayrıca mock verilənlər bazası istifadə olunmur.
+Əsas portal `student-web/` qovluğundakı mövcud ADNSU kabinet dizaynını saxlayır. Admin panel Next.js üzərində işləyir. Hər iki tətbiq eyni API-yə qoşulur; ayrıca mock verilənlər bazası istifadə olunmur.
 
 ## Domen modelləri
 
@@ -47,7 +47,7 @@ Limitlər UI-da göstərilir, lakin əsas nəzarət PostgreSQL trigger və RLS s
 
 ## Təhlükəsizlik sərhədləri
 
-- Supabase Auth sessiyanı və parolu idarə edir.
+- Serverin auth xidməti sessiyanı və parolu idarə edir.
 - RLS hər sorğunu istifadəçi rolu və sahiblik münasibətinə görə süzgəcdən keçirir.
 - `anon` rolu yalnız təsdiqlənmiş/yayımlanmış vakansiyaları görə bilir.
 - FREE şirkət yalnız öz vakansiyalarına müraciət etmiş namizədləri görə bilər.

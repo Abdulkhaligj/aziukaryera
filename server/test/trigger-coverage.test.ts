@@ -28,6 +28,6 @@ test('every Postgres trigger is ported with the same name, events, UPDATE OF col
   const want = expected();
   assert.deepEqual(want.filter(x => !ported.includes(x)), [], 'missing ports');
   assert.deepEqual(ported.filter(x => !want.includes(x)), [], 'ports without a Postgres trigger');
-  // 77 on public tables, plus the 2 avatar triggers on storage.objects (Supabase's own storage triggers are not ours).
+  // 77 on public tables, plus the 2 avatar triggers on storage.objects (the storage service's own triggers are not ours).
   assert.equal(new Set(source.map(s => `${s.table}.${s.name}`)).size, 79);
 });

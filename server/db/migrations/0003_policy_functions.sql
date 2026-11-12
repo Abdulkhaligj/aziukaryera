@@ -1,6 +1,6 @@
 -- Helpers referenced by the row-level policies (src/rest/policies.generated.json).
 -- They read the per-request session variables the API sets before every query,
--- the MySQL counterpart of Supabase's request.jwt.claims:
+-- the MySQL counterpart of Postgres request.jwt.claims:
 --   @auth_uid        auth.uid()            (ascii_bin, NULL for anon)
 --   @auth_role       anon | authenticated | service_role
 --   @is_admin        1 when public.current_admin_role() is not null

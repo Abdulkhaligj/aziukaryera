@@ -16,7 +16,7 @@ const tasks = [
   { heading:'Fərdi məlumatların reyestri', detail:'Dövlət qeydiyyatı öhdəliyinin olub-olmaması və mümkün istisna yazılı qaydada qiymətləndirilməlidir.' },
   { heading:'Vasitəçilik statusu', detail:'İşədüzəltmə vasitəçiliyi üzrə fəaliyyət təsnifatı və mümkün reyestr tələbi dəqiqləşdirilməlidir.' },
   { heading:'CV və razılıq', detail:'Hər şirkətlə məlumat paylaşımının hüquqi əsası və tələb edilən razılıq forması təsdiq edilməlidir.' },
-  { heading:'Transsərhəd məlumat axını', detail:'Vercel, Supabase və AI xidmətlərinin regionları, üçüncü tərəf emalı və məlumat ötürülməsi qiymətləndirilməlidir.' },
+  { heading:'Transsərhəd məlumat axını', detail:'Vercel, universitet serveri və AI xidmətlərinin regionları, üçüncü tərəf emalı və məlumat ötürülməsi qiymətləndirilməlidir.' },
   { heading:'Məlumat hüquqları', detail:'İstifadəçi sorğularının qəbulu, şəxsiyyət təsdiqi, qanuni müddətlər, silinmə və cavab qaydası təsdiqlənməlidir.' },
   { heading:'Şirkət təhlükəsizliyi', detail:'RLS, təsdiqlənmiş şirkət statusu, ayrı-seçkiliyin moderasiyası və CV-yə yalnız səlahiyyətli giriş sınaqdan keçirilməlidir.' },
   { heading:'Paketlər və ödəniş', detail:'Free/Pro/Business müqaviləsi, tariflər, qanuni hesablaşma və geri ödəniş proseduru dəqiqləşdirilməlidir.' },

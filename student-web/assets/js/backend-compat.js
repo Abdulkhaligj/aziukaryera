@@ -1,7 +1,7 @@
 /*!
  * ADNSU Career - runtime backend compatibility.
  * The deployed 20261024 app.js expects avatar, ads and awards methods absent
- * from the deployed backend.js. Restore those methods using existing Supabase
+ * from the deployed backend.js. Restore those methods using existing server
  * tables/functions, never exposing private records or bypassing RLS.
  */
 (() => {

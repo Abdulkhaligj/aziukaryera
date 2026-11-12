@@ -1,6 +1,6 @@
 // /rest/v1/rpc functions: the database functions the site, the admin panel and
 // the Edge Functions call. Each declares its parameters (Postgres types), the
-// roles granted EXECUTE (service_role may run every function, as in Supabase),
+// roles granted EXECUTE (service_role may run every function, as before the move),
 // its security (DEFINER code writes as owner: env.definer) and its result shape.
 import { DbRuleError } from '../errors.ts';
 import type { WriteEnv } from '../write/pipeline.ts';

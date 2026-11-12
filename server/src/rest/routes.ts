@@ -1,4 +1,4 @@
-// /rest/v1 — the PostgREST subset supabase-js uses: table reads with
+// /rest/v1 — the PostgREST subset the data client uses: table reads with
 // embedding and counts, inserts/upserts, updates, deletes. Every request runs
 // in one transaction with the caller's session variables set.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -100,7 +100,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     return send(reply, req, 200, result.rows, { range });
   };
   // Fastify derives HEAD from GET; the handler answers it with headers only.
-  // /rpc/:name — POST with named arguments in a JSON object (supabase-js), or
+  // /rpc/:name — POST with named arguments in a JSON object (data client), or
   // GET with arguments in the query string for read-only functions. Rows of a
   // set-returning function can be shaped with select, filters, order, limit.
   async function rpcCall(req: FastifyRequest<{ Params: { name: string }; Querystring: Query; Body: unknown }>, reply: FastifyReply) {

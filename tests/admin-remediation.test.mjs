@@ -48,10 +48,10 @@ test('audit storage failure is a logged warning, never a failed (retryable) save
   const logged = [];
   const { writeAudit } = load('lib/admin-data.ts', ['writeAudit'], { console: { error: (...args) => logged.push(args.join(' ')) } });
   let attempts = 0;
-  assert.equal(await writeAudit({ userId: 'actor', fullName: 'Fixture', supabase: { from: () => ({ insert: async () => { attempts++; return { error: { message: 'unavailable' } }; } }) } }, 'events', null, 'create', 'Fixture'), false);
+  assert.equal(await writeAudit({ userId: 'actor', fullName: 'Fixture', db: { from: () => ({ insert: async () => { attempts++; return { error: { message: 'unavailable' } }; } }) } }, 'events', null, 'create', 'Fixture'), false);
   assert.equal(attempts, 1);
   assert.match(logged.join('\n'), /audit/);
-  assert.equal(await writeAudit({ supabase: { from: () => ({ insert: async () => ({ error: null }) }) } }, 'events', null, 'create', 'Fixture'), true);
+  assert.equal(await writeAudit({ db: { from: () => ({ insert: async () => ({ error: null }) }) } }, 'events', null, 'create', 'Fixture'), true);
 });
 
 class Redirect extends Error { constructor(url) { super(url); this.url = url; } }

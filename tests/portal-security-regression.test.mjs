@@ -31,10 +31,10 @@ function makeMain(storage, behavior = async () => ({ error: null })) {
   let calls = 0, purges = 0;
   const sdk = { auth: { signOut: async () => { calls++; return behavior(); } } };
   const context = vm.createContext({
-    USE_SUPABASE: true, SUPABASE_URL: 'https://test.invalid', SUPABASE_PUBLISHABLE_KEY: 'public',
-    window: { supabase: { createClient: () => sdk }, CVDrafts: { clear() { purges++; }, connect: async () => null } },
+    USE_BACKEND: true, API_URL: 'https://test.invalid', API_KEY: 'public',
+    window: { ApiClient: { createClient: () => sdk }, CVDrafts: { clear() { purges++; }, connect: async () => null } },
     localStorage: storage, document: { getElementById: () => null },
-    Store: { mode: 'supabase', state: { session: { userId: 'student-A' } }, bind() {}, save() {} },
+    Store: { mode: 'remote', state: { session: { userId: 'student-A' } }, bind() {}, save() {} },
     UI: {}, Landing: { load: () => Promise.resolve() },
     stopNotificationUpdates() {}, resetAuthForm() {}, rerender() {},
     toast: value => notices.push(value), console
@@ -87,7 +87,7 @@ function makeBuilder(storage, owner = null) {
   window.parent = window;
   let currentOwner = owner;
   const callbacks = [];
-  window.supabase = { createClient: () => ({ auth: {
+  window.ApiClient = { createClient: () => ({ auth: {
     getUser: async () => ({ data: { user: currentOwner ? { id: currentOwner } : null }, error: null }),
     onAuthStateChange: callback => { callbacks.push(callback); return { data: { subscription: { unsubscribe() {} } } }; }
   } }) };
@@ -96,8 +96,8 @@ function makeBuilder(storage, owner = null) {
     window, document: { getElementById: () => ({}) },
     location: { origin: 'https://staging.invalid' }, localStorage: storage,
     setTimeout, clearTimeout, console, URL, Blob, crypto,
-    USE_SUPABASE: true, CAREER_DEMO_MODE: false,
-    SUPABASE_URL: "https://test.invalid", SUPABASE_PUBLISHABLE_KEY: "public",
+    USE_BACKEND: true, CAREER_DEMO_MODE: false,
+    API_URL: "https://test.invalid", API_KEY: "public",
   });
   vm.runInContext(draftsSource, context);
   const start = cvSource.indexOf('function __RUN_APP__() {');
@@ -249,15 +249,17 @@ test('account replacement cannot put old data under the new owner', async () => 
 
 test('unconfigured default does not point at the sender project or enable implicit demo auth', () => {
   const context = vm.createContext({ window: {} });
-  vm.runInContext(read('assets/js/config.js') + '\nglobalThis.config = { SUPABASE_URL, USE_SUPABASE, CAREER_DEMO_MODE };', context);
-  assert.equal(context.config.SUPABASE_URL, '');
-  assert.equal(context.config.USE_SUPABASE, false);
+  vm.runInContext(read('assets/js/config.js') + '\nglobalThis.config = { API_URL, USE_BACKEND, CAREER_DEMO_MODE };', context);
+  assert.equal(context.config.API_URL, '');
+  assert.equal(context.config.USE_BACKEND, false);
   assert.equal(context.config.CAREER_DEMO_MODE, false);
 });
 
 test('external executable dependencies are exact versions with SHA384 integrity', () => {
   const index = read('index.html');
-  assert.match(index, /supabase-js@2\.58\.0[^>]+integrity="sha384-[^" ]+"[^>]+crossorigin="anonymous"/);
+  // The data client library ships with the site (same origin), pinned to one version.
+  assert.match(index, /<script src="assets\/vendor\/api-client\.min\.js\?v=[0-9a-z]+"><\/script>/);
+  assert.match(read('assets/vendor/api-client.min.js'), /^\/\*! Data client library \(MIT\), v2\.58\.0/);
   assert.match(cvSource, /react@18\.3\.1/);
   assert.match(cvSource, /react-dom@18\.3\.1/);
   assert.doesNotMatch(cvSource, /react(?:-dom)?@18\//);

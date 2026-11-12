@@ -1,14 +1,14 @@
 // The scheduled jobs that replaced pg_cron.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
 import { cronMatches, runJob } from '../src/jobs/scheduler.ts';
 import { loadSchema, type Schema } from '../src/schema.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness, schema: Schema;
-let student: SupabaseClient, studentId: string, adminId: string, companyUser: string, companyId: string;
+let student: ApiClient, studentId: string, adminId: string, companyUser: string, companyId: string;
 
 before(async () => {
   h = await startHarness();

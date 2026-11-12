@@ -8,9 +8,9 @@
 | `api` | Node.js API (`server/`): giriş, data, RPC, fayllar, Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər |
 | `caddy` | HTTPS: Let's Encrypt sertifikatını avtomatik alır və yeniləyir |
 
-API saytların artıq istifadə etdiyi HTTP protokolunu verir (supabase-js kitabxanası ilə uyğundur). Ona görə əsas sayt və admin panel **Vercel-də qalır**, kodları dəyişmir. Keçid günü yalnız ünvan və açar yenilənir. Kənardan yalnız 80/443 portları açıqdır, MySQL və API daxili şəbəkədədir.
+API saytların artıq istifadə etdiyi HTTP protokolunu verir. Ona görə əsas sayt və admin panel **Vercel-də qalır**, kodları dəyişmir. Keçid günü yalnız ünvan və açar yenilənir. Kənardan yalnız 80/443 portları açıqdır, MySQL və API daxili şəbəkədədir.
 
-> **Köhnə Supabase layihəsi 12.11.2026 silinib.** Bütün data (istifadəçilər şifrə hash-ləri ilə, elanlar, müraciətlər) və fayllar həmin gün ehtiyat nüsxəyə alınıb və nüsxə yoxlanılıb: 92 cədvəlin sətir sayları eynidir, MySQL-ə sınaq köçürməsi uğurludur. Köçürmə bu nüsxədən edilir. Server hazır olana qədər hər iki sayt "texniki işlər" səhifəsini göstərir.
+> **Köhnə baza 12.11.2026 bağlanıb.** Bütün data (istifadəçilər şifrə hash-ləri ilə, elanlar, müraciətlər) və fayllar həmin gün ehtiyat nüsxəyə alınıb və nüsxə yoxlanılıb: 92 cədvəlin sətir sayları eynidir, MySQL-ə sınaq köçürməsi uğurludur. Köçürmə bu nüsxədən edilir. Server hazır olana qədər hər iki sayt "texniki işlər" səhifəsini göstərir.
 
 ---
 
@@ -42,10 +42,10 @@ Sonra `deploy/universitet-mysql/api.env` faylında `SMTP_*` və `GEMINI_API_KEY`
 
 ## 3. Datanın köçürülməsi (ehtiyat nüsxədən)
 
-Ehtiyat nüsxə qovluğu (`supabase-final-backup-20261112`: `supabase-full.dump` və `storage/`) layihə rəhbərindən alınır və serverə köçürülür (məs. `scp -r`). Qovluqda şəxsi data və şifrə hash-ləri var: yalnız root oxuya bilsin (`chmod -R go-rwx`), köçürmədən sonra serverdən silinsin, nüsxəsi təhlükəsiz yerdə saxlanılsın.
+Ehtiyat nüsxə qovluğu (`db-final-backup-20261112`: `full.dump` və `storage/`) layihə rəhbərindən alınır və serverə köçürülür (məs. `scp -r`). Qovluqda şəxsi data və şifrə hash-ləri var: yalnız root oxuya bilsin (`chmod -R go-rwx`), köçürmədən sonra serverdən silinsin, nüsxəsi təhlükəsiz yerdə saxlanılsın.
 
 ```bash
-export IMPORT_BACKUP_DIR=/root/supabase-final-backup-20261112
+export IMPORT_BACKUP_DIR=/root/db-final-backup-20261112
 deploy/universitet-mysql/scripts/02-import.sh
 ```
 
@@ -66,8 +66,8 @@ Saytlar hazırda "texniki işlər" səhifəsini göstərir, yazı artıq dayanı
 
 1. `02-import.sh`, sonra `03-start.sh` və `04-verify.sh` (yuxarıda).
 2. **Admin panel** (Vercel → `asoiu-career-admin` → Settings → Environment Variables, Production), növbəti addımdakı push-dan **əvvəl**:
-   - `NEXT_PUBLIC_SUPABASE_URL` = `https://api.career.asoiu.edu.az`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = `ANON_KEY`
+   - `NEXT_PUBLIC_API_URL` = `https://api.career.asoiu.edu.az`
+   - `NEXT_PUBLIC_API_KEY` = `ANON_KEY`
 
    Dəyişənlərin adları köhnədir, dəyərlər yeni MySQL API-nin ünvanı və açarıdır.
 3. **Saytlar:** repo kökündə, `api.env`-dəki `ANON_KEY` ilə:

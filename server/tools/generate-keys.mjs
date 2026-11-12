@@ -1,5 +1,5 @@
 // Prints a JWT secret and the anon / service_role API keys signed with it,
-// in the same form as self-hosted Supabase (HS256 JWTs with a role claim).
+// in the standard form (HS256 JWTs with a role claim).
 //   node tools/generate-keys.mjs >> .env
 import { randomBytes } from 'node:crypto';
 import { SignJWT } from 'jose';

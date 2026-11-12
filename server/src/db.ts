@@ -1,5 +1,5 @@
 // MySQL access. Values are converted to the JSON shapes PostgREST/GoTrue
-// return, so clients see exactly what Supabase used to send them:
+// return, so clients see exactly what the old backend used to send them:
 // booleans, numbers for DECIMAL, ISO-8601 UTC timestamps, parsed JSON.
 import mysql from 'mysql2/promise';
 import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';

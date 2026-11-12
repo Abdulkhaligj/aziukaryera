@@ -1,7 +1,7 @@
 // Runs the functions in server/functions unchanged, inside the API
 // process: a small Deno shim (Deno.serve, Deno.env) and an import hook for
 // their `npm:` and `jsr:` specifiers. The functions call this API through
-// supabase-js with SUPABASE_URL = the API's public URL, as they called Supabase.
+// the data client with API_URL = the API's public URL.
 import { existsSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { join } from 'node:path';
@@ -20,7 +20,7 @@ function installHooks() {
       // npm:@scope/name@1.2.3/sub → @scope/name/sub, resolved from the server's node_modules
       const npm = specifier.match(/^npm:(@[^/@]+\/[^/@]+|[^/@]+)(?:@[^/]*)?(\/.*)?$/);
       if (npm) return nextResolve(npm[1] + (npm[2] ?? ''), { ...context, parentURL: base });
-      // Type-only side-effect imports such as jsr:@supabase/functions-js/edge-runtime.d.ts
+      // Type-only side-effect imports (jsr:…/*.d.ts)
       if (specifier.startsWith('jsr:') && specifier.endsWith('.d.ts')) return { url: 'data:text/javascript,', shortCircuit: true };
       return nextResolve(specifier, context);
     }
@@ -44,9 +44,9 @@ export class FunctionRuntime {
   private environment(): Record<string, string | undefined> {
     return {
       ...this.config.functionEnv,
-      SUPABASE_URL: this.config.publicUrl,
-      SUPABASE_ANON_KEY: this.config.anonKey,
-      SUPABASE_SERVICE_ROLE_KEY: this.config.serviceRoleKey
+      API_URL: this.config.publicUrl,
+      ANON_KEY: this.config.anonKey,
+      SERVICE_ROLE_KEY: this.config.serviceRoleKey
     };
   }
 

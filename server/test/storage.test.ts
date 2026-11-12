@@ -1,15 +1,15 @@
-// /storage/v1 through supabase-js: the avatar, public-media and assistant-audio
+// /storage/v1 through the data client: the avatar, public-media and assistant-audio
 // flows the portal, the admin panel and the moderation function use.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ApiClient } from './helpers.ts';
 import { exec, one } from '../src/db.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
-let student: SupabaseClient, other: SupabaseClient, admin: SupabaseClient;
+let student: ApiClient, other: ApiClient, admin: ApiClient;
 let studentId: string, otherId: string, adminId: string;
 
 async function signedIn(email: string, data: Record<string, unknown>) {

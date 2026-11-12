@@ -29,10 +29,10 @@ function harness(initial='student-A'){
     signInWithPassword:async({email})=>{if(state.signIn)await state.signIn.promise;const next={id:'student-'+email[0].toUpperCase(),email};h.emit('SIGNED_IN',next);return{data:{user:next,session:{user:next}},error:null};}
   },from:()=>query(()=>state.db()),rpc:()=>query(async()=>({data:await state.bootstrap(),error:null})),functions:{invoke:(...args)=>state.invoke(...args)}};
   const context=vm.createContext({
-    USE_SUPABASE:true,CAREER_DEMO_MODE:false,SUPABASE_URL:'https://fixture.invalid',SUPABASE_PUBLISHABLE_KEY:'public-fixture',
+    USE_BACKEND:true,CAREER_DEMO_MODE:false,API_URL:'https://fixture.invalid',API_KEY:'public-fixture',
     structuredClone,crypto:{randomUUID},localStorage:storage(),sessionStorage,AbortController,URL,Blob,
     FACULTIES:{},MAJOR_FIELD:{},COMPANIES:[],COMPANY_BY_ID:{},OPPORTUNITIES:[],EVENTS:[],STUDENT_POOL:[],
-    window:{supabase:{createClient:()=>sdk},location:{origin:'http://127.0.0.1',pathname:'/'},addEventListener:(name,fn)=>windowsEvents.set(name,fn)},
+    window:{ApiClient:{createClient:()=>sdk},location:{origin:'http://127.0.0.1',pathname:'/'},addEventListener:(name,fn)=>windowsEvents.set(name,fn)},
     navigator:{},document:{addEventListener:(name,fn)=>documentEvents.set(name,fn),getElementById:()=>null,querySelector:()=>null},
     UI:{auth:{busy:false},publicView:'landing',booting:false,sessionEpoch:0},Landing:{load:async()=>{}},
     render(){},stopNotificationUpdates(){},resetAuthForm(){context.UI.auth={busy:false};},toast(){},
@@ -43,7 +43,7 @@ function harness(initial='student-A'){
   const run=name=>vm.runInContext(read(name),context,{filename:name});
   run('cv-drafts.js');
   for(const [file,name] of [['backend.js','Backend'],['store.js','Store'],['auth.js','Auth']])vm.runInContext(read(file)+'\nglobalThis.'+name+'='+name+';',context,{filename:file});
-  context.Store.load();context.Store.mode='supabase';
+  context.Store.load();context.Store.mode='remote';
   run('boot-recovery.js');run('login-recovery.js');run('fast-auth-bootstrap.js');run('backend-compat.js');run('boot-instant.js');run('session.js');
   vm.runInContext(app.slice(app.indexOf('function clearPrivateSessionUI() {'),app.indexOf('function resetAuthForm(')),context);
   vm.runInContext(app.slice(app.indexOf('let notificationPollTimer = null;'),app.indexOf('/** QR kodu modal',app.indexOf('let notificationPollTimer = null;'))),context);
@@ -128,7 +128,7 @@ test('AIDA clears DOM/history and discards late replies; B next request never ca
   assert.deepEqual(calls[1].history,[]);assert.match(dom.nodes.get('.aida-chat').textContent,/B answer/);
 });
 
-test('real Supabase SDK preserves fluent queries, functions getter, synchronous public URLs and signed URLs under the lifecycle wrapper',async()=>{
+test('real data client preserves fluent queries, functions getter, synchronous public URLs and signed URLs under the lifecycle wrapper',async()=>{
   let require=createRequire(path.join(repo,'package.json'));
   let createClient;
   try{({createClient}=require('@supabase/supabase-js'));}catch{require=createRequire(path.resolve(repo,'../admin-panel/package.json'));({createClient}=require('@supabase/supabase-js'));}

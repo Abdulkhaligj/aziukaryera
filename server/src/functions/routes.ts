@@ -1,4 +1,4 @@
-// /functions/v1/:name — the Edge Functions gateway. Like Supabase, it checks the
+// /functions/v1/:name — the Edge Functions gateway. Like the old gateway, it checks the
 // JWT only for functions deployed with verify_jwt = true (admin-users); the
 // others verify their callers themselves.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';

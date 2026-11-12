@@ -5,5 +5,4 @@ node_modules/
 *.log
 *.tsbuildinfo
 .DS_Store
-supabase/.temp/
 tmp/

@@ -1,11 +1,11 @@
 import 'server-only';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/backend/server';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 
 export type AdminStore = Record<ResourceKey, AdminRow[]>;
 export type AdminLoad = { data: AdminStore; errors: Partial<Record<ResourceKey, string>>; lookups: Lookups };
 export type AdminContext = {
-  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>;
+  db: NonNullable<Awaited<ReturnType<typeof createClient>>>;
   userId: string;
   role: AdminRole;
   fullName: string;
@@ -43,25 +43,25 @@ function applicationStatus(value: string): Status {
 }
 
 export async function getAdminContext(options: { allowPasswordChange?: boolean } = {}): Promise<AdminContext | null> {
-  const supabase = await createClient();
-  if (!supabase) return null;
+  const db = await createClient();
+  if (!db) return null;
   // Fetch current server-owned metadata. An unexpired JWT can contain a role
   // or password-change flag that has since been revoked.
-  const { data, error: authError } = await supabase.auth.getUser();
+  const { data, error: authError } = await db.auth.getUser();
   const user = data?.user;
   const userId = user?.id || '';
   if (authError || !userId) return null;
   const metadata = user?.app_metadata as Record<string, unknown> | undefined;
   const requestedRole = metadata?.admin_role;
   if (!adminRoles.includes(requestedRole as AdminRole)) return null;
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('full_name,email,role,status,admin_role').eq('id', userId).single();
+  const { data: profile, error: profileError } = await db.from('profiles').select('full_name,email,role,status,admin_role').eq('id', userId).single();
   if (!profile || profile.role !== 'admin' || profile.status !== 'active') return null;
   if (profileError || profile.admin_role !== requestedRole) return null;
   const mustChangePassword = metadata?.must_change_password === true;
   if (mustChangePassword && !options.allowPasswordChange) return null;
   const role = profile.admin_role as AdminRole;
   return {
-    supabase, userId, role,
+    db, userId, role,
     fullName: profile.full_name || 'Karyera Mərkəzi',
     email: profile.email || user?.email || '',
     mustChangePassword
@@ -70,8 +70,8 @@ export async function getAdminContext(options: { allowPasswordChange?: boolean }
 
 export async function loadLookups(context: AdminContext): Promise<Lookups> {
   const [faculties, majors] = await Promise.all([
-    context.supabase.from('faculties').select('id,name').order('sort_order'),
-    context.supabase.from('majors').select('id,name,faculty_id').order('name')
+    context.db.from('faculties').select('id,name').order('sort_order'),
+    context.db.from('majors').select('id,name,faculty_id').order('name')
   ]);
   return { faculties: faculties.data || [], majors: majors.data || [] };
 }
@@ -98,7 +98,7 @@ function bakuLocal(value?: string | null) {
 async function signAvatars(context: AdminContext, paths: unknown[]): Promise<Record<string, string>> {
   const list = [...new Set(paths.filter((p): p is string => typeof p === 'string' && p.length > 0))];
   if (!list.length) return {};
-  const { data, error } = await context.supabase.storage.from('avatars').createSignedUrls(list, 6 * 3600);
+  const { data, error } = await context.db.storage.from('avatars').createSignedUrls(list, 6 * 3600);
   if (error) return {};
   const out: Record<string, string> = {};
   (data || []).forEach(item => { if (item.path && item.signedUrl && !item.error) out[item.path] = item.signedUrl; });
@@ -110,10 +110,10 @@ const logoOf = (url: unknown) => typeof url === 'string' && /^https:\/\//i.test(
 const photo = (pics: Record<string, string>, path: unknown) => (typeof path === 'string' && pics[path]) || undefined;
 
 export async function loadResource(context: AdminContext, resource: ResourceKey, lookups?: Lookups): Promise<AdminRow[]> {
-  const { supabase } = context;
+  const { db } = context;
   const label = labelMaps(lookups);
   if (resource === 'jobs' || resource === 'pending_jobs') {
-    const { data, error } = await supabase.from('jobs').select('id,title,type,mode,location,deadline,summary,department,duties,requirements,skills,preferred_skills,faculty_ids,major_ids,experience_level,salary_min,salary_max,currency,salary_visible,positions,application_method,application_url,rejection_reason,changes_requested,status,company_id,created_at,companies(name)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('jobs').select('id,title,type,mode,location,deadline,summary,department,duties,requirements,skills,preferred_skills,faculty_ids,major_ids,experience_level,salary_min,salary_max,currency,salary_visible,positions,application_method,application_url,rejection_reason,changes_requested,status,company_id,created_at,companies(name)').order('created_at', { ascending: false });
     if (error) throw error;
     const rows = resource === 'pending_jobs' ? (data || []).filter((row: any) => ['pending', 'pending_approval', 'changes_requested'].includes(row.status)) : (data || []);
     return rows.map((row: any) => ({
@@ -123,7 +123,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'companies') {
-    const { data, error } = await supabase.from('companies').select('id,name,sector,email,phone,website,about,status,verified,company_size,address,logo_url,contact,contact_position,contact_email,contact_phone,created_at').order('created_at', { ascending: false });
+    const { data, error } = await db.from('companies').select('id,name,sector,email,phone,website,about,status,verified,company_size,address,logo_url,contact,contact_position,contact_email,contact_phone,created_at').order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.name, subtitle: row.sector || 'Şirkət', status: accountStatus(row.status),
@@ -133,7 +133,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'events') {
-    const { data, error } = await supabase.from('events').select('id,title,kind,starts_at,place,seats,description,organizers,image_url,created_at').order('starts_at', { ascending: false });
+    const { data, error } = await db.from('events').select('id,title,kind,starts_at,place,seats,description,organizers,image_url,created_at').order('starts_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.title, subtitle: row.kind || 'Tədbir', status: new Date(row.starts_at) >= new Date() ? 'Aktiv' : 'Bitib',
@@ -142,7 +142,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'benefits') {
-    const { data, error } = await supabase.from('benefits').select('id,title,description,discount_label,valid_from,valid_to,active,created_at,partner_id,benefit_partners(name,logo_url)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('benefits').select('id,title,description,discount_label,valid_from,valid_to,active,created_at,partner_id,benefit_partners(name,logo_url)').order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.title, subtitle: row.benefit_partners?.name || 'Tərəfdaş', status: row.active ? 'Aktiv' : 'Bitib',
@@ -152,7 +152,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'applications') {
-    const { data, error } = await supabase.from('applications').select('id,status,note,created_at,profiles!applications_student_id_fkey(full_name,avatar_path),jobs(title)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('applications').select('id,status,note,created_at,profiles!applications_student_id_fkey(full_name,avatar_path),jobs(title)').order('created_at', { ascending: false });
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     return (data || []).map((row: any) => ({
@@ -162,7 +162,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'students') {
-    const { data, error } = await supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,avatar_path,updated_at').eq('role', 'student').eq('account_status', 'student').order('updated_at', { ascending: false });
+    const { data, error } = await db.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,avatar_path,updated_at').eq('role', 'student').eq('account_status', 'student').order('updated_at', { ascending: false });
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.avatar_path));
     return (data || []).map((row: any) => ({
@@ -174,7 +174,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
   }
   if (resource === 'master_students' || resource === 'alumni') {
     const alumni = resource === 'alumni';
-    let query = supabase.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,avatar_path,updated_at');
+    let query = db.from('profiles').select('id,full_name,email,personal_email,phone,city,role,status,account_status,faculty_id,major_id,course,gpa,alumni_verified,avatar_path,updated_at');
     query = alumni ? query.eq('role', 'graduate') : query.eq('role', 'student').eq('account_status', 'master_student');
     const { data, error } = await query.order('updated_at', { ascending: false });
     if (error) throw error;
@@ -188,13 +188,13 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'network') {
-    const { data, error } = await supabase.from('posts').select('id,body,kind,tags,moderation_status,created_at,profiles!posts_author_id_fkey(full_name,avatar_path)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('posts').select('id,body,kind,tags,moderation_status,created_at,profiles!posts_author_id_fkey(full_name,avatar_path)').order('created_at', { ascending: false });
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'İstifadəçi', subtitle: row.body, avatar: photo(pics, row.profiles?.avatar_path), avatarKind: 'photo' as const, status: row.moderation_status === 'visible' ? 'Aktiv' : row.moderation_status === 'hidden' ? 'Bitib' : 'Yoxlamada', meta: `${row.kind || 'general'} · ${(row.tags || []).map((x: string) => `#${x}`).join(' ')}`, updatedAt: dateLabel(row.created_at), fields: { moderation_status: row.moderation_status, kind: row.kind } }));
   }
   if (resource === 'mentor_requests') {
-    const { data, error } = await supabase.from('mentor_requests').select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at,profiles(full_name,email,avatar_path)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('mentor_requests').select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at,profiles(full_name,email,avatar_path)').order('created_at', { ascending: false });
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     const states: Record<string, Status> = { pending: 'Yoxlamada', in_review: 'Yoxlamada', matched: 'Aktiv', completed: 'Bitib', cancelled: 'Bitib' };
@@ -206,19 +206,19 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'reports') {
-    const { data, error } = await supabase.from('reports').select('id,target_type,target_id,reason,details,status,created_at,profiles!reports_reporter_id_fkey(full_name)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('reports').select('id,target_type,target_id,reason,details,status,created_at,profiles!reports_reporter_id_fkey(full_name)').order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.reason, subtitle: `${row.target_type} · ${row.profiles?.full_name || 'İstifadəçi'}`, status: row.status === 'resolved' || row.status === 'dismissed' ? 'Bitib' : row.status === 'reviewing' ? 'Yoxlamada' : 'Aktiv', meta: row.details || String(row.target_id), updatedAt: dateLabel(row.created_at), fields: { status: row.status } }));
   }
   if (resource === 'subscriptions') {
-    const { data, error } = await supabase.from('subscriptions').select('id,plan_id,status,requested_at,starts_at,ends_at,companies(name),plans!subscriptions_plan_id_fkey(name,monthly_price)').order('requested_at', { ascending: false });
+    const { data, error } = await db.from('subscriptions').select('id,plan_id,status,requested_at,starts_at,ends_at,companies(name),plans!subscriptions_plan_id_fkey(name,monthly_price)').order('requested_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.companies?.name || 'Şirkət', subtitle: `${row.plans?.name || row.plan_id} · ${row.plans?.monthly_price ?? 0} AZN/ay`, status: row.status === 'active' ? 'Aktiv' : row.status === 'pending' ? 'Yoxlamada' : 'Bitib', meta: row.ends_at ? `Bitmə: ${dateLabel(row.ends_at)}` : 'Aylıq paket', updatedAt: dateLabel(row.requested_at), fields: { plan_id: row.plan_id, status: row.status } }));
   }
   if (resource === 'plans') {
     const [{ data: plans, error }, { data: features, error: featureError }] = await Promise.all([
-      supabase.from('plans').select('*').order('sort_order'),
-      supabase.from('plan_features').select('plan_id,feature_key,enabled,limit_value')
+      db.from('plans').select('*').order('sort_order'),
+      db.from('plan_features').select('plan_id,feature_key,enabled,limit_value')
     ]);
     if (error || featureError) throw error || featureError;
     const featureMap = new Map((features || []).map((feature: any) => [`${feature.plan_id}:${feature.feature_key}`, feature]));
@@ -236,37 +236,37 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     } }));
   }
   if (resource === 'payments') {
-    const { data, error } = await supabase.from('payments').select('id,amount,currency,status,provider,provider_reference,created_at,paid_at,companies(name)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('payments').select('id,amount,currency,status,provider,provider_reference,created_at,paid_at,companies(name)').order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.companies?.name || 'Şirkət', subtitle: `${row.amount} ${row.currency} · ${row.provider}`, status: row.status === 'paid' ? 'Aktiv' : row.status === 'pending' ? 'Yoxlamada' : 'Bitib', meta: row.provider_reference || 'Manual qeyd', updatedAt: dateLabel(row.paid_at || row.created_at), fields: { status: row.status } }));
   }
   if (resource === 'moderation_logs') {
-    const { data, error } = await supabase.from('moderation_logs').select('id,target_type,target_id,action,reason,created_at,profiles(full_name)').order('created_at', { ascending: false }).limit(250);
+    const { data, error } = await db.from('moderation_logs').select('id,target_type,target_id,action,reason,created_at,profiles(full_name)').order('created_at', { ascending: false }).limit(250);
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.action, subtitle: `${row.target_type} · ${row.profiles?.full_name || 'Admin'}`, status: 'Aktiv', meta: row.reason || String(row.target_id), updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'notifications') {
-    const { data, error } = await supabase.from('notifications').select('id,kind,title,body,read_at,created_at,profiles(full_name)').order('created_at', { ascending: false }).limit(250);
+    const { data, error } = await db.from('notifications').select('id,kind,title,body,read_at,created_at,profiles(full_name)').order('created_at', { ascending: false }).limit(250);
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.title, subtitle: `${row.profiles?.full_name || 'İstifadəçi'} · ${row.kind}`, status: row.read_at ? 'Bitib' : 'Aktiv', meta: row.body || 'Bildiriş', updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'cv_analytics') {
-    const { data, error } = await supabase.from('cv_documents').select('id,title,language,template_id,ats_score,updated_at,profiles(full_name)').order('updated_at', { ascending: false }).limit(200);
+    const { data, error } = await db.from('cv_documents').select('id,title,language,template_id,ats_score,updated_at,profiles(full_name)').order('updated_at', { ascending: false }).limit(200);
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || row.title, subtitle: `${row.title} · ${row.language?.toUpperCase() || 'AZ'}`, status: row.ats_score >= 70 ? 'Aktiv' : 'Yoxlamada', meta: `ATS: ${row.ats_score ?? '—'} · ${row.template_id || 'şablonsuz'}`, updatedAt: dateLabel(row.updated_at) }));
   }
   if (resource === 'interview_analytics') {
-    const { data, error } = await supabase.from('interview_sessions').select('id,target_role,interview_type,major,score,created_at,completed_at,profiles(full_name)').order('created_at', { ascending: false }).limit(200);
+    const { data, error } = await db.from('interview_sessions').select('id,target_role,interview_type,major,score,created_at,completed_at,profiles(full_name)').order('created_at', { ascending: false }).limit(200);
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'Namizəd', subtitle: `${row.target_role} · ${row.interview_type}`, status: row.completed_at ? 'Aktiv' : 'Yoxlamada', meta: `${row.major || 'İxtisas yoxdur'} · bal ${row.score ?? '—'}`, updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'ai_usage') {
-    const { data, error } = await supabase.from('ai_usage').select('id,task,provider,model,input_chars,output_chars,success,error_code,created_at').order('created_at', { ascending: false }).limit(250);
+    const { data, error } = await db.from('ai_usage').select('id,task,provider,model,input_chars,output_chars,success,error_code,created_at').order('created_at', { ascending: false }).limit(250);
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: String(row.id), title: row.task, subtitle: `${row.provider || '—'} · ${row.model || '—'}`, status: row.success ? 'Aktiv' : 'Bitib', meta: `${row.input_chars} → ${row.output_chars} simvol${row.error_code ? ` · ${row.error_code}` : ''}`, updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'ads') {
-    const { data, error } = await supabase.from('ads').select('*').order('created_at', { ascending: false });
+    const { data, error } = await db.from('ads').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     const today = new Date().toISOString().slice(0, 10);
     return (data || []).map((row: any) => ({
@@ -278,7 +278,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'awards') {
-    const { data, error } = await supabase.from('company_awards').select('*').order('year', { ascending: false }).order('nomination');
+    const { data, error } = await db.from('company_awards').select('*').order('year', { ascending: false }).order('nomination');
     if (error) throw error;
     return (data || []).map((row: any) => ({
       id: row.id, title: row.company_name, subtitle: `${row.year} · ${row.nomination}`,
@@ -289,7 +289,7 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'admins') {
-    const { data, error } = await supabase.from('profiles').select('id,full_name,email,status,admin_role,avatar_path,updated_at').eq('role', 'admin').order('updated_at', { ascending: false });
+    const { data, error } = await db.from('profiles').select('id,full_name,email,status,admin_role,avatar_path,updated_at').eq('role', 'admin').order('updated_at', { ascending: false });
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.avatar_path));
     return (data || []).map((row: any) => ({
@@ -299,11 +299,11 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'content') {
-    const { data, error } = await supabase.from('site_content').select('*').order('updated_at', { ascending: false });
+    const { data, error } = await db.from('site_content').select('*').order('updated_at', { ascending: false });
     if (error) throw error;
     return (data || []).map((row: any) => ({ id: row.id, title: row.title, subtitle: row.content_key, status: row.status as Status, meta: row.summary || 'Sayt məzmunu', updatedAt: dateLabel(row.updated_at), fields: { content_key: row.content_key, summary: row.summary, body: row.body } }));
   }
-  const { data, error } = await supabase.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
+  const { data, error } = await db.from('admin_audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
   if (error) throw error;
   return (data || []).map((row: any) => ({ id: row.id, title: row.title, subtitle: row.resource, status: 'Aktiv', meta: row.actor_name || 'Admin', updatedAt: dateLabel(row.created_at) }));
 }
@@ -328,7 +328,7 @@ export async function loadAdminData(context: AdminContext): Promise<AdminLoad> {
 
 export async function writeAudit(context: AdminContext, resource: string, resourceId: string | null, action: string, title: string) {
   const auditResourceId = resourceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(resourceId) ? resourceId : null;
-  const { error } = await context.supabase.from('admin_audit_logs').insert({ title, resource, resource_id: auditResourceId, action, actor_id: context.userId, actor_name: context.fullName });
+  const { error } = await context.db.from('admin_audit_logs').insert({ title, resource, resource_id: auditResourceId, action, actor_id: context.userId, actor_name: context.fullName });
   // The change is already saved (and the database audit triggers recorded it):
   // never turn that into an error the panel would retry, duplicating the change.
   if (error) { console.error('admin audit write failed:', error.message); return false; }

@@ -48,12 +48,12 @@ Recruiter sayı paket limitinə bağlıdır. FREE paket yalnız öz müraciətç
 
 **Vacib:** mərhələlər qrafiki tarixi konversiya funnel-i deyil, müraciətlərin hazırkı statuslarına görə bölgüsüdür. Göstəricilər yalnız hesabınızın məlumatları yükləndiyi an üçün keçərlidir.
 
-Paket hüququna görə namizəd axtarışı yalnız aktiv Pro və Business abunəliklərində açılır. Ödəniş və abunə təsdiqi hələ də mövcud admin/Supabase mexanizmləri tərəfindən həyata keçirilir.
+Paket hüququna görə namizəd axtarışı yalnız aktiv Pro və Business abunəliklərində açılır. Ödəniş və abunə təsdiqi hələ də mövcud admin/server mexanizmləri tərəfindən həyata keçirilir.
 
 
 ## Geniş Talent Pool
 
-Şirkət kabinetində **Geniş Talent Pool** seçin. Pro və Business paketində aktiv abunəliklə aşağıdakı filtrlər mövcuddur: ad/ixtisas/bacarıq axtarışı, fakültə, ixtisas, kurs, minimum GPA, bacarıq və vakansiyaya görə uyğunluq sıralaması. Yalnız Supabase RLS-in bu şirkət hesabına verdiyi profil məlumatları istifadə edilir. Namizədin tam şəxsi CV sənədi avtomatik göstərilmir.
+Şirkət kabinetində **Geniş Talent Pool** seçin. Pro və Business paketində aktiv abunəliklə aşağıdakı filtrlər mövcuddur: ad/ixtisas/bacarıq axtarışı, fakültə, ixtisas, kurs, minimum GPA, bacarıq və vakansiyaya görə uyğunluq sıralaması. Yalnız serverin icazə qatının bu şirkət hesabına verdiyi profil məlumatları istifadə edilir. Namizədin tam şəxsi CV sənədi avtomatik göstərilmir.
 
 ## CV/profil müqayisəsi
 

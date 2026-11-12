@@ -1,5 +1,5 @@
 // Runtime configuration from the environment. Names follow the self-hosted
-// Supabase .env where an equivalent exists, so operators recognise them.
+// previous backend's .env where an equivalent exists, so operators recognise them.
 
 export interface SmtpConfig {
   host: string;

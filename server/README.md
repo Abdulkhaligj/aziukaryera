@@ -1,14 +1,14 @@
 # ASOIU Karyera API (MySQL)
 
-Universitet İT-sinin tələbi ilə Supabase-in yerini tutan backend: **Node.js/TypeScript + MySQL 8.4**, universitet serverində. Əsas sayt və admin panel Vercel-də qalır.
+Universitet İT-sinin tələbi ilə platformanın backend-i: **Node.js/TypeScript + MySQL 8.4**, universitet serverində. Əsas sayt və admin panel Vercel-də qalır.
 
-Bu branch (`feat/mysql-backend`) tamamlanana qədər canlı sistem Supabase-də işləməyə davam edir.
+Köhnə baza 12.11.2026 bağlanıb; data ehtiyat nüsxədən köçürülür (`deploy/universitet-mysql/README.md`).
 
 ## Strategiya
 
-Yeni API saytın və admin panelin **artıq istifadə etdiyi Supabase HTTP protokolunun alt-dəstini** (PostgREST, GoTrue, Storage, Functions) MySQL üzərində təqdim edir. Bunun nəticəsində:
+Yeni API saytın və admin panelin **artıq istifadə etdiyi HTTP protokolunun alt-dəstini** (PostgREST, GoTrue, Storage, Functions) MySQL üzərində təqdim edir. Bunun nəticəsində:
 
-- `supabase-js` və `@supabase/ssr` kitabxanaları dəyişmir. Saytda yalnız `runtime-config.js`-dəki ünvan, admin paneldə isə Vercel env dəyəri dəyişir.
+- Saytların data kitabxanası dəyişmir. Saytda yalnız `runtime-config.js`-dəki ünvan, admin paneldə isə Vercel env dəyəri dəyişir.
 - Mövcud 78 test və saytın bütün axınları olduğu kimi qalır.
 - Postgres-in RLS qaydaları (235) API-də hər cədvəl üçün **icazə qatına** köçürülür. Bütün sorğular eyni yerdən keçir, necə ki RLS keçirdi.
 
@@ -19,7 +19,7 @@ Yalnız realtime (WebSocket) əvəzinə bildirişlər üçün qısa interval il�
 | # | Mərhələ | Vəziyyət |
 |---|---|---|
 | 1 | MySQL sxemi (55 cədvəl, 81 xarici açar, 84 CHECK), giriş və fayl cədvəlləri, data köçürmə + yoxlama | ✅ hazır, real data ilə sınanıb |
-| 2 | Giriş (GoTrue alt-dəsti): şifrə ilə giriş, refresh, çıxış, qeydiyyat, şifrə bərpası, `admin_role` claim-ləri; bcrypt hash-lar köçür | ✅ hazır, 15 test (`supabase-js 2.58.0` ilə) |
+| 2 | Giriş (GoTrue alt-dəsti): şifrə ilə giriş, refresh, çıxış, qeydiyyat, şifrə bərpası, `admin_role` claim-ləri; bcrypt hash-lar köçür | ✅ hazır, 15 test (data kitabxanası 2.58.0 ilə) |
 | 3 | Data API (PostgREST alt-dəsti) + icazə qatı: 235 qaydanın köçürülməsi, trigger məntiqi (moderasiya, kvotalar, bildirişlər) | ✅ data API, 222 icazə qaydası, bütün 77 trigger, Postgres xəta və trigger ardıcıllığı |
 | 4 | RPC funksiyaları (`career_bootstrap_v1`, `candidate_profiles`, müsahibə axını, güzəştlər, AI büdcələri, moderasiya, sıfırlama) | ✅ saytın, admin panelin və Edge Function-ların çağırdığı 22 funksiyanın hamısı (12 test) |
 | 5 | Fayllar (diskdə, imzalı linklər), Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər | ✅ Storage API, 5 funksiya dəyişmədən Node-da, 3 planlı iş (15 test) |
@@ -68,7 +68,7 @@ Postgres semantikası saxlanılır: NEW-da bütün sütunlar olur (default-lar B
 
 ## RPC (`/rest/v1/rpc/:name`)
 
-`src/rpc/` altında sayt, admin panel və Edge Function-ların `supabase.rpc(...)` ilə çağırdığı 22 funksiya var. `test/rpc-coverage.test.ts` repodakı bütün `.rpc('…')` çağırışlarını tapır və hər birinin köçürüldüyünü yoxlayır.
+`src/rpc/` altında sayt, admin panel və funksiyaların `.rpc(...)` ilə çağırdığı 22 funksiya var. `test/rpc-coverage.test.ts` repodakı bütün `.rpc('…')` çağırışlarını tapır və hər birinin köçürüldüyünü yoxlayır.
 
 | Fayl | Funksiyalar |
 |---|---|
@@ -85,7 +85,7 @@ PostgREST qaydaları saxlanılır: `EXECUTE` icazəsi (`anon`/`authenticated`; `
 
 ## Fayllar (`/storage/v1`)
 
-Supabase Storage-in supabase-js-in istifadə etdiyi hissəsi: yükləmə (`upload`, `x-upsert`), endirmə, açıq link (`getPublicUrl`), imzalı link (`createSignedUrl(s)`), silmə, siyahı. Fayllar diskdə saxlanılır: `STORAGE_DIR/<bucket>/<ad>`. Məlumatı isə `storage_objects` cədvəlindədir.
+Storage protokolunun data kitabxanasının istifadə etdiyi hissəsi: yükləmə (`upload`, `x-upsert`), endirmə, açıq link (`getPublicUrl`), imzalı link (`createSignedUrl(s)`), silmə, siyahı. Fayllar diskdə saxlanılır: `STORAGE_DIR/<bucket>/<ad>`. Məlumatı isə `storage_objects` cədvəlindədir.
 
 - 3 bucket, Postgres-dəki kimi: `avatars` (gizli, 1 MB, webp/jpeg), `public-media` (açıq, 5 MB, şəkil), `assistant-audio` (gizli, 10 MB, wav).
 - `storage.objects`-in 13 icazə qaydası `src/storage/policy.ts`-dədir. Məsələn, tələbə yalnız öz qovluğuna yazır, profilin göstərdiyi şəkli silmək olmur, admin şəkillərini yalnız staff yükləyir. İki avatar trigger-i də köçürülüb: eyni yol təkrar istifadə olunmur.
@@ -94,9 +94,9 @@ Supabase Storage-in supabase-js-in istifadə etdiyi hissəsi: yükləmə (`uploa
 
 ## Edge Functions (`/functions/v1/:name`)
 
-`functions/*` altındakı 5 funksiya **dəyişdirilmədən** API prosesinin içində işləyir. `src/functions/runtime.ts` kiçik bir Deno əvəzi verir (`Deno.serve`, `Deno.env.get`), `npm:`/`jsr:` importlarını da serverin paketlərinə yönləndirir. Funksiyalar API-nin özünə supabase-js ilə müraciət edir (`SUPABASE_URL` = API-nin ünvanı), necə ki Supabase-ə edirdilər. Ona görə kod bir yerdə qalır və keçid gününə qədər Supabase-də də işləyir.
+`functions/*` altındakı 5 funksiya **dəyişdirilmədən** API prosesinin içində işləyir. `src/functions/runtime.ts` kiçik bir Deno əvəzi verir (`Deno.serve`, `Deno.env.get`), `npm:`/`jsr:` importlarını da serverin paketlərinə yönləndirir. Funksiyalar API-nin özünə data kitabxanası ilə müraciət edir (`API_URL` = API-nin ünvanı). Ona görə kod bir yerdə qalır və keçid gününə qədər Supabase-də də işləyir.
 
-- JWT yoxlaması Supabase-dəki kimidir: yalnız `admin-users` üçün (`verify_jwt = true`). Qalanları çağıranı özləri yoxlayır.
+- JWT yoxlaması köhnə gateway-dəki kimidir: yalnız `admin-users` üçün (`verify_jwt = true`). Qalanları çağıranı özləri yoxlayır.
 - Funksiyaların açarları API-nin mühitindən oxunur: `GEMINI_API_KEY`, `GROQ_API_KEY`, `GEMINI_*_MODEL`, `MODERATION_WEBHOOK_SECRET`, `PUBLIC_SITE_URL`.
 - Moderasiya webhook-u (`private_moderation_webhook_config`) indi API-nin öz ünvanına göstərilir: `https://<api>/functions/v1/content-moderation` (migration `0005`). Sorğu commit-dən sonra göndərilir, pg_net-də olduğu kimi. Testdə bütün zəncir yoxlanılır: post → webhook → funksiya → RPC → qərar.
 
@@ -156,7 +156,7 @@ server/
     jobs/                   planlı işlər
     values.ts               sütun tipinə görə dəyər formatı (sorğu → bazanın qaytardığı forma)
     write/pipeline.ts       yazma qatı; write/rules/ — trigger ekvivalentləri; write/moderation-text.ts — söz filtri
-  test/                     supabase-js ilə inteqrasiya testləri (müvəqqəti MySQL bazası)
+  test/                     data kitabxanası ilə inteqrasiya testləri (müvəqqəti MySQL bazası)
 ```
 
 ## Lokal işə salma
@@ -164,7 +164,7 @@ server/
 ```bash
 cd server && npm install
 MYSQL_URL=mysql://root@127.0.0.1:3307/asoiu_career ALLOW_RESET=1 node db/setup.mjs --reset
-# Datanı sınaq üçün köçürmək: ehtiyat nüsxə (supabase-full.dump) əvvəl lokal Postgres-ə bərpa olunur
+# Datanı sınaq üçün köçürmək: ehtiyat nüsxə (full.dump) əvvəl lokal Postgres-ə bərpa olunur
 SOURCE_DB_URL=postgresql://postgres@127.0.0.1:5432/restored MYSQL_URL=mysql://root@127.0.0.1:3307/asoiu_career \
   node db/import-from-backup.mjs
 ```
@@ -175,7 +175,7 @@ Serverdə bunu `deploy/universitet-mysql/scripts/02-import.sh` edir. Şifrə has
 
 | Postgres | MySQL |
 |---|---|
-| `uuid` | `CHAR(36) ascii_bin` (Supabase ID-ləri dəyişmir) |
+| `uuid` | `CHAR(36) ascii_bin` (köhnə ID-lər dəyişmir) |
 | `text` | `TEXT`, açar/index-də `VARCHAR(191)` |
 | `timestamptz` | `DATETIME(6)`, həmişə UTC |
 | `jsonb`, `text[]` | `JSON` |

@@ -1,4 +1,4 @@
-// Who is calling. Mirrors the Postgres roles Supabase used: anon,
+// Who is calling. Mirrors the Postgres roles the old backend used: anon,
 // authenticated and service_role come from the request's key or JWT;
 // system stands for SECURITY DEFINER code (signup, scheduled jobs).
 import { jwtVerify } from 'jose';

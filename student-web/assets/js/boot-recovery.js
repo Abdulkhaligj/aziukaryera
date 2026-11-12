@@ -16,7 +16,7 @@
     ]).finally(() => clearTimeout(timer));
   };
 
-  // Supabase's browser Web Lock can remain held by an interrupted tab.
+  // The auth client's browser Web Lock can remain held by an interrupted tab.
   // Normally keep the cross-tab lock; if it is orphaned, recover after 3s.
   const originalInit = Backend.init.bind(Backend);
   Backend.init = function () {
@@ -56,7 +56,7 @@
   Auth.restoreRemote = async () => {
     const restored = await bounded(originalRestore, 11000, () => false, 'Sessiyanın bərpası');
     if (!restored && Store?.state?.session) {
-      // Never show stale local profiles as an authenticated Supabase session.
+      // Never show stale local profiles as an authenticated server session.
       Store.state.session = null;
       Store.bind();
     }

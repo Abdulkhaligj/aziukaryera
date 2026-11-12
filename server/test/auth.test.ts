@@ -73,7 +73,7 @@ test('signing up twice reports an existing account', async () => {
   assert.equal(error?.message, 'User already registered');
 });
 
-test('password sign-in issues Supabase-shaped tokens; a wrong password gets the GoTrue message', async () => {
+test('password sign-in issues the expected token shape; a wrong password gets the GoTrue message', async () => {
   const client = h.anon();
   const bad = await client.auth.signInWithPassword({ email: 'aysel.m@asoiu.edu.az', password: 'wrong-password' });
   assert.equal(bad.error?.message, 'Invalid login credentials');
@@ -90,7 +90,7 @@ test('password sign-in issues Supabase-shaped tokens; a wrong password gets the 
   assert.equal(me.data.user?.email, 'aysel.m@asoiu.edu.az');
 });
 
-test('passwords migrated from Supabase (bcrypt $2a$) keep working', async () => {
+test('passwords migrated from the old database (bcrypt $2a$) keep working', async () => {
   // Published bcrypt test vector: password "U*U".
   await exec(h.pool, `INSERT INTO auth_users (id, email, encrypted_password, email_confirmed_at) VALUES
     ('11111111-1111-4111-8111-111111111111', 'migrated@asoiu.edu.az', '$2a$05$CCCCCCCCCCCCCCCCCCCCC.E5YPO9kmyuRGyh0XouQYb4YMJKvyOeW', CURRENT_TIMESTAMP(6))`);
@@ -198,7 +198,7 @@ test('admin API (service role): create, merge app_metadata, staff role check, de
   assert.equal(anonAdmin.error?.message, 'User not allowed');
 });
 
-test('requests without an API key are refused like the Supabase gateway', async () => {
+test('requests without an API key are refused like the old gateway', async () => {
   const res = await fetch(`${h.url}/auth/v1/settings`);
   assert.equal(res.status, 401);
   assert.equal((await res.json()).msg, 'No API key found in request');

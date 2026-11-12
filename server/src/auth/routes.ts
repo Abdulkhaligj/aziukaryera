@@ -1,5 +1,5 @@
 // /auth/v1 — the subset of the GoTrue API that the student site, the admin
-// panel and the Edge Functions call through supabase-js.
+// panel and the Edge Functions call through the data client.
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';

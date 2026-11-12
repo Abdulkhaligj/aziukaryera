@@ -46,7 +46,7 @@ export function crossSite(request: Request): boolean {
   try { return new URL(origin).host !== new URL(request.url).host; } catch { return true; }
 }
 
-/** The message of a refused Edge Function call: supabase-js returns no data
+/** The message of a refused Edge Function call: db-js returns no data
  *  for non-2xx answers, only an error whose response holds the function's JSON. */
 export async function functionError(error: unknown, data: { error?: string } | null | undefined, fallback: string): Promise<string> {
   if (data?.error) return data.error;

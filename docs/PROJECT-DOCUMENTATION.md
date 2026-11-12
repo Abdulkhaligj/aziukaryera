@@ -6,7 +6,7 @@ ADNSU Career Center tələbə, magistr, məzun, şirkət və universitetin Karye
 
 ## Sistem arxitekturası
 
-Mövcud tələbə/şirkət portalı və Next.js admin paneli eyni Supabase Auth və PostgreSQL bazasına qoşulur. RLS, trigger-lər və Edge Functions rolları, sahiblik münasibətlərini, paket hüquqlarını və admin əməliyyatlarını qoruyur.
+Mövcud tələbə/şirkət portalı və Next.js admin paneli eyni API-yə (universitet serverində MySQL) qoşulur. API-nin icazə qatı, yazma qaydaları və funksiyalar rolları, sahiblik münasibətlərini, paket hüquqlarını və admin əməliyyatlarını qoruyur.
 
 ## Tələbə axını
 
@@ -38,7 +38,7 @@ Yeni elan `pending_approval` statusu ilə yaranır. Yalnız `approved` və `publ
 
 ## Təhlükəsizlik
 
-İstehsal parolları Supabase Auth-da saxlanılır. RLS tələbənin yalnız öz şəxsi məlumatlarını, şirkətin yalnız öz elan və müraciətlərini, adminin isə səlahiyyətinə uyğun məlumatı idarə etməsinə imkan verir. Service Role açarı serverdən kənara çıxmır. Mühüm admin əməliyyatları audit olunur.
+Parollar serverin auth xidmətində (bcrypt) saxlanılır. İcazə qatı tələbənin yalnız öz şəxsi məlumatlarını, şirkətin yalnız öz elan və müraciətlərini, adminin isə səlahiyyətinə uyğun məlumatı idarə etməsinə imkan verir. Service Role açarı serverdən kənara çıxmır. Mühüm admin əməliyyatları audit olunur.
 
 ## AI
 
@@ -46,7 +46,7 @@ CV təhlili və müsahibə sualları server tərəfli Edge Function-dan Gemini v
 
 ## Yerləşdirmə
 
-Əsas portal yalnız `asoiu-career` Vercel layihəsinə `student-web` root-u ilə, admin panel isə yalnız `asoiu-career-admin` layihəsinə repo kökündən yerləşdirilir. Hər iki tətbiq eyni Supabase layihəsini istifadə edir. GitHub repozitoriyası private olmalıdır.
+Əsas portal yalnız `asoiu-career` Vercel layihəsinə `student-web` root-u ilə, admin panel isə yalnız `asoiu-career-admin` layihəsinə repo kökündən yerləşdirilir. Hər iki tətbiq eyni API-ni istifadə edir. GitHub repozitoriyası private olmalıdır.
 
 ## Texniki xidmət
 

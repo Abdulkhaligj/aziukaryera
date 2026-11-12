@@ -1,6 +1,6 @@
 /*!
  * ADNSU Karyera — fast authenticated startup.
- * One RLS-preserving Supabase RPC instead of 16 authenticated REST queries.
+ * One access-rule-preserving server RPC instead of 16 authenticated REST queries.
  * Neither account permissions nor stored data are changed.
  * Deleting this include restores the prior Backend.loadAll implementation.
  */

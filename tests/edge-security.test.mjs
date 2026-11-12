@@ -51,7 +51,7 @@ async function handler(name, state = {}, env = {}) {
   };
   const sandbox = {
     createClient: () => db,
-    Deno: { serve: fn => { serve = fn; }, env: { get: key => ({ SUPABASE_URL: 'https://offline.invalid', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'offline-service', GEMINI_API_KEY: 'offline-provider', MODERATION_WEBHOOK_SECRET: 'x'.repeat(40), ...env })[key] } },
+    Deno: { serve: fn => { serve = fn; }, env: { get: key => ({ API_URL: 'https://offline.invalid', ANON_KEY: 'anon', SERVICE_ROLE_KEY: 'offline-service', GEMINI_API_KEY: 'offline-provider', MODERATION_WEBHOOK_SECRET: 'x'.repeat(40), ...env })[key] } },
     fetch: async (url, options) => {
       if (url === 'https://offline.invalid/auth/v1/user') {
         assert.equal(options.method, 'PUT');

@@ -31,7 +31,7 @@ test('student profile has real avatar file upload backed by private moderation',
   assert.match(js,/createSignedUrl\(path,3600\)/);
   assert.match(js,/avatar_pending_path/);
   assert.match(js,/me\.role === 'student'/);
-  assert.doesNotMatch(js,/localStorage|service_role|supabaseKey/);
+  assert.doesNotMatch(js,/localStorage|service_role|serviceRoleKey/);
   assert.match(css,/\.student-photo-card/);
   assert.match(index,/student-profile-enhancements\.js\?v=20261104a/);
   assert.match(index,/profile-photos\.js\?v=20261104a/);
