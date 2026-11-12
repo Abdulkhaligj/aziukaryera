@@ -16,7 +16,7 @@ Tarix: 12 noyabr 2026
 | Əsas sayt (tələbə, magistr, məzun, şirkət, Karyera Mərkəzi) | https://asoiu-career.vercel.app | `student-web/` | Statik HTML/CSS/JS (framework yoxdur) |
 | Admin panel (Karyera Mərkəzi əməkdaşları) | https://asoiu-career-admin.vercel.app | repo kökü: `app/`, `components/`, `lib/` | Next.js 16 (App Router), React 19, TypeScript |
 | Backend | universitet serveri (məs. `api.career.asoiu.edu.az`) | `server/`, `deploy/universitet-mysql/` | MySQL 8.4, Node.js/TypeScript API (Fastify), Docker, Caddy (HTTPS) |
-| AI funksiyaları | backend-in içində | `supabase/functions/*` (qovluq adı tarixidir; kod API-nin içində dəyişmədən işləyir) | Google Gemini, istəyə bağlı Groq |
+| AI funksiyaları | backend-in içində | `server/functions/*` | Google Gemini, istəyə bağlı Groq |
 
 Saytlar Vercel-dədir (`inspire5` komandası). Hər ikisi GitHub `Abdulkhaligj/aziukaryera` reposunun `main` budağına bağlıdır:
 - `asoiu-career-main-v3`: Root Directory `student-web`.

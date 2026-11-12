@@ -8,7 +8,7 @@ import '../src/rpc/index.ts';
 import { findRpc } from '../src/rpc/registry.ts';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
-const DIRS = ['student-web', 'app', 'lib', 'supabase/functions'];
+const DIRS = ['student-web', 'app', 'lib', 'server/functions'];
 
 function* files(dir: string): Generator<string> {
   let entries: string[];

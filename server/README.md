@@ -94,7 +94,7 @@ Supabase Storage-in supabase-js-in istifadə etdiyi hissəsi: yükləmə (`uploa
 
 ## Edge Functions (`/functions/v1/:name`)
 
-`supabase/functions/*` altındakı 5 funksiya **dəyişdirilmədən** API prosesinin içində işləyir. `src/functions/runtime.ts` kiçik bir Deno əvəzi verir (`Deno.serve`, `Deno.env.get`), `npm:`/`jsr:` importlarını da serverin paketlərinə yönləndirir. Funksiyalar API-nin özünə supabase-js ilə müraciət edir (`SUPABASE_URL` = API-nin ünvanı), necə ki Supabase-ə edirdilər. Ona görə kod bir yerdə qalır və keçid gününə qədər Supabase-də də işləyir.
+`functions/*` altındakı 5 funksiya **dəyişdirilmədən** API prosesinin içində işləyir. `src/functions/runtime.ts` kiçik bir Deno əvəzi verir (`Deno.serve`, `Deno.env.get`), `npm:`/`jsr:` importlarını da serverin paketlərinə yönləndirir. Funksiyalar API-nin özünə supabase-js ilə müraciət edir (`SUPABASE_URL` = API-nin ünvanı), necə ki Supabase-ə edirdilər. Ona görə kod bir yerdə qalır və keçid gününə qədər Supabase-də də işləyir.
 
 - JWT yoxlaması Supabase-dəki kimidir: yalnız `admin-users` üçün (`verify_jwt = true`). Qalanları çağıranı özləri yoxlayır.
 - Funksiyaların açarları API-nin mühitindən oxunur: `GEMINI_API_KEY`, `GROQ_API_KEY`, `GEMINI_*_MODEL`, `MODERATION_WEBHOOK_SECRET`, `PUBLIC_SITE_URL`.
