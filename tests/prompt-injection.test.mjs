@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 
-const source = stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/_shared/untrusted.ts', import.meta.url), 'utf8'), { mode: 'strip' }).replace(/^export /gm, '');
+const source = stripTypeScriptTypes(readFileSync(new URL('../server/functions/_shared/untrusted.ts', import.meta.url), 'utf8'), { mode: 'strip' }).replace(/^export /gm, '');
 const context = { crypto: globalThis.crypto };
 vm.runInNewContext(source + '\nglobalThis.subject = { fence, looksLikeInjection };', context);
 const { fence, looksLikeInjection } = context.subject;

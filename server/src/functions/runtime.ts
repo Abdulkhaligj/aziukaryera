@@ -1,4 +1,4 @@
-// Runs the Edge Functions in supabase/functions unchanged, inside the API
+// Runs the functions in server/functions unchanged, inside the API
 // process: a small Deno shim (Deno.serve, Deno.env) and an import hook for
 // their `npm:` and `jsr:` specifiers. The functions call this API through
 // supabase-js with SUPABASE_URL = the API's public URL, as they called Supabase.

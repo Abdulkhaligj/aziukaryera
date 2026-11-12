@@ -6,7 +6,7 @@ import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 
 // Execute the real handler and streamed JSON limiter; replace only external I/O.
-const functions = new URL('../supabase/functions/', import.meta.url);
+const functions = new URL('../server/functions/', import.meta.url);
 const sharedSource = ['limits.ts', 'untrusted.ts'].map(f => stripTypeScriptTypes(readFileSync(new URL(`_shared/${f}`, functions), 'utf8'), { mode: 'strip' }).replace(/^export /gm, '')).join('\n');
 async function handler(name, state = {}, env = {}) {
   const source = stripTypeScriptTypes(readFileSync(new URL(`${name}/index.ts`, functions), 'utf8').replace(/^import .*;\r?\n/gm, ''), { mode: 'strip' });

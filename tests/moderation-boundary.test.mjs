@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 
-const functions = new URL('../supabase/functions/', import.meta.url);
+const functions = new URL('../server/functions/', import.meta.url);
 const strip = source => stripTypeScriptTypes(source.replace(/^import .*;\r?\n/gm, ''), { mode: 'strip' }).replace(/^export /gm, '');
 const shared = ['limits.ts', 'untrusted.ts'].map(f => strip(readFileSync(new URL(`_shared/${f}`, functions), 'utf8'))).join('\n');
 const source = strip(readFileSync(new URL('content-moderation/index.ts', functions), 'utf8'));

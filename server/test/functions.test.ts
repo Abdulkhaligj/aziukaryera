@@ -1,4 +1,4 @@
-// The Edge Functions from supabase/functions, run by the API's gateway. Gemini
+// The functions from server/functions, run by the API's gateway. Gemini
 // is replaced by a stub at the fetch level (the functions run in this process),
 // so the whole moderation chain is exercised: trigger → webhook after commit →
 // content-moderation → moderation_claim / moderation_finish.
