@@ -205,7 +205,8 @@ Deno.serve(async (req: Request) => {
   let inputBytes = text.length;
   try {
     if (audioPath) {
-      if (!audioPath.startsWith(`${actor.id}/`) || audioPath.includes("..")) return json({ ok: false, error: "Yanlış səs faylı" }, 400);
+      // Exactly the shape the panel uploads: <admin id>/<uuid>.wav (no encoded dots or slashes).
+      if (!new RegExp(`^${actor.id}/[0-9a-f-]{36}\\.wav$`).test(audioPath)) return json({ ok: false, error: "Yanlış səs faylı" }, 400);
       const { data: file, error } = await db.storage.from("assistant-audio").download(audioPath);
       /* Səs yalnız bir dəfə istifadə olunur və dərhal silinir */
       await db.storage.from("assistant-audio").remove([audioPath]);

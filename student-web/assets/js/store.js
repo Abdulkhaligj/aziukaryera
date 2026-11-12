@@ -20,17 +20,17 @@ const ALIAS_KEYS = ['student', 'company', 'applications', 'saved', 'eventRegistr
 const SEED_USERS = [
   {
     id: 'u-student-demo', role: 'student', name: 'Aylin Məmmədova',
-    email: 'aylin.mammadova@asoiu.edu.az', seedPassword: 'Telebe2026',
+    email: 'demo.telebe@asoiu.edu.az', seedPassword: 'Telebe2026',
     createdAt: '2026-09-01', status: 'active'
   },
   {
     id: 'u-company-demo', role: 'company', name: 'SOCAR',
-    email: 'careers@socar.az', seedPassword: 'Sirket2026',
+    email: 'demo.sirket@example.com', seedPassword: 'Sirket2026',
     createdAt: '2026-08-20', status: 'active'
   },
   {
     id: 'u-admin-demo', role: 'admin', name: 'ASOIU Karyera Mərkəzi',
-    email: 'career@asoiu.edu.az', seedPassword: 'Merkez2026',
+    email: 'demo.admin@asoiu.edu.az', seedPassword: 'Merkez2026',
     createdAt: '2026-08-01', status: 'active'
   }
 ];
@@ -43,7 +43,7 @@ const DEFAULT_STATE = {
   profiles: {
     'u-student-demo': {
       name: 'Aylin Məmmədova',
-      email: 'aylin.mammadova@asoiu.edu.az',
+      email: 'demo.telebe@asoiu.edu.az',
       phone: '+994 50 123 45 67',
       city: 'Bakı, Azərbaycan',
       personalEmail: 'aylin.mammadova@example.com',
@@ -83,7 +83,7 @@ const DEFAULT_STATE = {
       name: 'SOCAR',
       sector: 'Neft və qaz',
       contact: 'Nərmin Əliyeva',
-      email: 'careers@socar.az',
+      email: 'demo.sirket@example.com',
       about: 'Azərbaycan Respublikasının Dövlət Neft Şirkəti — hasilat, emal və kimya sənayesi.',
       website: 'socar.az'
     }

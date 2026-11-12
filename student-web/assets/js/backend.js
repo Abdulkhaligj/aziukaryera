@@ -232,6 +232,9 @@ const Backend = {
   translate(msg) {
     const m = String(msg || '');
     if (/Invalid login credentials/i.test(m)) return 'E-poçt və ya şifrə yanlışdır.';
+    if (/_(application_url|link_url|website|logo_url|cover_url|image_url)_web/i.test(m)) {
+      return 'Link http:// və ya https:// ilə başlamalıdır (şəkillər üçün https://).';
+    }
     if (/Email not confirmed/i.test(m)) {
       return 'E-poçt ünvanınız hələ təsdiqlənməyib — poçtunuzdakı təsdiq linkinə klikləyin.';
     }

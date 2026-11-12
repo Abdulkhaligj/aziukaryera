@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 
@@ -328,5 +329,10 @@ export async function loadAdminData(context: AdminContext): Promise<AdminLoad> {
 export async function writeAudit(context: AdminContext, resource: string, resourceId: string | null, action: string, title: string) {
   const auditResourceId = resourceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(resourceId) ? resourceId : null;
   const { error } = await context.supabase.from('admin_audit_logs').insert({ title, resource, resource_id: auditResourceId, action, actor_id: context.userId, actor_name: context.fullName });
-  if (error) throw new Error('Əməliyyatın audit qeydi saxlanmadı. Nəticəni yoxlayın və təkrar etməzdən əvvəl administratorla əlaqə saxlayın.');
+  // The change is already saved (and the database audit triggers recorded it):
+  // never turn that into an error the panel would retry, duplicating the change.
+  if (error) { console.error('admin audit write failed:', error.message); return false; }
+  return true;
 }
+
+export const AUDIT_WARNING = 'Dəyişiklik saxlanıldı, amma əlavə audit qeydi yazılmadı.';

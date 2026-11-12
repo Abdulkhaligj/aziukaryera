@@ -44,12 +44,14 @@ test('mandatory-password session cannot call real resource POST; password page h
   assert.equal(result.status, 401);
 });
 
-test('audit storage failure propagates instead of reporting success', async () => {
-  const { writeAudit } = load('lib/admin-data.ts', ['writeAudit']);
+test('audit storage failure is a logged warning, never a failed (retryable) saved change', async () => {
+  const logged = [];
+  const { writeAudit } = load('lib/admin-data.ts', ['writeAudit'], { console: { error: (...args) => logged.push(args.join(' ')) } });
   let attempts = 0;
-  await assert.rejects(writeAudit({ userId: 'actor', fullName: 'Fixture', supabase: { from: () => ({ insert: async () => { attempts++; return { error: { message: 'unavailable' } }; } }) } }, 'events', null, 'create', 'Fixture'), /audit/);
+  assert.equal(await writeAudit({ userId: 'actor', fullName: 'Fixture', supabase: { from: () => ({ insert: async () => { attempts++; return { error: { message: 'unavailable' } }; } }) } }, 'events', null, 'create', 'Fixture'), false);
   assert.equal(attempts, 1);
-  await writeAudit({ supabase: { from: () => ({ insert: async () => ({ error: null }) }) } }, 'events', null, 'create', 'Fixture');
+  assert.match(logged.join('\n'), /audit/);
+  assert.equal(await writeAudit({ supabase: { from: () => ({ insert: async () => ({ error: null }) }) } }, 'events', null, 'create', 'Fixture'), true);
 });
 
 class Redirect extends Error { constructor(url) { super(url); this.url = url; } }
@@ -76,10 +78,18 @@ test('password action uses trusted combined change and checks failure/refresh ou
 });
 
 test('streamed JSON is bounded and malformed/array bodies return controlled errors', async () => {
-  const { readAdminJson } = load('lib/request-body.ts', ['readAdminJson'], { TextDecoder });
-  const request = text => new Request('https://audit.invalid', { method: 'POST', body: text });
+  const { crossSite } = load('lib/admin-input.ts', ['crossSite'], { URL });
+  const { readAdminJson } = load('lib/request-body.ts', ['readAdminJson'], { TextDecoder, crossSite });
+  const json = { 'content-type': 'application/json' };
+  const request = (text, headers = json) => new Request('https://audit.invalid', { method: 'POST', body: text, headers });
   assert.equal((await readAdminJson(request('{"title":"Normal"}'))).body.title, 'Normal');
+  assert.equal((await readAdminJson(request('{"title":"Same"}', { ...json, origin: 'https://audit.invalid' }))).body.title, 'Same');
   for (const body of ['{', '[]', 'null', '"string"']) assert.equal((await readAdminJson(request(body))).status, 400);
   assert.equal((await readAdminJson(request('{"a":"' + 'x'.repeat(200) + '"}'), 64)).status, 413);
-  assert.equal((await readAdminJson(new Request('https://audit.invalid', { method: 'POST', body: '{}', headers: { 'content-length': '1000' } }), 64)).status, 413);
+  assert.equal((await readAdminJson(request('{}', { ...json, 'content-length': '1000' }), 64)).status, 413);
+  // CSRF: another site's form or fetch, and non-JSON (simple form) bodies, are refused.
+  assert.equal((await readAdminJson(request('{}', { ...json, origin: 'https://evil.invalid' }))).status, 403);
+  assert.equal((await readAdminJson(request('{}', { ...json, 'sec-fetch-site': 'cross-site' }))).status, 403);
+  assert.equal((await readAdminJson(request('{}', { 'content-type': 'text/plain' }))).status, 415);
+  assert.equal((await readAdminJson(request('title=x', { 'content-type': 'application/x-www-form-urlencoded' }))).status, 415);
 });

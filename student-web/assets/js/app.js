@@ -11,6 +11,8 @@ const TODAY = new Date();
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* Only web links become clickable (never javascript:, data: or other schemes). */
+const webHref = url => { const s = String(url ?? '').trim(); return /^https?:\/\/[^\s]+$/i.test(s) ? s : ''; };
 
 function fmtDate(iso) {
   if (!iso) return '—';
@@ -1505,7 +1507,7 @@ function viewNetwork() {
             </div>
             <div class="post-kind">${esc(POST_KIND_LABEL[p.kind] || 'Paylaşım')}</div>
             <p class="post-body">${esc(p.body).replace(/\n/g, '<br>')}</p>
-            ${p.linkUrl ? `<a class="post-link" href="${esc(p.linkUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.linkUrl)} ↗</a>` : ''}
+            ${webHref(p.linkUrl) ? `<a class="post-link" href="${esc(webHref(p.linkUrl))}" target="_blank" rel="noopener noreferrer">${esc(p.linkUrl)} ↗</a>` : ''}
             ${p.tags?.length ? `<div class="skillrow">${p.tags.map(tag => `<span class="sk">#${esc(tag)}</span>`).join('')}</div>` : ''}
             <div class="post-foot">
               <button class="post-act ${p.likedByMe ? 'on' : ''}" data-act="post-like"

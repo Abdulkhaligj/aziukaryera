@@ -1,6 +1,6 @@
 # ADNSU Karyera Platforması — İT şöbəsi üçün təhvil sənədi
 
-Tarix: 28 oktyabr 2026
+Tarix: 28 oktyabr 2026 (təhlükəsizlik auditindən sonra yenilənib: 12 noyabr 2026)
 
 ## 1. Platforma nədən ibarətdir
 
@@ -47,25 +47,36 @@ Admin rolları: Super Admin, Menecer, Redaktor, Yoxlayıcı (`lib/permissions.ts
 1. Yeni layihə yaradın (və ya mövcuddan istifadə edin).
 2. Extensions: `pg_cron`, `pg_net`.
 3. `supabase/migrations/` fayllarını **ad (tarix) sırası ilə** tətbiq edin: `supabase db push` və ya SQL redaktorunda bir-bir.
+   - **Diqqət:** ilkin sxem (əsas cədvəllər, `is_admin()` və s.) layihənin əvvəlində Supabase Dashboard-da yaradılıb və repo-da migration kimi yoxdur. Ona görə boş bazada migration-lar 2-ci fayldan dayanır. Yeni mühit üçün əvvəlcə canlı layihədən sxem nüsxəsi götürün:
+     ```bash
+     supabase db dump --linked --schema public,private,storage -f supabase/baseline/schema.sql
+     ```
+     Yeni bazaya əvvəl bu faylı, sonra yalnız nüsxə tarixindən **sonrakı** migration-ları tətbiq edin. Universitet serverinə köçürmə (`deploy/universitet-server`) buna ehtiyac duymur: o, buluddan tam baza nüsxəsi köçürür.
    - `20261019130000_network_content_moderation.sql` daxilində `content-moderation` funksiyasının URL-i layihə ünvanı ilə yazılıb — yeni layihədə ünvanı dəyişin.
 4. Edge Functions (hamısı `verify_jwt = false`, çünki zəng edəni funksiyanın özü yoxlayır; `admin-users` istisnadır — `verify_jwt = true`):
    `supabase functions deploy aida-chat --no-verify-jwt` (eyni qayda ilə `career-ai`, `admin-assistant`, `content-moderation`), `supabase functions deploy admin-users`.
 5. Secrets (`supabase secrets set ...`): `GEMINI_API_KEY` (məcburi). İstəyə bağlı: `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`, `GEMINI_AIDA_MODEL`, `GEMINI_ASSISTANT_MODEL`, `GEMINI_MODERATION_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `PUBLIC_SITE_URL`. `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` avtomatik verilir.
-6. Storage bucket-lər miqrasiyalarla yaranır: `avatars` (şəxsi), `public-media` (ictimai, admin yazır), `assistant-audio` (şəxsi).
+6. Storage bucket-lər miqrasiyalarla yaranır: `avatars` (şəxsi), `public-media` (ictimai; Super Admin, Menecer və Redaktor yükləyir, yalnız Super Admin və Menecer dəyişir/silir), `assistant-audio` (şəxsi, yalnız admin; `20261112100000_security_audit_fixes.sql`).
 
 ### 4.2 Əsas sayt (`student-web/`)
 - `assets/js/config.js` → `SUPABASE_URL` və `SUPABASE_PUBLISHABLE_KEY` (ictimai açar).
 - Vercel: Root Directory `student-web`, framework "Other", build yoxdur. `vercel.json` təhlükəsizlik başlıqlarını və təmiz URL-ləri verir.
 - Lokal: `cd student-web && python3 -m http.server 8080`.
-- Diqqət: `assets/js/auth.js` daxilindəki 3 nümunə hesab (`aylin.mammadova@…`, `careers@socar.az`, `career@asoiu.edu.az`) **yalnız Supabase olmayan offline demo rejimindədir**, real hesab deyil.
+- Diqqət: `assets/js/auth.js` daxilindəki 3 nümunə hesab (`demo.telebe@asoiu.edu.az`, `demo.sirket@example.com`, `demo.admin@asoiu.edu.az`) **yalnız Supabase olmayan offline demo rejimindədir**, real hesab deyil və real ünvanlara aid deyil.
 
 ### 4.3 Admin panel
 - `.env.example` → `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL`.
 - `npm ci && npm run build && npm start` (Node 20+). Vercel-də eyni env dəyişənləri.
-- Testlər: `node --test tests/` (19 test).
+- Testlər: `node --test tests/*.test.mjs` (78 test).
 
 ### 4.4 Supabase Auth parametrləri (İT-nin etməli olduğu)
-- **SMTP + e-poçt təsdiqi:** Hazırda `mailer_autoconfirm = true`-dur, yəni istənilən şəxs başqasının @asoiu.edu.az ünvanı ilə qeydiyyat edə bilər. Düzəliş: Authentication → SMTP Settings (universitet poçt serveri və ya SendGrid/SES), e-poçt şablonlarına `{{ .Token }}` əlavə edin, "Confirm email"-i aktiv edin. Sayt artıq təsdiq kodu axınını dəstəkləyir.
+- **SMTP + e-poçt təsdiqi (təcili, audit H-01):** Hazırda `mailer_autoconfirm = true`-dur, yəni istənilən şəxs başqasının @asoiu.edu.az ünvanı ilə qeydiyyat edə bilər. Düzəliş ardıcıllığı:
+  1. Authentication → **SMTP Settings**: universitet poçt serveri (və ya SendGrid/SES), göndərən `career@asoiu.edu.az`.
+  2. Authentication → **Email Templates** → "Confirm signup": şablona `{{ .Token }}` əlavə edin (sayt 6 rəqəmli kodu qəbul edir).
+  3. Authentication → **Sign In / Providers → Email** → **"Confirm email"**-i aktiv edin.
+  4. Yoxlama: yeni test ünvanı ilə qeydiyyat → kod e-poçtla gəlir, kodsuz giriş olmur.
+
+  Bu addım SMTP olmadan edilməməlidir: təsdiq aktiv olub e-poçt getməsə, heç kim qeydiyyatı bitirə bilməz. Bazada artıq qorunma var: qeydiyyat zamanı `alumni_verified` həmişə `false` yazılır, məzun statusunu yalnız admin təsdiqləyir.
 - **Microsoft (Outlook) ilə giriş:** Kod hazırdır; provayder aktiv deyil. Entra ID-də tətbiq qeydiyyatı (single-tenant, ADNSU tenant `44774b4d-c635-4fa6-8746-23738dd53e9c`), redirect `https://ttfsbgbhyomfheglefkn.supabase.co/auth/v1/callback`, optional claims `xms_edov` + `email`; Supabase → Auth → Providers → Azure: Client ID, Secret, Tenant URL `https://login.microsoftonline.com/44774b4d-c635-4fa6-8746-23738dd53e9c`. Aktiv edildikdən sonra giriş səhifəsində düymə avtomatik görünür.
 - Site URL: `https://asoiu-career.vercel.app`, Redirect URLs-də eyni ünvan.
 
@@ -75,7 +86,11 @@ Admin rolları: Super Admin, Menecer, Redaktor, Yoxlayıcı (`lib/permissions.ts
 - Şəbəkə paylaşımları və şərhlər: söz siyahısı + AI moderasiya (fail-closed).
 - Şirkət müraciətdə yalnız mərhələni, öz qeydini və etiketləri dəyişə bilər (trigger ilə qorunur).
 - AI çağırışları gündəlik limitlidir (`ai_usage`); AIDA qonaqlar üçün IP-nin gündəlik duzlu hash-i ilə məhdudlaşır, IP saxlanmır.
-- Admin API-ləri hər sorğuda rolu yoxlayır, əməliyyatlar audit jurnalına yazılır.
+- Admin API-ləri hər sorğuda rolu yoxlayır, əməliyyatlar audit jurnalına yazılır. Yazma sorğuları yalnız eyni saytdan və JSON formatında qəbul olunur (CSRF qorunması); panel CSP, HSTS və `no-store` başlıqları ilə verilir.
+- Admin hesabları: heç kim öz rolunu aşağı sala və ya özünü bloklaya bilməz; sonuncu aktiv Super Admin dəyişdirilə/silinə bilməz; şirkət hesabları "Adminlər" bölməsindən idarə olunmur.
+- Təsdiqlənmiş vakansiyanın məzmunu dəyişdirilərsə, vakansiya yenidən təsdiq növbəsinə düşür.
+- Namizəd sıralaması (Career AI) xarici AI-yə göndərilməzdən əvvəl ad, e-poçt, telefon və profil linkləri gizlədilir.
+- Linklər (vakansiya, post, şirkət saytı, şəkillər) yalnız `http(s)://` ola bilər; bazada CHECK qaydası ilə qorunur.
 - Məlum məhdudiyyət: Pro paketli şirkət API vasitəsilə Talent Pool-dakı tələbələrin e-poçt/telefonunu oxuya bilər (ekranda gizlədilir). Tam həll üçün sütun səviyyəli RPC tövsiyə olunur.
 
 ## 6. Test nəticələri (28.10.2026)
