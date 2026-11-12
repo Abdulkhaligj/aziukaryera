@@ -1,9 +1,15 @@
 // Bound streamed JSON before parsing, including chunked requests without a
 // Content-Length header. Never partially accept an oversized document.
+import { crossSite } from '@/lib/admin-input';
+
 export async function readAdminJson(request: Request, maxBytes = 262144): Promise<
   { body: Record<string, unknown> } |
   { error: string; status: number }
 > {
+  if (crossSite(request)) return { error: 'Sorğu başqa saytdan göndərilib.', status: 403 };
+  if (!/^application\/json\b/i.test(request.headers.get('content-type') ?? '')) {
+    return { error: 'Sorğu JSON formatında olmalıdır.', status: 415 };
+  }
   const length = request.headers.get('content-length');
   if (length && (!/^\d+$/.test(length) || Number(length) > maxBytes)) {
     return { error: 'Sorğu ölçüsü icazə verilən həddi aşır.', status: 413 };

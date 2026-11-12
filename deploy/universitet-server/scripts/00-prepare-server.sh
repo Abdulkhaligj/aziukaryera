@@ -26,7 +26,13 @@ env_set API_EXTERNAL_URL "https://$PUBLIC_DOMAIN"
 env_set SITE_URL "$SITE_URL"
 env_set ADDITIONAL_REDIRECT_URLS "$SITE_URL/**,$ADMIN_URL/**"
 env_set ENABLE_EMAIL_SIGNUP true
-env_set ENABLE_EMAIL_AUTOCONFIRM "${ENABLE_EMAIL_AUTOCONFIRM:-true}"
+autoconfirm="${ENABLE_EMAIL_AUTOCONFIRM:-false}"
+case "$autoconfirm" in
+  false) [ -n "${SMTP_HOST:-}" ] || die "kit.env: E-poçt təsdiqi aktivdir (ENABLE_EMAIL_AUTOCONFIRM=false), amma SMTP_HOST boşdur. SMTP məlumatlarını doldurun." ;;
+  true) echo "XƏBƏRDARLIQ: ENABLE_EMAIL_AUTOCONFIRM=true — e-poçt təsdiqsiz qeydiyyat. Yalnız sınaq üçün; SMTP hazır olan kimi false edin." ;;
+  *) die "kit.env: ENABLE_EMAIL_AUTOCONFIRM true və ya false olmalıdır." ;;
+esac
+env_set ENABLE_EMAIL_AUTOCONFIRM "$autoconfirm"
 env_set ENABLE_PHONE_SIGNUP false
 env_set ENABLE_ANONYMOUS_USERS false
 # admin-users verifies the caller's JWT itself; the other functions are public,

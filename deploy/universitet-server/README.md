@@ -25,9 +25,9 @@ Köçən data: bütün cədvəllər, 9 istifadəçi hesabı (şifrə hash-ları 
   - Google Gemini API, Let's Encrypt;
   - Docker Hub, npm/jsr (funksiya asılılıqları);
   - köçürmə günü `*.supabase.co`.
-- [ ] **SMTP:** host, port, istifadəçi, şifrə, göndərən ünvan. Qeydiyyat təsdiqi, şifrə bərpası və admin dəvətləri üçün lazımdır.
+- [ ] **SMTP (məcburi):** host, port, istifadəçi, şifrə, göndərən ünvan. Qeydiyyat təsdiqi, şifrə bərpası və admin dəvətləri üçün lazımdır. E-poçt təsdiqi standart olaraq aktivdir; SMTP olmadan `00-prepare-server.sh` dayanır.
 - [ ] **AI açarı:** `GEMINI_API_KEY`, istəsəniz `GROQ_API_KEY`.
-- [ ] **Backup yeri:** gündəlik baza və fayl nüsxələri üçün (bax: §7).
+- [ ] **Backup yeri:** gündəlik baza və fayl nüsxələri üçün, serverdən kənarda bir maşın da daxil olmaqla (bax: §7).
 - [ ] **Köçürmə günü buluddan:**
   - Supabase Dashboard → **Connect → Session pooler** bağlantı sətri (`CLOUD_DB_URL`);
   - **Project Settings → API Keys** → service_role və ya secret açar (`CLOUD_SERVICE_ROLE_KEY`).
@@ -122,7 +122,7 @@ Bir-iki saatlıq fasilə planlayın: axşam saatı, istifadəçilərə əvvəlc�
    node --test tests/*.test.mjs
    ```
    `ANON_KEY` serverdəki `.env`-dədir və ictimai açardır. Skript `runtime-config.js`-i və 5 fayldakı CSP-ni yeniləyir.
-3. `deploy/universitet-server/sql/moderation-endpoint.sql` faylını tarixli migration kimi `supabase/migrations/`-a əlavə edin, sonra commit və push edin. Vercel əsas saytı avtomatik deploy edir.
+3. Dəyişiklikləri commit və push edin. Vercel əsas saytı avtomatik deploy edir. (Moderasiya ünvanı üçün ayrıca migration lazım deyil: `20261112100000_security_audit_fixes.sql` artıq `api-gw` və HTTPS domenə icazə verir.)
 4. Vercel → `asoiu-career-admin` → **Environment Variables (Production)**:
    - `NEXT_PUBLIC_SUPABASE_URL = https://api.career.asoiu.edu.az`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = <ANON_KEY>`
@@ -165,13 +165,28 @@ sudo crontab -e
 30 2 * * *  /opt/asoiu-career/deploy/universitet-server/scripts/backup.sh >> /var/log/asoiu-backup.log 2>&1
 ```
 
-Hər gecə bazanın tam nüsxəsi (`pg_dump -Fc`, istifadəçi hesabları daxil) və storage faylları `BACKUP_DIR`-ə (standart `/var/backups/asoiu-career`) yazılır. Son 14 gün saxlanılır. Nüsxələri başqa bir maşına da kopyalayın.
+Hər gecə bazanın tam nüsxəsi (`pg_dump -Fc`, istifadəçi hesabları daxil) və storage faylları `BACKUP_DIR`-ə (standart `/var/backups/asoiu-career`) yazılır. Son `BACKUP_DAYS` gün (standart 14) saxlanılır.
+
+Nüsxələrdə şəxsi məlumatlar və şifrə hash-ləri var, ona görə:
+
+- **Şifrələmə:** açar faylı yaradın və `kit.env`-də `BACKUP_KEY_FILE`-a yazın. Nüsxələr diskə AES-256 ilə şifrələnmiş (`.enc`) yazılır.
+  ```bash
+  sudo sh -c 'umask 077; openssl rand -base64 48 > /root/asoiu-backup.key'
+  ```
+  Açar faylının nüsxəsini serverdən kənarda (seyf, parol meneceri) saxlayın. Açar itsə, nüsxələr bərpa olunmur.
+- **Serverdən kənar nüsxə:** `BACKUP_REMOTE`-a rsync hədəfi yazın (məs. `backup@10.0.0.5:/srv/asoiu-career`, SSH açarı ilə). Server sıradan çıxsa, nüsxələr orada qalır.
 
 Bərpa (yeni boş bazaya):
 
 ```bash
+# Şifrələnmiş nüsxə:
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:/root/asoiu-backup.key -in db-YYYY-MM-DD-HHMM.dump.enc \
+  | docker exec -i supabase-db pg_restore -U postgres -d postgres --clean --if-exists
+# Şifrələnməmiş nüsxə:
 docker exec -i supabase-db pg_restore -U postgres -d postgres --clean --if-exists < db-YYYY-MM-DD-HHMM.dump
 ```
+
+Fayllar: `openssl enc -d … -in storage-….tar.gz.enc | tar -C "$SUPABASE_DIR/volumes" -xzf -`.
 
 ---
 
@@ -193,4 +208,4 @@ docker exec -i supabase-db pg_restore -U postgres -d postgres --clean --if-exist
 
   Tam zəncir (`01`–`06`) real serverdə və Docker-də hələ işlədilməyib. Buna görə §3-dəki sınaq köçürməsi məcburidir.
 - Buludda Supabase avtomatik yenilənir, self-hosted-də isə yeniləmələri İT edir. Rəsmi `update.sh` istifadə olunur, əvvəlcə backup alınmalıdır.
-- E-poçt təsdiqi buludda söndürülüb, yeni serverdə də söndürülmüş başlayır (`ENABLE_EMAIL_AUTOCONFIRM=true`). SMTP işlədikdən sonra `false` edin, `00-prepare-server.sh`-ı yenidən işlədin və `docker compose up -d` edin.
+- E-poçt təsdiqi yeni serverdə aktiv başlayır (`ENABLE_EMAIL_AUTOCONFIRM=false`), buna görə SMTP məcburidir. Təsdiq söndürülsə, istənilən şəxs başqasının @asoiu.edu.az ünvanı ilə hesab aça bilər. `true` yalnız qısa sınaq üçündür; dəyəri dəyişdikdən sonra `00-prepare-server.sh`-ı yenidən işlədin və `docker compose up -d` edin.

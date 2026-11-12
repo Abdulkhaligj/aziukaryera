@@ -35,7 +35,8 @@ export async function handleNewUser(env: WriteEnv, user: { id: string; email: st
     id: user.id, role, status, email: user.email, full_name: display,
     phone: text(meta, 'phone') ?? '', university, group_name: text(meta, 'group_name') ?? '',
     avatar_url: nonEmpty(meta, 'avatar_url'), account_status: requestedStatus,
-    alumni_verified: role === 'graduate' && isUni
+    // H-01 (audit 2026-11-12): staff verify alumni; sign-up never does.
+    alumni_verified: false
   });
 
   if (role === 'student' || role === 'graduate') {

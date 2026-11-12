@@ -57,7 +57,10 @@ function bakuTime(iso: string) {
 }
 
 async function clientHash(req: Request, day: string) {
-  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || "unknown";
+  // The first X-Forwarded-For entry is whatever the client sent. Use the address
+  // the edge proxy itself reports (Cloudflare / the API gateway), else the last hop.
+  const forwarded = (req.headers.get("x-forwarded-for") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || forwarded.at(-1) || "unknown";
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${day}|${ip}|${SERVICE_KEY.slice(-24)}`));
   return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
 }

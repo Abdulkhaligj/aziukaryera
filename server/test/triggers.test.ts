@@ -257,3 +257,41 @@ test('after-commit work runs only when the transaction commits', async () => {
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(ran, ['committed']);
 });
+
+// Security audit 2026-11-12 (the same rules as migration 20261112100000).
+test('audit: editing an approved vacancy\'s content sends it back to review; the deadline does not', async () => {
+  assert.equal((await admin.from('jobs').update({ status: 'approved' }).eq('id', jobId)).error, null);
+  const later = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 10);
+  assert.equal((await company.from('jobs').update({ deadline: later }).eq('id', jobId)).error, null);
+  let job = await one<{ status: string; approved_at: string | null }>(h.pool, 'SELECT status, approved_at FROM jobs WHERE id = ?', [jobId]);
+  assert.equal(job!.status, 'approved', 'deadline changes keep the approval');
+  assert.equal((await company.from('jobs').update({ location: 'Bakı' }).eq('id', jobId)).error, null);
+  assert.equal((await one<{ status: string }>(h.pool, 'SELECT status FROM jobs WHERE id = ?', [jobId]))!.status, 'approved', 'an unchanged value is no edit');
+  assert.equal((await company.from('jobs').update({ application_url: 'https://apply.example.com/job' }).eq('id', jobId)).error, null);
+  job = await one(h.pool, 'SELECT status, approved_at FROM jobs WHERE id = ?', [jobId]);
+  assert.deepEqual(job, { status: 'pending', approved_at: null });
+  assert.equal((await admin.from('jobs').update({ title: 'Təcrübəçi mühəndis (yenilənib)', status: 'approved' }).eq('id', jobId)).error, null);
+  assert.equal((await one<{ status: string }>(h.pool, 'SELECT status FROM jobs WHERE id = ?', [jobId]))!.status, 'approved', 'staff edits stay approved');
+});
+
+test('audit: links must be http(s), images https', async () => {
+  const bad = await company.from('jobs').update({ application_url: 'javascript:alert(1)' }).eq('id', jobId);
+  assert.equal(bad.error?.code, '23514');
+  assert.equal(bad.error?.message, 'new row for relation "jobs" violates check constraint "jobs_application_url_web"');
+  const logo = await company.from('companies').update({ logo_url: 'http://cdn.example.com/logo.png' }).eq('id', companyId);
+  assert.equal(logo.error?.message, 'new row for relation "companies" violates check constraint "companies_logo_url_web"');
+  const site = await company.from('companies').update({ website: 'data:text/html,hi' }).eq('id', companyId);
+  assert.equal(site.error?.message, 'new row for relation "companies" violates check constraint "companies_website_web"');
+  assert.equal((await company.from('companies').update({ website: 'HTTPS://azercell.com', logo_url: '' }).eq('id', companyId)).error, null);
+  const partner = await admin.from('benefit_partners').insert({ name: 'Test tərəfdaş', website: 'ftp://files.example.com' });
+  assert.equal(partner.error?.message, 'new row for relation "benefit_partners" violates check constraint "benefit_partners_website_web"');
+});
+
+test('audit: the profile email follows the sign-in account; sign-up never verifies an alumnus', async () => {
+  const email = await student.from('profiles').update({ email: 'someone.else@asoiu.edu.az' }).eq('id', studentId);
+  assert.equal(email.status, 403);
+  assert.equal(email.error?.message, 'E-poçt ünvanı giriş hesabından idarə olunur');
+  const { id } = await signedIn('mezun.yeni@asoiu.edu.az', { role: 'graduate', full_name: 'Yeni Məzun' });
+  const graduate = await one<{ role: string; status: string; alumni_verified: number }>(h.pool, 'SELECT role, status, alumni_verified FROM profiles WHERE id = ?', [id]);
+  assert.deepEqual({ ...graduate, alumni_verified: Number(graduate!.alumni_verified) }, { role: 'graduate', status: 'active', alumni_verified: 0 });
+});

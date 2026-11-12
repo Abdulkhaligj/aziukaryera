@@ -30,6 +30,8 @@ before('profiles', 'profiles_guard_privileges', ['update'], async (env, row, old
   if (!await privileged(env)) {
     if (changed(row, old, 'role', 'status')) throw new DbRuleError('Rol və hesab statusunu dəyişmək icazəsi yoxdur', '42501');
     if (changed(row, old, 'alumni_verified')) throw new DbRuleError('Məzun təsdiqini yalnız Karyera Mərkəzi dəyişə bilər', '42501');
+    // The profile email follows the sign-in account (audit 2026-11-12).
+    if (changed(row, old, 'email')) throw new DbRuleError('E-poçt ünvanı giriş hesabından idarə olunur', '42501');
   }
   row.updated_at = nowText(env);
 });

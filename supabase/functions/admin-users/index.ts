@@ -224,9 +224,27 @@ Deno.serve(async (req: Request) => {
   if (!id) return json({ ok: false, error: "İstifadəçi ID-si yoxdur" }, 400);
   if (id === actor.id && action === "delete") return json({ ok: false, error: "Öz admin hesabınızı silə bilməzsiniz" }, 409);
 
-  const { data: target } = await service.from("profiles").select("role,email,full_name").eq("id", id).maybeSingle();
+  const { data: target } = await service.from("profiles").select("role,email,full_name,status,admin_role").eq("id", id).maybeSingle();
   if (!target) return json({ ok: false, error: "İstifadəçi tapılmadı" }, 404);
+  // The account must belong to the section the request comes from: a company
+  // account (or any other role) cannot be reset, edited or converted from here.
+  if (target.role !== identity.role) return json({ ok: false, error: "Bu hesab bu bölmədə idarə olunmur" }, 403);
   if (target.role === "admin" && actorRole !== "super_admin") return json({ ok: false, error: "Admin hesablarını yalnız Super Admin idarə edə bilər" }, 403);
+
+  // Only the fields the request sends are changed.
+  const has = (key: keyof RequestBody) => Object.hasOwn(body, key);
+  const demotes = has("admin_role") && body.admin_role !== target.admin_role;
+  const blocks = has("status") && clean(body.status) !== "active";
+
+  if (id === actor.id && action === "update" && (demotes || blocks)) {
+    return json({ ok: false, error: "Öz rolunuzu və ya statusunuzu dəyişə bilməzsiniz" }, 409);
+  }
+  // The last active super admin cannot be demoted, blocked or deleted.
+  if (target.admin_role === "super_admin" && target.status === "active" && (action === "delete" || (action === "update" && (demotes || blocks)))) {
+    const { count } = await service.from("profiles").select("id", { count: "exact", head: true })
+      .eq("role", "admin").eq("status", "active").eq("admin_role", "super_admin").neq("id", id);
+    if (!count) return json({ ok: false, error: "Sonuncu aktiv Super Admin hesabı dəyişdirilə və ya silinə bilməz" }, 409);
+  }
 
   if (action === "reset_password") {
     const { data: targetAuth } = await service.auth.admin.getUserById(id);
@@ -249,22 +267,33 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "update") {
-    /* Öz hesabını dayandırmaq və ya rolunu endirmək paneli kilidləyə bilər */
-    if (id === actor.id && resource === "admins" && (profileData.admin_role !== actorRole || profileData.status !== "active")) {
-      return json({ ok: false, error: "Öz rolunuzu və ya statusunuzu dəyişə bilməzsiniz" }, 409);
-    }
+    const patch: Record<string, unknown> = { account_status: identity.accountStatus };
+    if (has("full_name")) patch.full_name = profileData.full_name;
+    if (has("email") && profileData.email) patch.email = profileData.email;
+    if (has("personal_email")) patch.personal_email = profileData.personal_email;
+    if (has("phone")) patch.phone = profileData.phone;
+    if (has("city")) patch.city = profileData.city;
+    if (has("faculty_id")) patch.faculty_id = profileData.faculty_id;
+    if (has("major_id")) patch.major_id = profileData.major_id;
+    if (has("course")) patch.course = profileData.course;
+    if (has("gpa")) patch.gpa = profileData.gpa;
+    if (has("status")) patch.status = profileData.status;
+    if (has("alumni_verified")) patch.alumni_verified = profileData.alumni_verified;
+    if (resource === "admins" && has("admin_role")) patch.admin_role = profileData.admin_role;
+
     const { data: targetAuth } = await service.auth.admin.getUserById(id);
     if (!targetAuth.user) return json({ ok: false, error: "Auth istifadəçisi tapılmadı" }, 404);
-    const authUpdate: Record<string, unknown> = {
-      user_metadata: { ...targetAuth.user.user_metadata, full_name: profileData.full_name },
-    };
-    if (profileData.email && profileData.email !== targetAuth.user.email) authUpdate.email = profileData.email;
-    if (resource === "admins") authUpdate.app_metadata = { admin_role: profileData.admin_role };
-    const { error: authUpdateError } = await service.auth.admin.updateUserById(id, authUpdate as never);
-    if (authUpdateError) return json({ ok: false, error: authUpdateError.message }, 400);
-    const { error: profileUpdateError } = await service.from("profiles").update({ ...profileData, role: identity.role }).eq("id", id);
+    const authUpdate: Record<string, unknown> = {};
+    if (has("full_name") && profileData.full_name) authUpdate.user_metadata = { ...targetAuth.user.user_metadata, full_name: profileData.full_name };
+    if (patch.email && patch.email !== targetAuth.user.email) authUpdate.email = patch.email;
+    if (resource === "admins" && has("admin_role")) authUpdate.app_metadata = { admin_role: profileData.admin_role };
+    if (Object.keys(authUpdate).length) {
+      const { error: authUpdateError } = await service.auth.admin.updateUserById(id, authUpdate as never);
+      if (authUpdateError) return json({ ok: false, error: authUpdateError.message }, 400);
+    }
+    const { error: profileUpdateError } = await service.from("profiles").update(patch).eq("id", id);
     if (profileUpdateError) return json({ ok: false, error: profileUpdateError.message }, 400);
-    if ((await service.from("admin_audit_logs").insert({ title: `${profileData.full_name || target.full_name} yeniləndi`, resource, resource_id: id, action: "update-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
+    if ((await service.from("admin_audit_logs").insert({ title: `${(patch.full_name as string) || target.full_name} yeniləndi`, resource, resource_id: id, action: "update-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true });
   }
 

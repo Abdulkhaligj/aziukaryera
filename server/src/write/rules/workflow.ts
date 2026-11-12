@@ -74,10 +74,20 @@ audited('applications');
 
 // jobs_guard_status → public.guard_job_status
 const STAFF_JOB_STATUSES = ['approved', 'published', 'rejected', 'changes_requested', 'expired', 'archived'];
+// M-04 (audit 2026-11-12): the public content of a reviewed vacancy. Deadline
+// and number of positions are not part of it.
+const REVIEWED_JOB_CONTENT = ['title', 'type', 'mode', 'location', 'duration', 'pay', 'summary', 'duties', 'requirements',
+  'skills', 'preferred_skills', 'faculty_ids', 'major_ids', 'min_course', 'min_gpa', 'department',
+  'salary_min', 'salary_max', 'currency', 'salary_visible', 'experience_level', 'application_method', 'application_url'];
 before('jobs', 'jobs_guard_status', ['update'], async (env, row, old) => {
   if (await privileged(env)) return;
   if (changed(row, old, 'status') && STAFF_JOB_STATUSES.includes(row.status as string)) {
     throw new DbRuleError('Elanın statusunu yalnız Karyera Mərkəzi dəyişə bilər', '42501');
+  }
+  if ((old!.status === 'approved' || old!.status === 'published') && changed(row, old, ...REVIEWED_JOB_CONTENT)) {
+    row.status = 'pending';
+    row.approved_at = null;
+    row.approved_by = null;
   }
 });
 

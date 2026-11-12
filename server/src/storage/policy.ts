@@ -12,12 +12,14 @@ export type StorageCmd = 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE';
 export const firstFolder = (name: string) => (name.includes('/') ? name.split('/')[0] : null);
 
 class Checks {
-  private admin: boolean | undefined;
+  private role: Promise<string | null> | undefined;
   private tx: Tx;
   private ctx: Context;
   constructor(tx: Tx, ctx: Context) { this.tx = tx; this.ctx = ctx; }
   get uid() { return this.ctx.uid; }
-  async isAdmin() { return (this.admin ??= (await currentAdminRole(this.tx, this.ctx)) !== null); }
+  /** public.current_admin_role() */
+  adminRole() { return (this.role ??= currentAdminRole(this.tx, this.ctx)); }
+  async isAdmin() { return (await this.adminRole()) !== null; }
   own(o: ObjectRow) { return this.uid != null && firstFolder(o.name) === this.uid; }
   /** public.avatar_folder_has_room: fewer than 20 avatar files in the caller's folder. */
   async folderHasRoom() {
@@ -40,13 +42,18 @@ class Checks {
 type Rule = (c: Checks, o: ObjectRow) => Promise<boolean> | boolean;
 const audio: Rule = async (c, o) => o.bucket_id === 'assistant-audio' && await c.isAdmin() && c.own(o);
 const media: Rule = async (c, o) => o.bucket_id === 'public-media' && await c.isAdmin();
+// Site images: super admins, managers and editors upload; only super admins
+// and managers replace or delete (audit 2026-11-12).
+const mediaBy = (...roles: string[]): Rule => async (c, o) => o.bucket_id === 'public-media' && roles.includes((await c.adminRole()) ?? '');
+const mediaUpload = mediaBy('super_admin', 'manager', 'editor');
+const mediaManage = mediaBy('super_admin', 'manager');
 const notReferencedAvatar: Rule = async (c, o) => o.bucket_id !== 'avatars' || !await c.referenced(o.name);
 
 const PERMISSIVE: Record<StorageCmd, Rule[]> = {
   SELECT: [audio, media, async (c, o) => o.bucket_id === 'avatars' && (c.own(o) || await c.shown(o.name) || await c.isAdmin())],
-  INSERT: [audio, media, async (c, o) => o.bucket_id === 'avatars' && c.own(o) && await c.folderHasRoom()],
-  UPDATE: [media],
-  DELETE: [audio, media, (c, o) => o.bucket_id === 'avatars' && c.own(o)]
+  INSERT: [audio, mediaUpload, async (c, o) => o.bucket_id === 'avatars' && c.own(o) && await c.folderHasRoom()],
+  UPDATE: [mediaManage],
+  DELETE: [audio, mediaManage, (c, o) => o.bucket_id === 'avatars' && c.own(o)]
 };
 const RESTRICTIVE: Record<StorageCmd, Rule[]> = {
   SELECT: [],

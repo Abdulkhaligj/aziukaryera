@@ -138,3 +138,25 @@ test('assistant-audio: an admin\'s own folder, wav only', async () => {
   const service = h.service();
   assert.equal((await service.storage.from('assistant-audio').download(name)).data?.size, 8);
 });
+
+test('public-media (audit 2026-11-12): editors upload, only super admins and managers replace or delete', async () => {
+  const staffClient = async (email: string, role: string) => {
+    const made = await h.service().auth.admin.createUser({ email, password: 'Sifre2026!', email_confirm: true,
+      user_metadata: { role: 'student', full_name: `Staff ${role}` }, app_metadata: { admin_role: role } });
+    await exec(h.pool, `UPDATE profiles SET role = 'admin', admin_role = ? WHERE id = ?`, [role, made.data.user!.id]);
+    const client = h.anon();
+    await client.auth.signInWithPassword({ email, password: 'Sifre2026!' });
+    return client;
+  };
+  const editor = await staffClient('editor@asoiu.edu.az', 'editor');
+  const reviewer = await staffClient('yoxlayici@asoiu.edu.az', 'reviewer');
+  const name = `site/${hex(77)}.png`;
+  assert.equal((await reviewer.storage.from('public-media').upload(name, image(16, 'image/png'), { contentType: 'image/png' })).error?.message,
+    'new row violates row-level security policy');
+  assert.equal((await editor.storage.from('public-media').upload(name, image(16, 'image/png'), { contentType: 'image/png' })).error, null);
+  assert.equal((await editor.storage.from('public-media').update(name, image(20, 'image/png'), { contentType: 'image/png' })).error?.message,
+    'new row violates row-level security policy');
+  const removed = await editor.storage.from('public-media').remove([name]);
+  assert.deepEqual(removed.data, [], 'an editor cannot delete');
+  assert.equal((await admin.storage.from('public-media').remove([name])).data?.length, 1);
+});

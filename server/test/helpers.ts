@@ -38,7 +38,7 @@ export async function startHarness(env: Record<string, string> = {}): Promise<Ha
   const config = loadConfig({
     STORAGE_DIR: storageDir, ENABLE_JOBS: 'false', MYSQL_URL: mysqlUrl, JWT_SECRET: secret, ANON_KEY: await sign('anon'), SERVICE_ROLE_KEY: await sign('service_role'),
     API_EXTERNAL_URL: 'http://127.0.0.1', SITE_URL: 'https://asoiu-career.vercel.app',
-    ADDITIONAL_REDIRECT_URLS: 'https://asoiu-career-admin.vercel.app/**', ...env
+    ADDITIONAL_REDIRECT_URLS: 'https://asoiu-career-admin.vercel.app/**', ENABLE_EMAIL_AUTOCONFIRM: 'true', ...env
   } as NodeJS.ProcessEnv);
   const pool = createPool(mysqlUrl);
   const mailer = createMailer(config);

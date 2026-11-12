@@ -1,6 +1,7 @@
 import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminContext, loadLookups, loadResource, resourceKeys, writeAudit } from '@/lib/admin-data';
+import { AUDIT_WARNING, getAdminContext, loadLookups, loadResource, resourceKeys, writeAudit } from '@/lib/admin-data';
+import { escapeLike, functionError, httpsUrl, publicError, webUrl } from '@/lib/admin-input';
 import { can } from '@/lib/permissions';
 import type { ResourceKey } from '@/lib/types';
 
@@ -13,7 +14,6 @@ function list(value: unknown, separator = ',') { return text(value).split(separa
 function bool(value: unknown) { return value === true || value === 'true' || value === 'on'; }
 /* Formadakı "YYYY-MM-DDTHH:MM" Bakı vaxtıdır (UTC+4, yay vaxtı yoxdur) */
 function bakuTime(value: unknown) { const s = text(value); return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? `${s}:00+04:00` : s; }
-function httpsUrl(value: unknown) { const s = text(value); return /^https:\/\//i.test(s) ? s : null; }
 const placements = new Set(['landing_hero', 'landing_strip', 'dashboard']);
 const adStatuses = new Set(['draft', 'active', 'paused', 'ended']);
 
@@ -25,7 +25,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ resour
   try {
     return NextResponse.json(await loadResource(context, resource as ResourceKey, await loadLookups(context)));
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Məlumat alınmadı' }, { status: 400 });
+    return NextResponse.json({ error: publicError(error as { message?: string; code?: string }, 'Məlumat alınmadı') }, { status: 400 });
   }
 }
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { data, error } = await context.supabase.functions.invoke('admin-users', {
       body: { ...body, action: 'create', resource: key }
     });
-    if (error || !data?.ok) return NextResponse.json({ error: data?.error || error?.message || 'Hesab yaradılmadı' }, { status: 400 });
+    if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'Hesab yaradılmadı') }, { status: 400 });
     return NextResponse.json(data, { status: 201 });
   }
 
@@ -58,11 +58,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (company?.name) companyName = company.name;
     }
     if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
-    const payload = { year, nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: text(body.logo_url) || null, citation: text(body.citation) || null, published: bool(body.published) };
+    const payload = { year, nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: httpsUrl(body.logo_url), citation: text(body.citation) || null, published: bool(body.published) };
     const { data, error } = await context.supabase.from('company_awards').insert(payload).select('id').single();
-    if (error) return NextResponse.json({ error: /duplicate key/i.test(error.message) ? 'Bu şirkət həmin il və nominasiyada artıq var' : error.message }, { status: 400 });
-    await writeAudit(context, resource, data.id, 'create', `${companyName} — ${nomination} mükafatı əlavə edildi`);
-    return NextResponse.json({ id: data.id }, { status: 201 });
+    if (error) return NextResponse.json({ error: error.code === '23505' ? 'Bu şirkət həmin il və nominasiyada artıq var' : publicError(error) }, { status: 400 });
+    const audited = await writeAudit(context, resource, data.id, 'create', `${companyName} — ${nomination} mükafatı əlavə edildi`);
+    return NextResponse.json({ id: data.id, ...(audited ? {} : { warning: AUDIT_WARNING }) }, { status: 201 });
   }
 
   const title = text(body.title);
@@ -71,9 +71,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let table: string = resource;
   let payload: Record<string, unknown>;
   if (key === 'companies') {
-    payload = { name: title, sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: text(body.website), company_size: text(body.company_size), address: text(body.address), logo_url: text(body.logo_url) || null, about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: bool(body.verified), status: text(body.status) || 'pending' };
+    payload = { name: title, sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: webUrl(body.website) ?? '', company_size: text(body.company_size), address: text(body.address), logo_url: httpsUrl(body.logo_url), about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: bool(body.verified), status: text(body.status) || 'pending' };
   } else if (key === 'jobs') {
-    payload = { company_id: text(body.company_id), title, type: text(body.type) || 'tecrube', mode: text(body.mode) || 'Əyani', location: text(body.location) || 'Bakı', deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: text(body.salary_min) ? number(body.salary_min) : null, salary_max: text(body.salary_max) ? number(body.salary_max) : null, currency: text(body.currency) || 'AZN', salary_visible: bool(body.salary_visible), positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: text(body.application_url) || null, changes_requested: text(body.changes_requested) || null, status: text(body.status) || 'draft' };
+    payload = { company_id: text(body.company_id), title, type: text(body.type) || 'tecrube', mode: text(body.mode) || 'Əyani', location: text(body.location) || 'Bakı', deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: text(body.salary_min) ? number(body.salary_min) : null, salary_max: text(body.salary_max) ? number(body.salary_max) : null, currency: text(body.currency) || 'AZN', salary_visible: bool(body.salary_visible), positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: webUrl(body.application_url), changes_requested: text(body.changes_requested) || null, status: text(body.status) || 'draft' };
   } else if (key === 'events') {
     payload = { title, kind: text(body.kind), starts_at: bakuTime(body.starts_at), place: text(body.place), seats: number(body.seats), description: text(body.description) || null, organizers: list(body.organizers), image_url: httpsUrl(body.image_url) };
   } else if (key === 'ads') {
@@ -85,11 +85,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let partnerId = text(body.partner_id);
     const partnerName = text(body.partner_name);
     if (!partnerId && partnerName) {
-      const { data: existing } = await context.supabase.from('benefit_partners').select('id').ilike('name', partnerName).maybeSingle();
+      const { data: existing } = await context.supabase.from('benefit_partners').select('id').ilike('name', escapeLike(partnerName)).maybeSingle();
       if (existing?.id) partnerId = existing.id;
       else {
         const { data: created, error: partnerError } = await context.supabase.from('benefit_partners').insert({ name: partnerName, status: 'active', logo_url: httpsUrl(body.partner_logo_url) }).select('id').single();
-        if (partnerError) return NextResponse.json({ error: partnerError.message }, { status: 400 });
+        if (partnerError) return NextResponse.json({ error: publicError(partnerError) }, { status: 400 });
         partnerId = created.id;
       }
     }
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { data, error } = await context.supabase.from(table).insert(payload).select('id').single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  await writeAudit(context, resource, data.id, 'create', `${title} yaradıldı`);
-  return NextResponse.json({ id: data.id }, { status: 201 });
+  if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
+  const audited = await writeAudit(context, resource, data.id, 'create', `${title} yaradıldı`);
+  return NextResponse.json({ id: data.id, ...(audited ? {} : { warning: AUDIT_WARNING }) }, { status: 201 });
 }

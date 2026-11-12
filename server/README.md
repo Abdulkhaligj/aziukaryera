@@ -126,6 +126,7 @@ cd server && npm install
 node tools/generate-keys.mjs > .env.local        # JWT_SECRET, ANON_KEY, SERVICE_ROLE_KEY
 # .env.local-a əlavə edin: MYSQL_URL, API_EXTERNAL_URL, SITE_URL, STORAGE_DIR, (istəyə görə) SMTP_*,
 #   GEMINI_API_KEY, GROQ_API_KEY, MODERATION_WEBHOOK_SECRET, PUBLIC_SITE_URL, FUNCTIONS_DIR, ENABLE_JOBS
+#   Lokal sınaqda SMTP yoxdursa: ENABLE_EMAIL_AUTOCONFIRM=true (standart false: qeydiyyat e-poçt kodu ilə təsdiqlənir)
 node --env-file=.env.local src/index.ts           # Node 22.18+ TypeScript-i birbaşa işlədir
 npm test                                          # MYSQL_TEST_URL (standart: mysql://root@127.0.0.1:3307) üzərində
 ```

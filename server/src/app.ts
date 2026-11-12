@@ -17,7 +17,9 @@ import './write/rules/index.ts';
 export interface AppDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer; logger?: boolean }
 
 export async function buildApp(deps: AppDeps) {
-  const app = Fastify({ logger: deps.logger ?? false, trustProxy: true, bodyLimit: 1024 * 1024 });
+  // One trusted hop (Caddy): req.ip is the address Caddy saw, not whatever a
+  // client wrote into X-Forwarded-For.
+  const app = Fastify({ logger: deps.logger ?? false, trustProxy: (_address, hop) => hop < 1, bodyLimit: 1024 * 1024 });
   await app.register(cors, {
     origin: '*',
     allowedHeaders: ['authorization', 'apikey', 'content-type', 'x-client-info', 'x-supabase-api-version', 'prefer', 'range',

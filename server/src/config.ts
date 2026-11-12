@@ -64,7 +64,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     serviceRoleKey: required(env, 'SERVICE_ROLE_KEY'),
     accessTokenTtl: Number(env.JWT_EXPIRY || 3600),
     refreshTokenTtlDays: Number(env.REFRESH_TOKEN_TTL_DAYS || 30),
-    mailerAutoconfirm: (env.ENABLE_EMAIL_AUTOCONFIRM ?? 'true') === 'true',
+    // H-01 (audit 2026-11-12): sign-ups confirm their email unless explicitly disabled.
+    mailerAutoconfirm: (env.ENABLE_EMAIL_AUTOCONFIRM ?? 'false') === 'true',
     secureEmailChange: (env.SECURE_EMAIL_CHANGE ?? 'true') === 'true',
     disableSignup: env.DISABLE_SIGNUP === 'true',
     passwordMinLength: Number(env.PASSWORD_MIN_LENGTH || 6),

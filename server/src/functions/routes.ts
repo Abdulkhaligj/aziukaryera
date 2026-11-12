@@ -30,6 +30,10 @@ export async function functionRoutes(app: FastifyInstance, deps: { config: Confi
       if (value == null || HOP_BY_HOP.has(key)) continue;
       headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
     }
+    // The functions rate-limit guests by IP (cf-connecting-ip, then x-real-ip):
+    // set it here so a client cannot pick its own.
+    headers.delete('cf-connecting-ip');
+    headers.set('x-real-ip', req.ip);
     const body = req.method === 'GET' || req.method === 'HEAD' || !Buffer.isBuffer(req.body) ? undefined : new Uint8Array(req.body);
     const request = new Request(config.publicUrl + req.url, { method: req.method, headers, body });
     let response: Response;

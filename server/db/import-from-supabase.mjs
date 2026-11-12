@@ -112,6 +112,12 @@ try {
     report.push({ table: job.to, source: rows.length });
     process.stdout.write(`${job.to}: ${rows.length}\n`);
   }
+  // The buckets the platform uses, with the production settings, in case the
+  // source project lacks one (the repo defines them: audit 2026-11-12, M-06).
+  await db.query(`INSERT IGNORE INTO storage_buckets (id, public, file_size_limit, allowed_mime_types) VALUES
+    ('avatars', 0, 1048576, JSON_ARRAY('image/webp', 'image/jpeg')),
+    ('public-media', 1, 5242880, JSON_ARRAY('image/png', 'image/jpeg', 'image/webp')),
+    ('assistant-audio', 0, 10485760, JSON_ARRAY('audio/wav', 'audio/x-wav'))`);
   // Sequences that are not column identities continue from their Postgres value.
   for (const seq of await src.rows(`select sequencename as name, coalesce(last_value, 0) as value
       from pg_sequences where schemaname = 'private' and sequencename in ('invoice_seq')`)) {

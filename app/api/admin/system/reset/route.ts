@@ -1,6 +1,7 @@
 import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminContext } from '@/lib/admin-data';
+import { publicError } from '@/lib/admin-input';
 
 export async function POST(request: NextRequest) {
   const context = await getAdminContext();
@@ -16,6 +17,6 @@ export async function POST(request: NextRequest) {
   }
 
   const { data, error } = await context.supabase.rpc('admin_reset_platform_data', { p_confirmation: body.confirmation });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return NextResponse.json({ error: publicError(error, 'Sıfırlama alınmadı') }, { status: 400 });
   return NextResponse.json(data);
 }

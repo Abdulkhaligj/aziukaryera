@@ -21,9 +21,9 @@ API Supabase ilə eyni HTTP protokolunu verir. Ona görə əsas sayt və admin p
 - [ ] **Domen:** məsələn `api.career.asoiu.edu.az`, DNS A qeydi bu serverə yönəlmiş.
 - [ ] **Firewall:** internetdən yalnız **80 və 443**.
 - [ ] **Çıxış internet (HTTPS):** Google Gemini API, Let's Encrypt, Docker Hub, npm. Köçürmə günü `*.supabase.co`.
-- [ ] **SMTP:** host, port, istifadəçi, şifrə, göndərən ünvan (qeydiyyat təsdiqi, şifrə bərpası, admin dəvətləri).
+- [ ] **SMTP (məcburi):** host, port, istifadəçi, şifrə, göndərən ünvan (qeydiyyat təsdiqi, şifrə bərpası, admin dəvətləri). E-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`); SMTP olmadan `03-start.sh` dayanır.
 - [ ] **AI açarı:** `GEMINI_API_KEY`, istəsəniz `GROQ_API_KEY`.
-- [ ] **Backup yeri** gündəlik nüsxələr üçün.
+- [ ] **Backup yeri** gündəlik nüsxələr üçün, serverdən kənarda bir maşın da daxil olmaqla.
 
 ## 2. Quraşdırma
 
@@ -87,7 +87,7 @@ deploy/universitet-mysql/scripts/04-verify.sh    # HTTPS üzərindən 8 yoxlama
 | Loglar | `… logs -f api` |
 | Yeniləmə | `git pull && deploy/universitet-mysql/scripts/03-start.sh` (migration-lar API başlayanda yox, `01-init.sh`/`02-import.sh` ilə tətbiq olunur; yeni migration olanda: `… run --rm api node server/db/setup.mjs`) |
 | Backup | `deploy/universitet-mysql/scripts/backup.sh /srv/backups/asoiu`, cron ilə gündəlik: `30 3 * * *` |
-| Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması |
+| Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması. Şifrələnmiş nüsxədə əvvəlcə: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:/root/asoiu-backup.key -in db-….sql.gz.enc \| gunzip -c \| …` |
 
 Planlı işlər (moderasiya təkrarları hər dəqiqə, paket müddətləri hər saat) API-nin içində işləyir, ayrıca cron lazım deyil.
 
@@ -95,4 +95,4 @@ Planlı işlər (moderasiya təkrarları hər dəqiqə, paket müddətləri hər
 
 - `kit.env` və `api.env` serverdə qalır, heç vaxt git-ə və ya çata yazılmır. `SERVICE_ROLE_KEY` serverdən çıxmır: admin panel istifadəçi idarəsini `admin-users` funksiyası ilə edir.
 - MySQL və API portları kənara açılmır, yalnız Caddy (80/443).
-- Backup faylları şifrələnmiş və ya giriş məhdud olan yerdə saxlanmalıdır, çünki şəxsi data var.
+- Backup fayllarında şəxsi data və şifrə hash-ləri var: `kit.env`-də `BACKUP_KEY_FILE` (AES-256 şifrələmə) və `BACKUP_REMOTE` (serverdən kənar nüsxə) doldurun. Açar faylının nüsxəsini serverdən kənarda saxlayın.

@@ -15,6 +15,7 @@ import { logout } from '@/app/login/actions';
 import ImageField from '@/components/image-field';
 import Assistant from '@/components/assistant';
 import InstallHint from '@/components/install-hint';
+import { readJson } from '@/lib/read-json';
 
 type Store = Record<ResourceKey, AdminRow[]>;
 type View = 'dashboard' | ResourceKey;
@@ -318,7 +319,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     setApprovalNotes([]); setApprovalNoteOpen(false); setApprovalNoteText(''); setApprovalNoteError('');
     fetch(`/api/admin/approval-notes?job_id=${encodeURIComponent(jobId)}`, { cache: 'no-store' })
       .then(async response => {
-        const payload = await response.json();
+        const payload = await readJson(response);
         if (response.status === 401) { window.location.href = '/login'; return { notes: [] }; }
         if (!response.ok) throw new Error(payload.error || 'Qeydlər yüklənmədi');
         return payload;
@@ -366,7 +367,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
 
   async function refreshResource(resource: ResourceKey) {
     const response = await fetch(`/api/admin/${resource}`, { cache: 'no-store' });
-    const result = await response.json();
+    const result = await readJson(response);
     if (response.status === 401) { window.location.href = '/login'; return; }
     if (!response.ok) throw new Error(result.error || 'Məlumat yenilənmədi');
     setData(previous => ({ ...previous, [resource]: result }));
@@ -376,7 +377,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     for (const key of [...related, 'audit_logs' as ResourceKey]) {
       if (key === resource) continue;
       const r = await fetch(`/api/admin/${key}`, { cache: 'no-store' });
-      if (r.ok) { const rows = await r.json(); setData(previous => ({ ...previous, [key]: rows })); }
+      if (r.ok) { const rows = await readJson(r); setData(previous => ({ ...previous, [key]: rows })); }
     }
   }
 
@@ -393,7 +394,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     const endpoint = modal.mode === 'edit' && modal.row ? `/api/admin/${active}/${modal.row.id}` : `/api/admin/${active}`;
     try {
       const response = await fetch(endpoint, { method: modal.mode === 'edit' ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const result = await response.json();
+      const result = await readJson(response);
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'Əməliyyat alınmadı');
       await refreshResource(active);
@@ -419,7 +420,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_id: modal.row.id, note })
       });
-      const result = await response.json();
+      const result = await readJson(response);
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'Qeyd saxlanılmadı');
       setApprovalNotes(previous => [result.note as ApprovalNote, ...previous]);
@@ -437,7 +438,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     setBusy(true); setFormError('');
     try {
       const response = await fetch(`/api/admin/${active}/${row.id}`, { method: 'DELETE' });
-      const result = await response.json();
+      const result = await readJson(response);
       if (!response.ok) throw new Error(result.error || 'Silmək mümkün olmadı');
       await refreshResource(active);
       setModal(null);
@@ -452,7 +453,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     setBusy(true); setFormError('');
     try {
       const response = await fetch(`/api/admin/${active}/${row.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ __action: 'reset_password' }) });
-      const result = await response.json();
+      const result = await readJson(response);
       if (!response.ok) throw new Error(result.error || 'Şifrə sıfırlanmadı');
       setModal(null);
       setSecret({ title: 'Şifrə sıfırlandı', email: String(result.email || ''), password: result.temporaryPassword });
@@ -471,7 +472,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     setAssistantDone(previous => ({ ...previous, [key]: 'busy' }));
     try {
       const response = await fetch(`/api/admin/${resource}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const result = await response.json();
+      const result = await readJson(response);
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'Yaradılmadı');
       setAssistantDone(previous => ({ ...previous, [key]: 'done' }));
@@ -487,7 +488,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     setBusy(true); setFormError('');
     try {
       const response = await fetch('/api/admin/system/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: resetPhrase }) });
-      const result = await response.json();
+      const result = await readJson(response);
       if (!response.ok) throw new Error(result.error || 'Sıfırlama alınmadı');
       setResetOpen(false); setResetPhrase('');
       window.location.reload();

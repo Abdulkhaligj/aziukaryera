@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { decodeJwt } from 'jose';
 import { exec, one, rows } from '../src/db.ts';
 import { currentAdminRole } from '../src/write/rules/core.ts';
+import { loadConfig } from '../src/config.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
@@ -240,4 +241,11 @@ test('resend for an email change follows the 60-second cooldown and ignores unkn
   const unknown = await client.auth.resend({ type: 'email_change', email: 'hec-kim@asoiu.edu.az' });
   assert.equal(unknown.error, null, 'no hint whether an address is pending');
   assert.equal(h.mailer.outbox!.length, before);
+});
+
+test('email confirmation is on unless ENABLE_EMAIL_AUTOCONFIRM=true (audit 2026-11-12, H-01)', () => {
+  const base = { MYSQL_URL: 'mysql://app@127.0.0.1/app', JWT_SECRET: 'j'.repeat(40), ANON_KEY: 'anon', SERVICE_ROLE_KEY: 'service', API_EXTERNAL_URL: 'http://127.0.0.1' };
+  assert.equal(loadConfig(base as NodeJS.ProcessEnv).mailerAutoconfirm, false);
+  assert.equal(loadConfig({ ...base, ENABLE_EMAIL_AUTOCONFIRM: 'false' } as NodeJS.ProcessEnv).mailerAutoconfirm, false);
+  assert.equal(loadConfig({ ...base, ENABLE_EMAIL_AUTOCONFIRM: 'true' } as NodeJS.ProcessEnv).mailerAutoconfirm, true);
 });

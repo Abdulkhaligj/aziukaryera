@@ -5,7 +5,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { exec, one } from '../src/db.ts';
+import { exec, one, rows } from '../src/db.ts';
 import { startHarness, type Harness } from './helpers.ts';
 
 const SECRET = 'm'.repeat(40);
@@ -92,4 +92,15 @@ test('the database webhook calls the function after commit (pg_net replacement)'
   for (let i = 0; i < 50 && await status(post.data!.id) === 'pending'; i++) await new Promise(r => setTimeout(r, 50));
   assert.equal(await status(post.data!.id), 'visible');
   assert.equal(geminiCalls, before + 1);
+});
+
+test('the gateway sets the client IP itself: forged IP headers do not open a new guest quota', async () => {
+  await exec(h.pool, 'DELETE FROM private_ai_reservations WHERE profile_id IS NULL');
+  // Caddy (the one trusted hop) appends the real address last; whatever the
+  // client wrote before it, or in cf-connecting-ip / x-real-ip, is ignored.
+  for (const ip of ['198.51.100.1', '198.51.100.2']) {
+    await call('aida-chat', { message: 'Salam' }, { 'cf-connecting-ip': ip, 'x-real-ip': ip, 'x-forwarded-for': `${ip}, 203.0.113.9` });
+  }
+  const hashes = await rows<{ client_hash: string }>(h.pool, 'SELECT DISTINCT client_hash FROM private_ai_reservations WHERE profile_id IS NULL');
+  assert.equal(hashes.length, 1, 'both guest calls count against the same address');
 });
