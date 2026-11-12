@@ -1,0 +1,26 @@
+[
+ {
+  "labels": "{pending,active,rejected}",
+  "name": "account_status"
+ },
+ {
+  "labels": "{gonderildi,baxilir,musahibe,teklif,imtina,geri_goturuldu,applied,under_review,shortlisted,interview,offer,rejected,hired}",
+  "name": "application_status"
+ },
+ {
+  "labels": "{pending,accepted,declined,blocked}",
+  "name": "connection_status"
+ },
+ {
+  "labels": "{draft,pending,approved,rejected,closed,pending_approval,changes_requested,published,expired,archived}",
+  "name": "job_status"
+ },
+ {
+  "labels": "{is,tecrube,graduate,konullu}",
+  "name": "job_type"
+ },
+ {
+  "labels": "{student,graduate,company,admin}",
+  "name": "user_role"
+ }
+]

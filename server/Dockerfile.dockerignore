@@ -1,0 +1,7 @@
+*
+!server/
+!supabase/functions/
+server/node_modules
+server/storage
+server/.env*
+server/test

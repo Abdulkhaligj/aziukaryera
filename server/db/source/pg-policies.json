@@ -1,0 +1,2222 @@
+[
+ {
+  "cmd": "SELECT",
+  "name": "admins read audit logs",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "admin_audit_logs",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "admins write audit logs",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "admin_audit_logs",
+  "with_check": "(( SELECT is_admin() AS is_admin) AND (actor_id = ( SELECT auth.uid() AS uid)))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "ads_admin_all",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ads",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'ads'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ads",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ads",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'ads'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'ads'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ads",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'ads'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_ai_usage",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "ai_usage_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": "(profile_id = ( SELECT auth.uid() AS uid))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "ai_usage_read",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_ai_usage_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": "false"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_ai_usage_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "false",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": "false"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'ai_usage'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'ai_usage'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'ai_usage'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "ai_usage",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'ai_usage'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "application_history_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM (applications a\n     JOIN jobs j ON ((j.id = a.job_id)))\n  WHERE ((a.id = application_status_history.application_id) AND ((a.student_id = ( SELECT auth.uid() AS uid)) OR owns_company(j.company_id))))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "application_status_history",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_applications",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "applications_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "((student_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "applications_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": "((student_id = ( SELECT auth.uid() AS uid)) AND (( SELECT app_role() AS app_role) = ANY (ARRAY['student'::user_role, 'graduate'::user_role])) AND ( SELECT app_account_active() AS app_account_active) AND (EXISTS ( SELECT 1\n   FROM jobs j\n  WHERE ((j.id = applications.job_id) AND ((j.status)::text = ANY (ARRAY['approved'::text, 'published'::text])) AND ((j.deadline IS NULL) OR (j.deadline >= ((now() AT TIME ZONE 'Asia/Baku'::text))::date))))))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "applications_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((student_id = auth.uid()) OR is_admin() OR (EXISTS ( SELECT 1\n   FROM jobs j\n  WHERE ((j.id = applications.job_id) AND owns_company(j.company_id)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "applications_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM jobs j\n  WHERE ((j.id = applications.job_id) AND owns_company(j.company_id)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM jobs j\n  WHERE ((j.id = applications.job_id) AND owns_company(j.company_id)))))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'applications'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'applications'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'applications'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "applications",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'applications'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "claims_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin() OR (EXISTS ( SELECT 1\n   FROM (benefits b\n     JOIN benefit_partners p ON ((p.id = b.partner_id)))\n  WHERE ((b.id = benefit_claims.benefit_id) AND (p.owner_id = auth.uid())))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefit_claims",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "companies_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(status = 'active'::account_status)",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "benefit_partners",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "partners_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((status = 'active'::account_status) OR (owner_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefit_partners",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "partners_write",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() OR (owner_id = auth.uid()))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefit_partners",
+  "with_check": "(is_admin() OR (owner_id = auth.uid()))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'benefit_partners'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefit_partners",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefit_partners",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'benefit_partners'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'benefit_partners'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefit_partners",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'benefit_partners'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "benefits_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(active = true)",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "benefits",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "benefits_select",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefits",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "benefits_write",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM benefit_partners p\n  WHERE ((p.id = benefits.partner_id) AND (p.owner_id = auth.uid())))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefits",
+  "with_check": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM benefit_partners p\n  WHERE ((p.id = benefits.partner_id) AND (p.owner_id = auth.uid())))))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'benefits'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefits",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefits",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'benefits'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'benefits'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "benefits",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'benefits'::text))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "broadcast_notification_reads_own",
+  "permissive": "PERMISSIVE",
+  "qual": "(profile_id = ( SELECT auth.uid() AS uid))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notification_reads",
+  "with_check": "(profile_id = ( SELECT auth.uid() AS uid))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "broadcast_notifications_admin_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "broadcast_notifications_admin_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "broadcast_notifications_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "broadcast_notifications_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = ( SELECT auth.uid() AS uid)) AND ((p.role)::text = ANY (broadcast_notifications.target_roles)) AND ((p.status)::text = ANY (ARRAY['active'::text, 'pending'::text]))))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'broadcast_notifications'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'broadcast_notifications'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'broadcast_notifications'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'broadcast_notifications'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admins delete companies",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "admins insert companies",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "companies_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((status = 'active'::account_status) OR (owner_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "companies_update",
+  "permissive": "PERMISSIVE",
+  "qual": "((owner_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": "((owner_id = auth.uid()) OR is_admin())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "employers_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(status = 'active'::account_status)",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "companies",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "security_companies_read",
+  "permissive": "RESTRICTIVE",
+  "qual": "(((status)::text = 'active'::text) OR is_admin() OR owns_company(id))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'companies'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'companies'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'companies'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "companies",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'companies'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "company_awards_admin_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "company_awards_admin_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "company_awards_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "company_awards_public",
+  "permissive": "PERMISSIVE",
+  "qual": "published",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "company_awards_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(published OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'company_awards'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'company_awards'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_awards'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_awards",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_awards'::text))"
+ },
+ {
+  "cmd": "INSERT",
+  "name": "company_interview_slots_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_interview_slots",
+  "with_check": "((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1\n   FROM (applications a\n     JOIN jobs j ON ((j.id = a.job_id)))\n  WHERE ((a.id = company_interview_slots.application_id) AND owns_company(j.company_id)))))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "company_interview_slots_select",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM applications a\n  WHERE ((a.id = company_interview_slots.application_id) AND (a.student_id = ( SELECT auth.uid() AS uid))))) OR (EXISTS ( SELECT 1\n   FROM (applications a\n     JOIN jobs j ON ((j.id = a.job_id)))\n  WHERE ((a.id = company_interview_slots.application_id) AND owns_company(j.company_id)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_interview_slots",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "company_interview_slots_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM (applications a\n     JOIN jobs j ON ((j.id = a.job_id)))\n  WHERE ((a.id = company_interview_slots.application_id) AND owns_company(j.company_id)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_interview_slots",
+  "with_check": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM (applications a\n     JOIN jobs j ON ((j.id = a.job_id)))\n  WHERE ((a.id = company_interview_slots.application_id) AND owns_company(j.company_id)))))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'company_interview_slots'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_interview_slots",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_interview_slots",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'company_interview_slots'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_interview_slots'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_interview_slots",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_interview_slots'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "company_members_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "(owns_company(company_id) OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "company_members_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": "(owns_company(company_id) OR ( SELECT is_admin() AS is_admin))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "company_members_read",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = ( SELECT auth.uid() AS uid)) OR owns_company(company_id) OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "company_members_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(owns_company(company_id) OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": "(owns_company(company_id) OR ( SELECT is_admin() AS is_admin))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'company_members'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'company_members'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_members'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_members",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_members'::text))"
+ },
+ {
+  "cmd": "INSERT",
+  "name": "company_partnership_requests_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "with_check": "((created_by = ( SELECT auth.uid() AS uid)) AND (status = 'submitted'::text) AND (admin_note = ''::text) AND owns_company(company_id) AND (EXISTS ( SELECT 1\n   FROM companies c\n  WHERE ((c.id = company_partnership_requests.company_id) AND (c.status = 'active'::account_status)))))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "company_partnership_requests_select",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR owns_company(company_id))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "company_partnership_requests_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'company_partnership_requests'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'company_partnership_requests'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_partnership_requests'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'company_partnership_requests'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "connections_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "((requester_id = auth.uid()) OR (addressee_id = auth.uid()))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "connections",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "connections_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "connections",
+  "with_check": "(requester_id = auth.uid())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "connections_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((requester_id = auth.uid()) OR (addressee_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "connections",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "connections_update",
+  "permissive": "PERMISSIVE",
+  "qual": "((addressee_id = auth.uid()) OR (requester_id = auth.uid()))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "connections",
+  "with_check": "((addressee_id = auth.uid()) OR (requester_id = auth.uid()))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'content'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "content",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "content",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'content'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'content'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "content",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'content'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_cv_documents",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "cv_documents",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "cv_own",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "cv_documents",
+  "with_check": "((profile_id = auth.uid()) OR is_admin())"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'cv_documents'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "cv_documents",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "cv_documents",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'cv_documents'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'cv_documents'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "cv_documents",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'cv_documents'::text))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "education_own_write",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "education",
+  "with_check": "((profile_id = auth.uid()) OR is_admin())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "education_read",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE (p.id = education.profile_id))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "education",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "security_education_private_read",
+  "permissive": "RESTRICTIVE",
+  "qual": "private.can_read_profile(profile_id)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "education",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'students'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "education",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "education",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'students'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'students'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "education",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'students'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "event_reg_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "event_registrations",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "event_reg_write",
+  "permissive": "PERMISSIVE",
+  "qual": "(profile_id = auth.uid())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "event_registrations",
+  "with_check": "(profile_id = auth.uid())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "events_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "events",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "events_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "events",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "events_write",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "events",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'events'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "events",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "events",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'events'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'events'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "events",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'events'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "faculties_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "faculties",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "faculties_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "faculties",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "faculties_write",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "faculties",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "follows_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "(follower_id = ( SELECT auth.uid() AS uid))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "follows",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "follows_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "follows",
+  "with_check": "(follower_id = ( SELECT auth.uid() AS uid))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "follows_select",
+  "permissive": "PERMISSIVE",
+  "qual": "(follower_id = ( SELECT auth.uid() AS uid))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "follows",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "interview_requests_read",
+  "permissive": "PERMISSIVE",
+  "qual": "((student_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1\n   FROM companies c\n  WHERE ((c.id = interview_requests.company_id) AND (c.owner_id = ( SELECT auth.uid() AS uid)) AND (c.status = 'active'::account_status)))) OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "interview_requests",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_interviews",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "interview_sessions",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "interviews_own",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "interview_sessions",
+  "with_check": "((profile_id = auth.uid()) OR is_admin())"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'interview_sessions'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "interview_sessions",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "interview_sessions",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'interview_sessions'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'interview_sessions'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "interview_sessions",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'interview_sessions'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "invites_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((student_id = auth.uid()) OR owns_company(company_id) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "invites",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "invites_write",
+  "permissive": "PERMISSIVE",
+  "qual": "(owns_company(company_id) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "invites",
+  "with_check": "(owns_company(company_id) OR is_admin())"
+ },
+ {
+  "cmd": "INSERT",
+  "name": "admins insert jobs",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "jobs_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "(owns_company(company_id) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "jobs_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": "(owns_company(company_id) AND (EXISTS ( SELECT 1\n   FROM companies c\n  WHERE ((c.id = jobs.company_id) AND (c.status = 'active'::account_status)))) AND ((status)::text = ANY (ARRAY['pending'::text, 'pending_approval'::text])))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "jobs_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "((status)::text = ANY (ARRAY['approved'::text, 'published'::text]))",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "jobs_select",
+  "permissive": "PERMISSIVE",
+  "qual": "(((status)::text = ANY (ARRAY['approved'::text, 'published'::text])) OR is_admin() OR owns_company(company_id))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "jobs_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(owns_company(company_id) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": "(owns_company(company_id) OR is_admin())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "security_jobs_read",
+  "permissive": "RESTRICTIVE",
+  "qual": "(((status)::text = ANY (ARRAY['approved'::text, 'published'::text])) OR is_admin() OR owns_company(company_id))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'jobs'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'jobs'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'jobs'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "jobs",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'jobs'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "majors_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "majors",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "majors_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "majors",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "majors_write",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "majors",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "mentor_requests_admin_read",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "mentor_requests_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "INSERT",
+  "name": "mentor_requests_student_create",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": "((( SELECT auth.uid() AS uid) = student_id) AND (status = 'pending'::text) AND (mentor_name = ''::text) AND (admin_note = ''::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "mentor_requests_student_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT auth.uid() AS uid) = student_id)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'mentor_requests'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'mentor_requests'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'mentor_requests'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "mentor_requests",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'mentor_requests'::text))"
+ },
+ {
+  "cmd": "INSERT",
+  "name": "messages_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "messages",
+  "with_check": "(sender_id = auth.uid())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "messages_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((sender_id = auth.uid()) OR (recipient_id = auth.uid()))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "messages",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "messages_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(recipient_id = auth.uid())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "messages",
+  "with_check": "(recipient_id = auth.uid())"
+ },
+ {
+  "cmd": "ALL",
+  "name": "moderation_allow_admin",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "moderation_allow",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "ALL",
+  "name": "moderation_logs_admin",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "moderation_logs",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'moderation_logs'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "moderation_logs",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "moderation_logs",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'moderation_logs'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'moderation_logs'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "moderation_logs",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'moderation_logs'::text))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "moderation_terms_admin",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "moderation_terms",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "ALL",
+  "name": "notifications_own",
+  "permissive": "PERMISSIVE",
+  "qual": "((profile_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "notifications",
+  "with_check": "((profile_id = auth.uid()) OR is_admin())"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'notifications'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "notifications",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "notifications",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'notifications'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'notifications'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "notifications",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'notifications'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "payments_admin_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "payments_admin_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "payments_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "payments_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR owns_company(company_id))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'payments'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'payments'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'payments'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "payments",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'payments'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "plan_features_admin_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "plan_features_admin_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "plan_features_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "plan_features_read",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{anon,authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'plan_features'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'plan_features'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'plan_features'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plan_features",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'plan_features'::text))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "plans_admin_write",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plans",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "plans_public_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(active = true)",
+  "roles": "{anon,authenticated}",
+  "s": "public",
+  "t": "plans",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'plans'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plans",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plans",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'plans'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'plans'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "plans",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'plans'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "comments_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "((author_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_comments",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "comments_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_comments",
+  "with_check": "((author_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.status = 'active'::account_status)))))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "comments_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((moderation_status = 'visible'::text) OR ((author_id = ( SELECT auth.uid() AS uid)) AND (moderation_status = 'pending'::text)) OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_comments",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "likes_select",
+  "permissive": "PERMISSIVE",
+  "qual": "true",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_likes",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "likes_write",
+  "permissive": "PERMISSIVE",
+  "qual": "(profile_id = auth.uid())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_likes",
+  "with_check": "(profile_id = auth.uid())"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "post_media_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "(EXISTS ( SELECT 1\n   FROM posts p\n  WHERE ((p.id = post_media.post_id) AND ((p.author_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_media",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "post_media_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_media",
+  "with_check": "(EXISTS ( SELECT 1\n   FROM posts p\n  WHERE ((p.id = post_media.post_id) AND ((p.author_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin)))))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "post_media_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(EXISTS ( SELECT 1\n   FROM posts p\n  WHERE (p.id = post_media.post_id)))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_media",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "post_media_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(EXISTS ( SELECT 1\n   FROM posts p\n  WHERE ((p.id = post_media.post_id) AND ((p.author_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_media",
+  "with_check": "(EXISTS ( SELECT 1\n   FROM posts p\n  WHERE ((p.id = post_media.post_id) AND ((p.author_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin)))))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "post_saves_own",
+  "permissive": "PERMISSIVE",
+  "qual": "(profile_id = ( SELECT auth.uid() AS uid))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "post_saves",
+  "with_check": "(profile_id = ( SELECT auth.uid() AS uid))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_posts",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "posts_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "((author_id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "posts_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": "((author_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.status = 'active'::account_status)))))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "posts_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((moderation_status = 'visible'::text) OR ((author_id = ( SELECT auth.uid() AS uid)) AND (moderation_status = 'pending'::text)) OR ( SELECT is_admin() AS is_admin))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "posts_update",
+  "permissive": "PERMISSIVE",
+  "qual": "(author_id = auth.uid())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": "(author_id = auth.uid())"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'posts'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'posts'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'posts'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "posts",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'posts'::text))"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "profiles_select",
+  "permissive": "PERMISSIVE",
+  "qual": "((id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_admin() AS is_admin) OR ((status = 'active'::account_status) AND (role = ANY (ARRAY['student'::user_role, 'graduate'::user_role])) AND ((EXISTS ( SELECT 1\n   FROM ((applications a\n     JOIN jobs j ON ((j.id = a.job_id)))\n     JOIN companies c ON ((c.id = j.company_id)))\n  WHERE ((a.student_id = profiles.id) AND (c.owner_id = ( SELECT auth.uid() AS uid)) AND (c.status = 'active'::account_status)))) OR (EXISTS ( SELECT 1\n   FROM ((companies c\n     JOIN subscriptions s ON (((s.company_id = c.id) AND (s.status = 'active'::text))))\n     JOIN plan_features pf ON (((pf.plan_id = s.plan_id) AND (pf.feature_key = 'candidate_search'::text) AND pf.enabled)))\n  WHERE ((c.owner_id = ( SELECT auth.uid() AS uid)) AND (c.status = 'active'::account_status)))))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "profiles",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "profiles_update",
+  "permissive": "PERMISSIVE",
+  "qual": "((id = auth.uid()) OR is_admin())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "profiles",
+  "with_check": "((id = auth.uid()) OR is_admin())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "security_profile_private_read",
+  "permissive": "RESTRICTIVE",
+  "qual": "private.can_read_profile(id)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "profiles",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text,\nCASE\n    WHEN ((role)::text = 'admin'::text) THEN 'admins'::text\n    ELSE 'students'::text\nEND))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "profiles",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "profiles",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text,\nCASE\n    WHEN ((role)::text = 'admin'::text) THEN 'admins'::text\n    ELSE 'students'::text\nEND))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text,\nCASE\n    WHEN ((role)::text = 'admin'::text) THEN 'admins'::text\n    ELSE 'students'::text\nEND))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "profiles",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text,\nCASE\n    WHEN ((role)::text = 'admin'::text) THEN 'admins'::text\n    ELSE 'students'::text\nEND))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_reports",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": null
+ },
+ {
+  "cmd": "SELECT",
+  "name": "reports_admin_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() OR (reporter_id = auth.uid()))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": null
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "reports_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "INSERT",
+  "name": "reports_insert_own",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": "(reporter_id = ( SELECT auth.uid() AS uid))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'reports'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'reports'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'reports'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "reports",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'reports'::text))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "saved_own",
+  "permissive": "PERMISSIVE",
+  "qual": "(student_id = auth.uid())",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "saved_jobs",
+  "with_check": "(student_id = auth.uid())"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "active site content is public",
+  "permissive": "PERMISSIVE",
+  "qual": "(status = 'Aktiv'::text)",
+  "roles": "{anon}",
+  "s": "public",
+  "t": "site_content",
+  "with_check": null
+ },
+ {
+  "cmd": "ALL",
+  "name": "admins manage site content",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "site_content",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'site_content'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "site_content",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "site_content",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'site_content'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'site_content'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "site_content",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'site_content'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'subscription_usage'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'subscription_usage'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'subscription_usage'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'subscription_usage'::text))"
+ },
+ {
+  "cmd": "DELETE",
+  "name": "usage_admin_delete",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "usage_admin_insert",
+  "permissive": "PERMISSIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "usage_admin_update",
+  "permissive": "PERMISSIVE",
+  "qual": "( SELECT is_admin() AS is_admin)",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": "( SELECT is_admin() AS is_admin)"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "usage_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(( SELECT is_admin() AS is_admin) OR (EXISTS ( SELECT 1\n   FROM subscriptions s\n  WHERE ((s.id = subscription_usage.subscription_id) AND owns_company(s.company_id)))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscription_usage",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "admin_delete_subscriptions",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() AND (COALESCE(( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'admin_role'::text)), ''::text) = ANY (ARRAY['super_admin'::text, 'manager'::text])))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscriptions",
+  "with_check": null
+ },
+ {
+  "cmd": "DELETE",
+  "name": "security_staff_delete",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('delete'::text, 'subscriptions'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscriptions",
+  "with_check": null
+ },
+ {
+  "cmd": "INSERT",
+  "name": "security_staff_insert",
+  "permissive": "RESTRICTIVE",
+  "qual": null,
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscriptions",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('insert'::text, 'subscriptions'::text))"
+ },
+ {
+  "cmd": "UPDATE",
+  "name": "security_staff_update",
+  "permissive": "RESTRICTIVE",
+  "qual": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'subscriptions'::text))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscriptions",
+  "with_check": "((NOT private.actor_is_staff()) OR private.admin_can('update'::text, 'subscriptions'::text))"
+ },
+ {
+  "cmd": "ALL",
+  "name": "subscriptions_admin_write",
+  "permissive": "PERMISSIVE",
+  "qual": "is_admin()",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscriptions",
+  "with_check": "is_admin()"
+ },
+ {
+  "cmd": "SELECT",
+  "name": "subscriptions_read",
+  "permissive": "PERMISSIVE",
+  "qual": "(is_admin() OR (EXISTS ( SELECT 1\n   FROM companies c\n  WHERE ((c.id = subscriptions.company_id) AND (c.owner_id = auth.uid())))))",
+  "roles": "{authenticated}",
+  "s": "public",
+  "t": "subscriptions",
+  "with_check": null
+ }
+]

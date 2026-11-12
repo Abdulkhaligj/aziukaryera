@@ -1,0 +1,202 @@
+[
+ {
+  "rls": true,
+  "t": "admin_audit_logs"
+ },
+ {
+  "rls": true,
+  "t": "ads"
+ },
+ {
+  "rls": true,
+  "t": "ai_usage"
+ },
+ {
+  "rls": true,
+  "t": "application_status_history"
+ },
+ {
+  "rls": true,
+  "t": "applications"
+ },
+ {
+  "rls": true,
+  "t": "audit_logs"
+ },
+ {
+  "rls": true,
+  "t": "benefit_claims"
+ },
+ {
+  "rls": true,
+  "t": "benefit_partners"
+ },
+ {
+  "rls": true,
+  "t": "benefits"
+ },
+ {
+  "rls": true,
+  "t": "broadcast_notification_reads"
+ },
+ {
+  "rls": true,
+  "t": "broadcast_notifications"
+ },
+ {
+  "rls": true,
+  "t": "companies"
+ },
+ {
+  "rls": true,
+  "t": "company_awards"
+ },
+ {
+  "rls": true,
+  "t": "company_interview_slots"
+ },
+ {
+  "rls": true,
+  "t": "company_members"
+ },
+ {
+  "rls": true,
+  "t": "company_partnership_requests"
+ },
+ {
+  "rls": false,
+  "t": "company_subscriptions"
+ },
+ {
+  "rls": true,
+  "t": "connections"
+ },
+ {
+  "rls": true,
+  "t": "content"
+ },
+ {
+  "rls": true,
+  "t": "cv_documents"
+ },
+ {
+  "rls": true,
+  "t": "education"
+ },
+ {
+  "rls": true,
+  "t": "event_registrations"
+ },
+ {
+  "rls": true,
+  "t": "events"
+ },
+ {
+  "rls": true,
+  "t": "faculties"
+ },
+ {
+  "rls": true,
+  "t": "follows"
+ },
+ {
+  "rls": true,
+  "t": "interview_requests"
+ },
+ {
+  "rls": true,
+  "t": "interview_sessions"
+ },
+ {
+  "rls": true,
+  "t": "invites"
+ },
+ {
+  "rls": true,
+  "t": "jobs"
+ },
+ {
+  "rls": true,
+  "t": "majors"
+ },
+ {
+  "rls": true,
+  "t": "mentor_requests"
+ },
+ {
+  "rls": true,
+  "t": "messages"
+ },
+ {
+  "rls": true,
+  "t": "moderation_allow"
+ },
+ {
+  "rls": true,
+  "t": "moderation_logs"
+ },
+ {
+  "rls": true,
+  "t": "moderation_terms"
+ },
+ {
+  "rls": true,
+  "t": "notifications"
+ },
+ {
+  "rls": true,
+  "t": "payments"
+ },
+ {
+  "rls": true,
+  "t": "plan_features"
+ },
+ {
+  "rls": true,
+  "t": "plans"
+ },
+ {
+  "rls": true,
+  "t": "post_comments"
+ },
+ {
+  "rls": true,
+  "t": "post_likes"
+ },
+ {
+  "rls": true,
+  "t": "post_media"
+ },
+ {
+  "rls": true,
+  "t": "post_saves"
+ },
+ {
+  "rls": true,
+  "t": "posts"
+ },
+ {
+  "rls": true,
+  "t": "profiles"
+ },
+ {
+  "rls": true,
+  "t": "reports"
+ },
+ {
+  "rls": true,
+  "t": "saved_jobs"
+ },
+ {
+  "rls": true,
+  "t": "site_content"
+ },
+ {
+  "rls": true,
+  "t": "subscription_usage"
+ },
+ {
+  "rls": true,
+  "t": "subscriptions"
+ }
+]

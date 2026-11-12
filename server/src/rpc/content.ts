@@ -1,0 +1,70 @@
+// Ads and student benefits: active_ads, ad_track, claim_benefit, redeem_benefit_code.
+import { randomUUID } from 'node:crypto';
+import { one, rows, toMysqlDatetime, type Row } from '../db.ts';
+import { DbRuleError } from '../errors.ts';
+import { insertRow, nowText, updateRow } from '../write/pipeline.ts';
+import { isAdmin, pgTrim } from '../write/rules/core.ts';
+import { rpc } from './registry.ts';
+import { bakuDate, requireUid, utcDate } from './util.ts';
+
+rpc({
+  name: 'active_ads', readOnly: true, args: { p_placement: 'text' }, roles: ['anon', 'authenticated'], security: 'definer', returns: 'rows',
+  run: (env, a) => rows(env.tx, `SELECT id, title, advertiser, description, image_url, link_url, cta_label, placement, priority
+      FROM ads WHERE status = 'active' AND ? BETWEEN starts_on AND ends_on AND (? IS NULL OR placement = ?)
+     ORDER BY priority DESC, created_at DESC LIMIT 20`, [bakuDate(env.now), a.p_placement, a.p_placement])
+});
+
+rpc({
+  name: 'ad_track', args: { p_id: 'uuid', p_kind: 'text' }, roles: ['anon', 'authenticated'], security: 'definer', returns: 'void',
+  async run(env, a) {
+    if (a.p_kind !== 'view' && a.p_kind !== 'click') return;
+    const ad = await one<{ id: string; impressions: number; clicks: number }>(env.tx, `SELECT id, impressions, clicks FROM ads
+       WHERE id = ? AND status = 'active' AND ? BETWEEN starts_on AND ends_on FOR UPDATE`, [a.p_id, bakuDate(env.now)]);
+    if (!ad) return;
+    await updateRow(env, 'ads', { id: ad.id }, {
+      impressions: ad.impressions + (a.p_kind === 'view' ? 1 : 0), clicks: ad.clicks + (a.p_kind === 'click' ? 1 : 0)
+    });
+  }
+});
+
+/** public.new_claim_code */
+const newClaimCode = () => `ASOIU-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+
+rpc({
+  name: 'claim_benefit', args: { p_benefit: 'uuid' }, roles: ['authenticated'], security: 'definer', returns: 'row',
+  async run(env, a) {
+    const me = requireUid(env, 'Giriş tələb olunur');
+    const benefit = await one<{ valid_to: string | null }>(env.tx, 'SELECT valid_to FROM benefits WHERE id = ? AND active = 1', [a.p_benefit]);
+    if (!benefit) throw new DbRuleError('Güzəşt tapılmadı və ya aktiv deyil', 'P0002');
+    if (benefit.valid_to != null && benefit.valid_to < utcDate(env.now)) throw new DbRuleError('Güzəştin müddəti bitib', '23514');
+    const existing = await one(env.tx, `SELECT * FROM benefit_claims WHERE benefit_id = ? AND profile_id = ?
+       AND redeemed_at IS NULL AND expires_at > ? LIMIT 1`, [a.p_benefit, me, toMysqlDatetime(env.now)]);
+    if (existing) return existing;
+    return insertRow(env, 'benefit_claims', { benefit_id: a.p_benefit, profile_id: me, code: newClaimCode() });
+  }
+});
+
+rpc({
+  name: 'redeem_benefit_code', args: { p_code: 'text' }, roles: ['authenticated'], security: 'definer', returns: 'rows',
+  async run(env, a) {
+    const me = requireUid(env, 'Giriş tələb olunur');
+    const code = a.p_code == null ? null : (pgTrim(a.p_code) as string).toUpperCase();
+    const claim = code == null ? null : await one<Row>(env.tx, 'SELECT * FROM benefit_claims WHERE code = ? COLLATE utf8mb4_bin', [code]);
+    const result = (status: string, student: unknown = null, faculty: unknown = null, benefit: unknown = null, partner: unknown = null, at: unknown = null) =>
+      [{ status, student_name: student, faculty, benefit, partner, redeemed_at: at }];
+    if (!claim) return result('tapilmadi');
+    const benefit = await one<{ title: string; partner_id: string | null }>(env.tx, 'SELECT title, partner_id FROM benefits WHERE id = ?', [claim.benefit_id]);
+    const partner = benefit?.partner_id ? await one<{ name: string; owner_id: string | null }>(env.tx,
+      'SELECT name, owner_id FROM benefit_partners WHERE id = ?', [benefit.partner_id]) : null;
+    if (!(await isAdmin(env) || (partner?.owner_id != null && partner.owner_id === me))) {
+      throw new DbRuleError('Bu kodu təsdiqləmək icazəniz yoxdur', '42501');
+    }
+    const student = await one<{ full_name: string; faculty_id: string | null }>(env.tx, 'SELECT full_name, faculty_id FROM profiles WHERE id = ?', [claim.profile_id]);
+    const faculty = student?.faculty_id ? (await one<{ name: string }>(env.tx, 'SELECT name FROM faculties WHERE id = ?', [student.faculty_id]))?.name : null;
+    const details = [student?.full_name ?? null, faculty ?? '—', benefit?.title ?? null, partner?.name ?? null] as const;
+    if (claim.redeemed_at != null) return result('istifade_olunub', ...details, claim.redeemed_at);
+    if (new Date(claim.expires_at as string).getTime() < env.now.getTime()) return result('muddeti_bitib', ...details, null);
+    await updateRow(env, 'benefit_claims', { id: claim.id }, { redeemed_at: nowText(env), redeemed_by: me });
+    return result('tesdiqlendi', ...details, nowText(env));
+  }
+});

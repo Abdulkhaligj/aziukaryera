@@ -1,0 +1,7 @@
+[
+ {
+  "def": " SELECT s.id,\n    s.company_id,\n    s.plan_id,\n    s.status,\n    s.starts_at,\n    s.ends_at,\n    s.requested_at,\n    s.approved_by,\n    p.name AS plan_name,\n    p.monthly_price,\n    p.currency,\n    s.requested_plan_id\n   FROM (subscriptions s\n     JOIN plans p ON ((p.id = s.plan_id)));",
+  "s": "public",
+  "t": "company_subscriptions"
+ }
+]

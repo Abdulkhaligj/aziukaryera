@@ -1,0 +1,476 @@
+[
+  {
+    "table": "ads",
+    "name": "ads_touch",
+    "def": "CREATE TRIGGER ads_touch BEFORE UPDATE ON public.ads FOR EACH ROW EXECUTE FUNCTION private.ads_touch()",
+    "security": "invoker"
+  },
+  {
+    "table": "ads",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.ads FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "ai_usage",
+    "name": "security_audit_deletes",
+    "def": "CREATE TRIGGER security_audit_deletes AFTER DELETE ON public.ai_usage FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "applications",
+    "name": "000_security_limited_admin_fields",
+    "def": "CREATE TRIGGER \"000_security_limited_admin_fields\" BEFORE UPDATE ON public.applications FOR EACH ROW EXECUTE FUNCTION private.limited_admin_fields_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "applications",
+    "name": "applications_status_history",
+    "def": "CREATE TRIGGER applications_status_history AFTER INSERT OR UPDATE OF status ON public.applications FOR EACH ROW EXECUTE FUNCTION record_application_status_history()",
+    "security": "definer"
+  },
+  {
+    "table": "applications",
+    "name": "applications_update_guard",
+    "def": "CREATE TRIGGER applications_update_guard BEFORE UPDATE ON public.applications FOR EACH ROW EXECUTE FUNCTION guard_application_update()",
+    "security": "definer"
+  },
+  {
+    "table": "applications",
+    "name": "applications_workflow_notification",
+    "def": "CREATE TRIGGER applications_workflow_notification AFTER INSERT OR UPDATE OF status ON public.applications FOR EACH ROW EXECUTE FUNCTION notify_core_workflow()",
+    "security": "definer"
+  },
+  {
+    "table": "applications",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.applications FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "benefit_partners",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.benefit_partners FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "benefits",
+    "name": "benefits_broadcast_notification",
+    "def": "CREATE TRIGGER benefits_broadcast_notification AFTER INSERT OR UPDATE OF active ON public.benefits FOR EACH ROW EXECUTE FUNCTION private.publish_content_notification()",
+    "security": "definer"
+  },
+  {
+    "table": "benefits",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.benefits FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "broadcast_notifications",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.broadcast_notifications FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "companies",
+    "name": "companies_guard_status",
+    "def": "CREATE TRIGGER companies_guard_status BEFORE UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION guard_company_status()",
+    "security": "definer"
+  },
+  {
+    "table": "companies",
+    "name": "companies_sync_owner_profile_status",
+    "def": "CREATE TRIGGER companies_sync_owner_profile_status AFTER UPDATE OF status ON public.companies FOR EACH ROW WHEN ((old.status IS DISTINCT FROM new.status)) EXECUTE FUNCTION sync_company_owner_profile_status()",
+    "security": "definer"
+  },
+  {
+    "table": "companies",
+    "name": "companies_workflow_notification",
+    "def": "CREATE TRIGGER companies_workflow_notification AFTER UPDATE OF status ON public.companies FOR EACH ROW EXECUTE FUNCTION notify_core_workflow()",
+    "security": "definer"
+  },
+  {
+    "table": "companies",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.companies FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "company_awards",
+    "name": "company_awards_touch",
+    "def": "CREATE TRIGGER company_awards_touch BEFORE INSERT OR UPDATE ON public.company_awards FOR EACH ROW EXECUTE FUNCTION private.company_awards_touch()",
+    "security": "invoker"
+  },
+  {
+    "table": "company_awards",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.company_awards FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "company_interview_slots",
+    "name": "company_interview_slots_advance_application",
+    "def": "CREATE TRIGGER company_interview_slots_advance_application AFTER INSERT OR UPDATE OF status ON public.company_interview_slots FOR EACH ROW EXECUTE FUNCTION advance_interview_application_on_slot()",
+    "security": "definer"
+  },
+  {
+    "table": "company_interview_slots",
+    "name": "company_interview_slots_guard",
+    "def": "CREATE TRIGGER company_interview_slots_guard BEFORE UPDATE ON public.company_interview_slots FOR EACH ROW EXECUTE FUNCTION company_employer_record_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "company_interview_slots",
+    "name": "company_interview_slots_notify",
+    "def": "CREATE TRIGGER company_interview_slots_notify AFTER INSERT OR UPDATE OF starts_at, status ON public.company_interview_slots FOR EACH ROW EXECUTE FUNCTION notify_company_interview_slot()",
+    "security": "definer"
+  },
+  {
+    "table": "company_interview_slots",
+    "name": "company_interview_slots_validate",
+    "def": "CREATE TRIGGER company_interview_slots_validate BEFORE INSERT OR UPDATE OF application_id, starts_at, duration_minutes, meeting_mode, location, status ON public.company_interview_slots FOR EACH ROW EXECUTE FUNCTION validate_company_interview_slot()",
+    "security": "definer"
+  },
+  {
+    "table": "company_interview_slots",
+    "name": "interview_request_slot_sync",
+    "def": "CREATE TRIGGER interview_request_slot_sync AFTER INSERT ON public.company_interview_slots FOR EACH ROW EXECUTE FUNCTION sync_interview_request_on_slot()",
+    "security": "definer"
+  },
+  {
+    "table": "company_interview_slots",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.company_interview_slots FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "company_members",
+    "name": "000_atomic_company_quota",
+    "def": "CREATE TRIGGER \"000_atomic_company_quota\" AFTER INSERT OR DELETE OR UPDATE ON public.company_members FOR EACH ROW EXECUTE FUNCTION private.apply_company_quota()",
+    "security": "definer"
+  },
+  {
+    "table": "company_members",
+    "name": "members_sync_usage",
+    "def": "CREATE TRIGGER members_sync_usage AFTER INSERT OR DELETE OR UPDATE ON public.company_members FOR EACH ROW EXECUTE FUNCTION sync_company_subscription_usage()",
+    "security": "definer"
+  },
+  {
+    "table": "company_members",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.company_members FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "company_partnership_requests",
+    "name": "company_partnership_requests_guard",
+    "def": "CREATE TRIGGER company_partnership_requests_guard BEFORE UPDATE ON public.company_partnership_requests FOR EACH ROW EXECUTE FUNCTION company_employer_record_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "company_partnership_requests",
+    "name": "company_partnership_requests_notify",
+    "def": "CREATE TRIGGER company_partnership_requests_notify AFTER INSERT OR UPDATE OF status, admin_note ON public.company_partnership_requests FOR EACH ROW EXECUTE FUNCTION notify_company_partnership_event()",
+    "security": "definer"
+  },
+  {
+    "table": "company_partnership_requests",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.company_partnership_requests FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "content",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.content FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "cv_documents",
+    "name": "security_audit_deletes",
+    "def": "CREATE TRIGGER security_audit_deletes AFTER DELETE ON public.cv_documents FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "education",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.education FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "education",
+    "name": "security_education_verification",
+    "def": "CREATE TRIGGER security_education_verification BEFORE INSERT OR UPDATE ON public.education FOR EACH ROW EXECUTE FUNCTION private.education_verification_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "events",
+    "name": "events_broadcast_notification",
+    "def": "CREATE TRIGGER events_broadcast_notification AFTER INSERT ON public.events FOR EACH ROW EXECUTE FUNCTION private.publish_content_notification()",
+    "security": "definer"
+  },
+  {
+    "table": "events",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.events FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "interview_requests",
+    "name": "interview_requests_notify",
+    "def": "CREATE TRIGGER interview_requests_notify AFTER INSERT OR UPDATE OF status ON public.interview_requests FOR EACH ROW EXECUTE FUNCTION notify_interview_request()",
+    "security": "definer"
+  },
+  {
+    "table": "interview_sessions",
+    "name": "security_audit_deletes",
+    "def": "CREATE TRIGGER security_audit_deletes AFTER DELETE ON public.interview_sessions FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "jobs",
+    "name": "000_atomic_company_quota",
+    "def": "CREATE TRIGGER \"000_atomic_company_quota\" AFTER INSERT OR DELETE OR UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION private.apply_company_quota()",
+    "security": "definer"
+  },
+  {
+    "table": "jobs",
+    "name": "jobs_broadcast_notification",
+    "def": "CREATE TRIGGER jobs_broadcast_notification AFTER INSERT OR UPDATE OF status ON public.jobs FOR EACH ROW EXECUTE FUNCTION private.publish_content_notification()",
+    "security": "definer"
+  },
+  {
+    "table": "jobs",
+    "name": "jobs_guard_status",
+    "def": "CREATE TRIGGER jobs_guard_status BEFORE UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION guard_job_status()",
+    "security": "definer"
+  },
+  {
+    "table": "jobs",
+    "name": "jobs_sync_usage",
+    "def": "CREATE TRIGGER jobs_sync_usage AFTER INSERT OR DELETE OR UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION sync_company_subscription_usage()",
+    "security": "definer"
+  },
+  {
+    "table": "jobs",
+    "name": "jobs_workflow_notification",
+    "def": "CREATE TRIGGER jobs_workflow_notification AFTER UPDATE OF status ON public.jobs FOR EACH ROW EXECUTE FUNCTION notify_core_workflow()",
+    "security": "definer"
+  },
+  {
+    "table": "jobs",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "mentor_requests",
+    "name": "000_security_limited_admin_fields",
+    "def": "CREATE TRIGGER \"000_security_limited_admin_fields\" BEFORE UPDATE ON public.mentor_requests FOR EACH ROW EXECUTE FUNCTION private.limited_admin_fields_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "mentor_requests",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.mentor_requests FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "moderation_allow",
+    "name": "moderation_allow_normalize",
+    "def": "CREATE TRIGGER moderation_allow_normalize BEFORE INSERT OR UPDATE OF word ON public.moderation_allow FOR EACH ROW EXECUTE FUNCTION private.moderation_terms_normalize()",
+    "security": "definer"
+  },
+  {
+    "table": "moderation_logs",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.moderation_logs FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "moderation_terms",
+    "name": "moderation_terms_normalize",
+    "def": "CREATE TRIGGER moderation_terms_normalize BEFORE INSERT OR UPDATE OF term ON public.moderation_terms FOR EACH ROW EXECUTE FUNCTION private.moderation_terms_normalize()",
+    "security": "definer"
+  },
+  {
+    "table": "notifications",
+    "name": "security_audit_deletes",
+    "def": "CREATE TRIGGER security_audit_deletes AFTER DELETE ON public.notifications FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "payments",
+    "name": "payments_apply",
+    "def": "CREATE TRIGGER payments_apply BEFORE INSERT OR UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION private.payments_apply()",
+    "security": "definer"
+  },
+  {
+    "table": "payments",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "plan_features",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.plan_features FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "plans",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.plans FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "post_comments",
+    "name": "post_comments_moderation_guard",
+    "def": "CREATE TRIGGER post_comments_moderation_guard BEFORE INSERT OR UPDATE ON public.post_comments FOR EACH ROW EXECUTE FUNCTION private.moderation_guard()",
+    "security": "definer"
+  },
+  {
+    "table": "post_comments",
+    "name": "post_comments_moderation_request",
+    "def": "CREATE TRIGGER post_comments_moderation_request AFTER INSERT OR UPDATE ON public.post_comments FOR EACH ROW EXECUTE FUNCTION private.moderation_request()",
+    "security": "definer"
+  },
+  {
+    "table": "post_media",
+    "name": "post_media_plan_limit",
+    "def": "CREATE TRIGGER post_media_plan_limit BEFORE INSERT ON public.post_media FOR EACH ROW EXECUTE FUNCTION enforce_post_media_plan()",
+    "security": "definer"
+  },
+  {
+    "table": "posts",
+    "name": "000_atomic_company_quota",
+    "def": "CREATE TRIGGER \"000_atomic_company_quota\" AFTER INSERT OR DELETE OR UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION private.apply_company_quota()",
+    "security": "definer"
+  },
+  {
+    "table": "posts",
+    "name": "000_security_limited_admin_fields",
+    "def": "CREATE TRIGGER \"000_security_limited_admin_fields\" BEFORE UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION private.limited_admin_fields_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "posts",
+    "name": "posts_broadcast_notification",
+    "def": "CREATE TRIGGER posts_broadcast_notification AFTER INSERT OR UPDATE OF moderation_status ON public.posts FOR EACH ROW EXECUTE FUNCTION private.publish_content_notification()",
+    "security": "definer"
+  },
+  {
+    "table": "posts",
+    "name": "posts_moderation_guard",
+    "def": "CREATE TRIGGER posts_moderation_guard BEFORE INSERT OR UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION private.moderation_guard()",
+    "security": "definer"
+  },
+  {
+    "table": "posts",
+    "name": "posts_moderation_request",
+    "def": "CREATE TRIGGER posts_moderation_request AFTER INSERT OR UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION private.moderation_request()",
+    "security": "definer"
+  },
+  {
+    "table": "posts",
+    "name": "posts_sync_usage",
+    "def": "CREATE TRIGGER posts_sync_usage AFTER INSERT OR DELETE OR UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION sync_company_subscription_usage()",
+    "security": "definer"
+  },
+  {
+    "table": "posts",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "profiles",
+    "name": "profiles_admin_seat_limit",
+    "def": "CREATE TRIGGER profiles_admin_seat_limit BEFORE INSERT OR UPDATE OF role, status ON public.profiles FOR EACH ROW EXECUTE FUNCTION enforce_admin_seat_limit()",
+    "security": "invoker"
+  },
+  {
+    "table": "profiles",
+    "name": "profiles_avatar_guard",
+    "def": "CREATE TRIGGER profiles_avatar_guard BEFORE INSERT OR UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION private.profile_avatar_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "profiles",
+    "name": "profiles_avatar_request",
+    "def": "CREATE TRIGGER profiles_avatar_request AFTER UPDATE OF avatar_pending_path, avatar_requested_at ON public.profiles FOR EACH ROW EXECUTE FUNCTION private.profile_avatar_request()",
+    "security": "definer"
+  },
+  {
+    "table": "profiles",
+    "name": "profiles_guard_privileges",
+    "def": "CREATE TRIGGER profiles_guard_privileges BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION guard_profile_privileges()",
+    "security": "definer"
+  },
+  {
+    "table": "profiles",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "reports",
+    "name": "000_security_limited_admin_fields",
+    "def": "CREATE TRIGGER \"000_security_limited_admin_fields\" BEFORE UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION private.limited_admin_fields_guard()",
+    "security": "invoker"
+  },
+  {
+    "table": "reports",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.reports FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "site_content",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.site_content FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "site_content",
+    "name": "set_site_content_updated_at",
+    "def": "CREATE TRIGGER set_site_content_updated_at BEFORE UPDATE ON public.site_content FOR EACH ROW EXECUTE FUNCTION touch_site_content_updated_at()",
+    "security": "invoker"
+  },
+  {
+    "table": "site_content",
+    "name": "site_content_broadcast_notification",
+    "def": "CREATE TRIGGER site_content_broadcast_notification AFTER INSERT OR UPDATE OF status ON public.site_content FOR EACH ROW EXECUTE FUNCTION private.publish_content_notification()",
+    "security": "definer"
+  },
+  {
+    "table": "subscriptions",
+    "name": "security_audit_changes",
+    "def": "CREATE TRIGGER security_audit_changes AFTER INSERT OR DELETE OR UPDATE ON public.subscriptions FOR EACH ROW EXECUTE FUNCTION private.audit_security_change()",
+    "security": "definer"
+  },
+  {
+    "table": "subscriptions",
+    "name": "subscriptions_normalize",
+    "def": "CREATE TRIGGER subscriptions_normalize BEFORE INSERT OR UPDATE ON public.subscriptions FOR EACH ROW EXECUTE FUNCTION private.subscriptions_normalize()",
+    "security": "definer"
+  },
+  {
+    "table": "subscriptions",
+    "name": "subscriptions_request_invoice",
+    "def": "CREATE TRIGGER subscriptions_request_invoice AFTER INSERT OR UPDATE OF requested_plan_id ON public.subscriptions FOR EACH ROW EXECUTE FUNCTION private.subscriptions_request_invoice()",
+    "security": "definer"
+  },
+  {
+    "table": "storage_objects",
+    "name": "security_avatar_generation",
+    "def": "CREATE TRIGGER security_avatar_generation BEFORE DELETE OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.avatar_generation_guard()",
+    "security": "definer"
+  },
+  {
+    "table": "storage_objects",
+    "name": "security_avatar_new_generation",
+    "def": "CREATE TRIGGER security_avatar_new_generation BEFORE INSERT ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.avatar_new_generation()",
+    "security": "definer"
+  }
+]

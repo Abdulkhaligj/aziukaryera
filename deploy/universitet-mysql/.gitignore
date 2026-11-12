@@ -1,0 +1,4 @@
+# Secrets and backups stay on the server.
+kit.env
+api.env
+backups/

@@ -9,8 +9,8 @@
  * görünüşləri (`app.js`) dəyişmədən işləyir.
  *
  * Təhlükəsizlik: burada heç bir icazə yoxlanışı YOXDUR və olmamalıdır.
- * Kim nəyi görə və dəyişə bilər — bunu Postgres-dəki RLS siyasətləri həll edir
- * (bax: supabase/migrations/0001_init.sql). Bu fayl sadəcə sorğu göndərir;
+ * Kim nəyi görə və dəyişə bilər — bunu backend-in icazə qatı həll edir
+ * (bax: server/src/rest/). Bu fayl sadəcə sorğu göndərir;
  * icazəsiz sorğu bazadan boş nəticə və ya xəta ilə qayıdır.
  *
  */
@@ -376,9 +376,26 @@ const Backend = {
     return failed || { ok: true, readAt: new Date().toISOString() };
   },
 
+  /* Supabase pushes new notifications over Realtime. The university API has
+   * no Realtime, so there the list is refreshed every 30 seconds and whenever
+   * the tab becomes visible again (CAREER_CONFIG.notificationPollSeconds). */
+  notificationPollSeconds() {
+    const configured = Number(CAREER_CONFIG.notificationPollSeconds);
+    if (Number.isFinite(configured) && configured >= 0) return configured;
+    try { return /\.supabase\.co$/i.test(new URL(SUPABASE_URL).hostname) ? 0 : 30; } catch { return 30; }
+  },
+
   subscribeNotifications(onChange) {
     if (!this.init()) return null;
     this.unsubscribeNotifications();
+    const every = this.notificationPollSeconds();
+    if (every > 0) {
+      const poll = () => { if (!document.hidden) onChange(); };
+      this.notificationTimer = setInterval(poll, every * 1000);
+      this.notificationVisible = () => { if (!document.hidden) onChange(); };
+      document.addEventListener('visibilitychange', this.notificationVisible);
+      return this.notificationTimer;
+    }
     this.notificationChannel = this.sb.channel('career-notifications-' + Date.now())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_notifications' }, onChange)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, onChange)
@@ -389,6 +406,10 @@ const Backend = {
   unsubscribeNotifications() {
     if (this.sb && this.notificationChannel) this.sb.removeChannel(this.notificationChannel);
     this.notificationChannel = null;
+    if (this.notificationTimer) clearInterval(this.notificationTimer);
+    this.notificationTimer = null;
+    if (this.notificationVisible) document.removeEventListener('visibilitychange', this.notificationVisible);
+    this.notificationVisible = null;
   },
 
   /* ---------------------------------------------------------------- *

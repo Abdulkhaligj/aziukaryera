@@ -1,0 +1,1661 @@
+[
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "ai_reservations_pkey",
+  "s": "private",
+  "t": "ai_reservations",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((provider_attempts >= 0) AND (provider_attempts <= 7)))",
+  "name": "ai_reservations_provider_attempts_check",
+  "s": "private",
+  "t": "ai_reservations",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (path)",
+  "name": "avatar_generations_pkey",
+  "s": "private",
+  "t": "avatar_generations",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((feature_key = ANY (ARRAY['active_vacancies'::text, 'team_members'::text, 'monthly_network_posts'::text])))",
+  "name": "company_quota_counters_feature_key_check",
+  "s": "private",
+  "t": "company_quota_counters",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (subject_id, feature_key, period_start)",
+  "name": "company_quota_counters_pkey",
+  "s": "private",
+  "t": "company_quota_counters",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((used_count >= 0))",
+  "name": "company_quota_counters_used_count_check",
+  "s": "private",
+  "t": "company_quota_counters",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((attempts >= 1) AND (attempts <= 5)))",
+  "name": "moderation_claims_attempts_check",
+  "s": "private",
+  "t": "moderation_claims",
+  "type": "c"
+ },
+ {
+  "def": "UNIQUE (claim_id)",
+  "name": "moderation_claims_claim_id_key",
+  "s": "private",
+  "t": "moderation_claims",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (target_table, target_id)",
+  "name": "moderation_claims_pkey",
+  "s": "private",
+  "t": "moderation_claims",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((target_table = ANY (ARRAY['posts'::text, 'post_comments'::text, 'profiles'::text])))",
+  "name": "moderation_claims_target_table_check",
+  "s": "private",
+  "t": "moderation_claims",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((endpoint ~ '^https://[a-z0-9]{20}\\.supabase\\.co/functions/v1/content-moderation$'::text))",
+  "name": "moderation_webhook_config_endpoint_check",
+  "s": "private",
+  "t": "moderation_webhook_config",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (singleton)",
+  "name": "moderation_webhook_config_pkey",
+  "s": "private",
+  "t": "moderation_webhook_config",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((length(secret) >= 32))",
+  "name": "moderation_webhook_config_secret_check",
+  "s": "private",
+  "t": "moderation_webhook_config",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (singleton)",
+  "name": "moderation_webhook_config_singleton_check",
+  "s": "private",
+  "t": "moderation_webhook_config",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((months >= 1) AND (months <= 12)))",
+  "name": "payment_entitlements_months_check",
+  "s": "private",
+  "t": "payment_entitlements",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (payment_id)",
+  "name": "payment_entitlements_pkey",
+  "s": "private",
+  "t": "payment_entitlements",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+  "name": "admin_audit_logs_actor_id_fkey",
+  "s": "public",
+  "t": "admin_audit_logs",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "admin_audit_logs_pkey",
+  "s": "public",
+  "t": "admin_audit_logs",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM advertiser)) >= 1) AND (char_length(TRIM(BOTH FROM advertiser)) <= 120)))",
+  "name": "ads_advertiser_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((ends_on >= starts_on))",
+  "name": "ads_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL",
+  "name": "ads_company_id_fkey",
+  "s": "public",
+  "t": "ads",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "ads_created_by_fkey",
+  "s": "public",
+  "t": "ads",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((char_length(cta_label) <= 30))",
+  "name": "ads_cta_label_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((description IS NULL) OR (char_length(description) <= 280)))",
+  "name": "ads_description_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((image_url IS NULL) OR (image_url ~ '^https://'::text)))",
+  "name": "ads_image_url_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((link_url IS NULL) OR (link_url ~ '^https://'::text)))",
+  "name": "ads_link_url_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "ads_pkey",
+  "s": "public",
+  "t": "ads",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((placement = ANY (ARRAY['landing_hero'::text, 'landing_strip'::text, 'dashboard'::text])))",
+  "name": "ads_placement_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((price_azn IS NULL) OR (price_azn >= (0)::numeric)))",
+  "name": "ads_price_azn_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text, 'ended'::text])))",
+  "name": "ads_status_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM title)) >= 2) AND (char_length(TRIM(BOTH FROM title)) <= 90)))",
+  "name": "ads_title_check",
+  "s": "public",
+  "t": "ads",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL",
+  "name": "ai_usage_company_id_fkey",
+  "s": "public",
+  "t": "ai_usage",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "ai_usage_pkey",
+  "s": "public",
+  "t": "ai_usage",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "ai_usage_profile_id_fkey",
+  "s": "public",
+  "t": "ai_usage",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE",
+  "name": "application_status_history_application_id_fkey",
+  "s": "public",
+  "t": "application_status_history",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (changed_by) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "application_status_history_changed_by_fkey",
+  "s": "public",
+  "t": "application_status_history",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "application_status_history_pkey",
+  "s": "public",
+  "t": "application_status_history",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((company_note IS NULL) OR (char_length(company_note) <= 2000)))",
+  "name": "applications_company_note_len",
+  "s": "public",
+  "t": "applications",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE",
+  "name": "applications_job_id_fkey",
+  "s": "public",
+  "t": "applications",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (job_id, student_id)",
+  "name": "applications_job_id_student_id_key",
+  "s": "public",
+  "t": "applications",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "applications_pkey",
+  "s": "public",
+  "t": "applications",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "applications_student_id_fkey",
+  "s": "public",
+  "t": "applications",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((candidate_tags IS NULL) OR (cardinality(candidate_tags) <= 10)))",
+  "name": "applications_tags_len",
+  "s": "public",
+  "t": "applications",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (actor_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+  "name": "audit_logs_actor_id_fkey",
+  "s": "public",
+  "t": "audit_logs",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "audit_logs_pkey",
+  "s": "public",
+  "t": "audit_logs",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (benefit_id) REFERENCES benefits(id) ON DELETE CASCADE",
+  "name": "benefit_claims_benefit_id_fkey",
+  "s": "public",
+  "t": "benefit_claims",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (code)",
+  "name": "benefit_claims_code_key",
+  "s": "public",
+  "t": "benefit_claims",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "benefit_claims_pkey",
+  "s": "public",
+  "t": "benefit_claims",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "benefit_claims_profile_id_fkey",
+  "s": "public",
+  "t": "benefit_claims",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (redeemed_by) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "benefit_claims_redeemed_by_fkey",
+  "s": "public",
+  "t": "benefit_claims",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((logo_url IS NULL) OR (logo_url ~ '^https://'::text)))",
+  "name": "benefit_partners_logo_url_https",
+  "s": "public",
+  "t": "benefit_partners",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "benefit_partners_owner_id_fkey",
+  "s": "public",
+  "t": "benefit_partners",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "benefit_partners_pkey",
+  "s": "public",
+  "t": "benefit_partners",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (partner_id) REFERENCES benefit_partners(id) ON DELETE CASCADE",
+  "name": "benefits_partner_id_fkey",
+  "s": "public",
+  "t": "benefits",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "benefits_pkey",
+  "s": "public",
+  "t": "benefits",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (broadcast_id) REFERENCES broadcast_notifications(id) ON DELETE CASCADE",
+  "name": "broadcast_notification_reads_broadcast_id_fkey",
+  "s": "public",
+  "t": "broadcast_notification_reads",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (broadcast_id, profile_id)",
+  "name": "broadcast_notification_reads_pkey",
+  "s": "public",
+  "t": "broadcast_notification_reads",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "broadcast_notification_reads_profile_id_fkey",
+  "s": "public",
+  "t": "broadcast_notification_reads",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "broadcast_notifications_created_by_fkey",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "broadcast_notifications_pkey",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "type": "p"
+ },
+ {
+  "def": "UNIQUE (source_type, source_id)",
+  "name": "broadcast_notifications_source_type_source_id_key",
+  "s": "public",
+  "t": "broadcast_notifications",
+  "type": "u"
+ },
+ {
+  "def": "FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "companies_owner_id_fkey",
+  "s": "public",
+  "t": "companies",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "companies_pkey",
+  "s": "public",
+  "t": "companies",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((citation IS NULL) OR (char_length(citation) <= 300)))",
+  "name": "company_awards_citation_check",
+  "s": "public",
+  "t": "company_awards",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL",
+  "name": "company_awards_company_id_fkey",
+  "s": "public",
+  "t": "company_awards",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM company_name)) >= 1) AND (char_length(TRIM(BOTH FROM company_name)) <= 120)))",
+  "name": "company_awards_company_name_check",
+  "s": "public",
+  "t": "company_awards",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "company_awards_created_by_fkey",
+  "s": "public",
+  "t": "company_awards",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((logo_url IS NULL) OR (logo_url ~ '^https://'::text)))",
+  "name": "company_awards_logo_url_check",
+  "s": "public",
+  "t": "company_awards",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM nomination)) >= 2) AND (char_length(TRIM(BOTH FROM nomination)) <= 80)))",
+  "name": "company_awards_nomination_check",
+  "s": "public",
+  "t": "company_awards",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "company_awards_pkey",
+  "s": "public",
+  "t": "company_awards",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((tier = ANY (ARRAY['gold'::text, 'silver'::text, 'bronze'::text])))",
+  "name": "company_awards_tier_check",
+  "s": "public",
+  "t": "company_awards",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((year >= 2020) AND (year <= 2100)))",
+  "name": "company_awards_year_check",
+  "s": "public",
+  "t": "company_awards",
+  "type": "c"
+ },
+ {
+  "def": "UNIQUE (year, nomination, company_name)",
+  "name": "company_awards_year_nomination_company_name_key",
+  "s": "public",
+  "t": "company_awards",
+  "type": "u"
+ },
+ {
+  "def": "FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE",
+  "name": "company_interview_slots_application_id_fkey",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (created_by) REFERENCES profiles(id)",
+  "name": "company_interview_slots_created_by_fkey",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((duration_minutes >= 15) AND (duration_minutes <= 180)))",
+  "name": "company_interview_slots_duration_minutes_check",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((char_length(location) <= 300))",
+  "name": "company_interview_slots_location_check",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((meeting_mode = ANY (ARRAY['on_site'::text, 'online'::text, 'phone'::text])))",
+  "name": "company_interview_slots_meeting_mode_check",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((char_length(meeting_url) <= 1000))",
+  "name": "company_interview_slots_meeting_url_check",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "c"
+ },
+ {
+  "def": "EXCLUDE USING gist (application_id WITH =, tstzrange(starts_at, private.interview_end(starts_at, duration_minutes), '[)'::text) WITH &&) WHERE ((status = 'scheduled'::text))",
+  "name": "company_interview_slots_no_overlap",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "x"
+ },
+ {
+  "def": "CHECK ((char_length(notes) <= 2000))",
+  "name": "company_interview_slots_notes_check",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "company_interview_slots_pkey",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['scheduled'::text, 'completed'::text, 'cancelled'::text])))",
+  "name": "company_interview_slots_status_check",
+  "s": "public",
+  "t": "company_interview_slots",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "company_members_company_id_fkey",
+  "s": "public",
+  "t": "company_members",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (company_id, profile_id)",
+  "name": "company_members_company_id_profile_id_key",
+  "s": "public",
+  "t": "company_members",
+  "type": "u"
+ },
+ {
+  "def": "CHECK ((member_role = ANY (ARRAY['owner'::text, 'admin'::text, 'recruiter'::text, 'viewer'::text])))",
+  "name": "company_members_member_role_check",
+  "s": "public",
+  "t": "company_members",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "company_members_pkey",
+  "s": "public",
+  "t": "company_members",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "company_members_profile_id_fkey",
+  "s": "public",
+  "t": "company_members",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['invited'::text, 'active'::text, 'suspended'::text])))",
+  "name": "company_members_status_check",
+  "s": "public",
+  "t": "company_members",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((char_length(admin_note) <= 2000))",
+  "name": "company_partnership_requests_admin_note_check",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((category = ANY (ARRAY['career_day'::text, 'workshop'::text, 'campus_visit'::text, 'internship'::text, 'capstone'::text, 'guest_lecture'::text, 'other'::text])))",
+  "name": "company_partnership_requests_category_check",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "company_partnership_requests_company_id_fkey",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM contact_email)) >= 3) AND (char_length(TRIM(BOTH FROM contact_email)) <= 200)))",
+  "name": "company_partnership_requests_contact_email_check",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (created_by) REFERENCES profiles(id)",
+  "name": "company_partnership_requests_created_by_fkey",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM details)) >= 20) AND (char_length(TRIM(BOTH FROM details)) <= 4000)))",
+  "name": "company_partnership_requests_details_check",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "company_partnership_requests_pkey",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['submitted'::text, 'reviewing'::text, 'approved'::text, 'rejected'::text, 'completed'::text])))",
+  "name": "company_partnership_requests_status_check",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((char_length(TRIM(BOTH FROM title)) >= 5) AND (char_length(TRIM(BOTH FROM title)) <= 160)))",
+  "name": "company_partnership_requests_title_check",
+  "s": "public",
+  "t": "company_partnership_requests",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (addressee_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "connections_addressee_id_fkey",
+  "s": "public",
+  "t": "connections",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((requester_id <> addressee_id))",
+  "name": "connections_check",
+  "s": "public",
+  "t": "connections",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "connections_pkey",
+  "s": "public",
+  "t": "connections",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (requester_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "connections_requester_id_fkey",
+  "s": "public",
+  "t": "connections",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (content_key)",
+  "name": "content_content_key_key",
+  "s": "public",
+  "t": "content",
+  "type": "u"
+ },
+ {
+  "def": "FOREIGN KEY (created_by) REFERENCES auth.users(id)",
+  "name": "content_created_by_fkey",
+  "s": "public",
+  "t": "content",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "content_pkey",
+  "s": "public",
+  "t": "content",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((ats_score >= 0) AND (ats_score <= 100)))",
+  "name": "cv_documents_ats_score_check",
+  "s": "public",
+  "t": "cv_documents",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "cv_documents_pkey",
+  "s": "public",
+  "t": "cv_documents",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "cv_documents_profile_id_fkey",
+  "s": "public",
+  "t": "cv_documents",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((degree_type = ANY (ARRAY['bachelor'::text, 'master'::text, 'phd'::text, 'other'::text])))",
+  "name": "education_degree_type_check",
+  "s": "public",
+  "t": "education",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((graduation_year >= 1950) AND (graduation_year <= 2100)))",
+  "name": "education_graduation_year_check",
+  "s": "public",
+  "t": "education",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "education_pkey",
+  "s": "public",
+  "t": "education",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "education_profile_id_fkey",
+  "s": "public",
+  "t": "education",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((start_year >= 1950) AND (start_year <= 2100)))",
+  "name": "education_start_year_check",
+  "s": "public",
+  "t": "education",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE",
+  "name": "event_registrations_event_id_fkey",
+  "s": "public",
+  "t": "event_registrations",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (event_id, profile_id)",
+  "name": "event_registrations_pkey",
+  "s": "public",
+  "t": "event_registrations",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "event_registrations_profile_id_fkey",
+  "s": "public",
+  "t": "event_registrations",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((image_url IS NULL) OR (image_url ~ '^https://'::text)))",
+  "name": "events_image_url_https",
+  "s": "public",
+  "t": "events",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "events_pkey",
+  "s": "public",
+  "t": "events",
+  "type": "p"
+ },
+ {
+  "def": "UNIQUE (name)",
+  "name": "faculties_name_key",
+  "s": "public",
+  "t": "faculties",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "faculties_pkey",
+  "s": "public",
+  "t": "faculties",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((num_nonnulls(followed_profile_id, followed_company_id) = 1))",
+  "name": "follows_check",
+  "s": "public",
+  "t": "follows",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (followed_company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "follows_followed_company_id_fkey",
+  "s": "public",
+  "t": "follows",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (followed_profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "follows_followed_profile_id_fkey",
+  "s": "public",
+  "t": "follows",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (follower_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "follows_follower_id_fkey",
+  "s": "public",
+  "t": "follows",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "follows_pkey",
+  "s": "public",
+  "t": "follows",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE",
+  "name": "interview_requests_application_id_fkey",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (application_id)",
+  "name": "interview_requests_application_id_key",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "u"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "interview_requests_company_id_fkey",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((char_length(message) <= 1000))",
+  "name": "interview_requests_message_check",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "interview_requests_pkey",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((char_length(reply_note) <= 1000))",
+  "name": "interview_requests_reply_note_check",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (scheduled_slot_id) REFERENCES company_interview_slots(id) ON DELETE SET NULL",
+  "name": "interview_requests_scheduled_slot_id_fkey",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text, 'scheduled'::text, 'cancelled'::text])))",
+  "name": "interview_requests_status_check",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "interview_requests_student_id_fkey",
+  "s": "public",
+  "t": "interview_requests",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL",
+  "name": "interview_sessions_company_id_fkey",
+  "s": "public",
+  "t": "interview_sessions",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL",
+  "name": "interview_sessions_job_id_fkey",
+  "s": "public",
+  "t": "interview_sessions",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "interview_sessions_pkey",
+  "s": "public",
+  "t": "interview_sessions",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "interview_sessions_profile_id_fkey",
+  "s": "public",
+  "t": "interview_sessions",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((score >= 0) AND (score <= 100)))",
+  "name": "interview_sessions_score_check",
+  "s": "public",
+  "t": "interview_sessions",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "invites_company_id_fkey",
+  "s": "public",
+  "t": "invites",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (company_id, student_id, job_id)",
+  "name": "invites_company_id_student_id_job_id_key",
+  "s": "public",
+  "t": "invites",
+  "type": "u"
+ },
+ {
+  "def": "FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE",
+  "name": "invites_job_id_fkey",
+  "s": "public",
+  "t": "invites",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "invites_pkey",
+  "s": "public",
+  "t": "invites",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "invites_student_id_fkey",
+  "s": "public",
+  "t": "invites",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (approved_by) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "jobs_approved_by_fkey",
+  "s": "public",
+  "t": "jobs",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "jobs_company_id_fkey",
+  "s": "public",
+  "t": "jobs",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "jobs_pkey",
+  "s": "public",
+  "t": "jobs",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((positions > 0))",
+  "name": "jobs_positions_check",
+  "s": "public",
+  "t": "jobs",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (faculty_id) REFERENCES faculties(id) ON DELETE CASCADE",
+  "name": "majors_faculty_id_fkey",
+  "s": "public",
+  "t": "majors",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (faculty_id, name)",
+  "name": "majors_faculty_id_name_key",
+  "s": "public",
+  "t": "majors",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "majors_pkey",
+  "s": "public",
+  "t": "majors",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((char_length(admin_note) <= 1200))",
+  "name": "mentor_requests_admin_note_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((category = ANY (ARRAY['karyera'::text, 'cv'::text, 'müsahibə'::text, 'texniki'::text, 'startap'::text, 'magistr'::text, 'şəbəkələşmə'::text])))",
+  "name": "mentor_requests_category_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((char_length(btrim(details)) >= 15) AND (char_length(btrim(details)) <= 1800)))",
+  "name": "mentor_requests_details_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((format = ANY (ARRAY['online'::text, 'in_person'::text, 'either'::text])))",
+  "name": "mentor_requests_format_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((char_length(mentor_name) <= 120))",
+  "name": "mentor_requests_mentor_name_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "mentor_requests_pkey",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((char_length(preferred_time) <= 180))",
+  "name": "mentor_requests_preferred_time_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['pending'::text, 'in_review'::text, 'matched'::text, 'completed'::text, 'cancelled'::text])))",
+  "name": "mentor_requests_status_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "mentor_requests_student_id_fkey",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((char_length(btrim(topic)) >= 5) AND (char_length(btrim(topic)) <= 140)))",
+  "name": "mentor_requests_topic_check",
+  "s": "public",
+  "t": "mentor_requests",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((length(TRIM(BOTH FROM body)) >= 1) AND (length(TRIM(BOTH FROM body)) <= 4000)))",
+  "name": "messages_body_check",
+  "s": "public",
+  "t": "messages",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((sender_id <> recipient_id))",
+  "name": "messages_check",
+  "s": "public",
+  "t": "messages",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "messages_pkey",
+  "s": "public",
+  "t": "messages",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (recipient_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "messages_recipient_id_fkey",
+  "s": "public",
+  "t": "messages",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (sender_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "messages_sender_id_fkey",
+  "s": "public",
+  "t": "messages",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (word)",
+  "name": "moderation_allow_pkey",
+  "s": "public",
+  "t": "moderation_allow",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((action = ANY (ARRAY['approve'::text, 'hide'::text, 'delete'::text, 'warn'::text, 'suspend'::text, 'restore'::text])))",
+  "name": "moderation_logs_action_check",
+  "s": "public",
+  "t": "moderation_logs",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (actor_id) REFERENCES profiles(id) ON DELETE SET NULL",
+  "name": "moderation_logs_actor_id_fkey",
+  "s": "public",
+  "t": "moderation_logs",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "moderation_logs_pkey",
+  "s": "public",
+  "t": "moderation_logs",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE SET NULL",
+  "name": "moderation_logs_report_id_fkey",
+  "s": "public",
+  "t": "moderation_logs",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((match = ANY (ARRAY['stem'::text, 'word'::text, 'infix'::text])))",
+  "name": "moderation_terms_match_check",
+  "s": "public",
+  "t": "moderation_terms",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (term)",
+  "name": "moderation_terms_pkey",
+  "s": "public",
+  "t": "moderation_terms",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((script = ANY (ARRAY['latin'::text, 'cyrillic'::text, 'arabic'::text])))",
+  "name": "moderation_terms_script_check",
+  "s": "public",
+  "t": "moderation_terms",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((tier = ANY (ARRAY['A'::text, 'B'::text])))",
+  "name": "moderation_terms_tier_check",
+  "s": "public",
+  "t": "moderation_terms",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "notifications_pkey",
+  "s": "public",
+  "t": "notifications",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "notifications_profile_id_fkey",
+  "s": "public",
+  "t": "notifications",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((amount >= (0)::numeric))",
+  "name": "payments_amount_check",
+  "s": "public",
+  "t": "payments",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "payments_company_id_fkey",
+  "s": "public",
+  "t": "payments",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((months >= 1) AND (months <= 12)))",
+  "name": "payments_months_check",
+  "s": "public",
+  "t": "payments",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "payments_pkey",
+  "s": "public",
+  "t": "payments",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (plan_id) REFERENCES plans(id)",
+  "name": "payments_plan_id_fkey",
+  "s": "public",
+  "t": "payments",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text, 'refunded'::text, 'cancelled'::text])))",
+  "name": "payments_status_check",
+  "s": "public",
+  "t": "payments",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL",
+  "name": "payments_subscription_id_fkey",
+  "s": "public",
+  "t": "payments",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((limit_value IS NULL) OR (limit_value >= 0)))",
+  "name": "plan_features_limit_value_check",
+  "s": "public",
+  "t": "plan_features",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (plan_id, feature_key)",
+  "name": "plan_features_pkey",
+  "s": "public",
+  "t": "plan_features",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE",
+  "name": "plan_features_plan_id_fkey",
+  "s": "public",
+  "t": "plan_features",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "plans_pkey",
+  "s": "public",
+  "t": "plans",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "post_comments_author_id_fkey",
+  "s": "public",
+  "t": "post_comments",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((length(TRIM(BOTH FROM body)) >= 1) AND (length(TRIM(BOTH FROM body)) <= 1000)))",
+  "name": "post_comments_body_check",
+  "s": "public",
+  "t": "post_comments",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((moderation_status = ANY (ARRAY['pending'::text, 'visible'::text, 'hidden'::text])))",
+  "name": "post_comments_moderation_status_check",
+  "s": "public",
+  "t": "post_comments",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "post_comments_pkey",
+  "s": "public",
+  "t": "post_comments",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE",
+  "name": "post_comments_post_id_fkey",
+  "s": "public",
+  "t": "post_comments",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (post_id, profile_id)",
+  "name": "post_likes_pkey",
+  "s": "public",
+  "t": "post_likes",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE",
+  "name": "post_likes_post_id_fkey",
+  "s": "public",
+  "t": "post_likes",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "post_likes_profile_id_fkey",
+  "s": "public",
+  "t": "post_likes",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((storage_path IS NOT NULL) OR (public_url IS NOT NULL)))",
+  "name": "post_media_check",
+  "s": "public",
+  "t": "post_media",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((media_type = ANY (ARRAY['image'::text, 'pdf'::text, 'document'::text, 'link'::text])))",
+  "name": "post_media_media_type_check",
+  "s": "public",
+  "t": "post_media",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "post_media_pkey",
+  "s": "public",
+  "t": "post_media",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE",
+  "name": "post_media_post_id_fkey",
+  "s": "public",
+  "t": "post_media",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (post_id, profile_id)",
+  "name": "post_saves_pkey",
+  "s": "public",
+  "t": "post_saves",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE",
+  "name": "post_saves_post_id_fkey",
+  "s": "public",
+  "t": "post_saves",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "post_saves_profile_id_fkey",
+  "s": "public",
+  "t": "post_saves",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "posts_author_id_fkey",
+  "s": "public",
+  "t": "posts",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((length(TRIM(BOTH FROM body)) >= 1) AND (length(TRIM(BOTH FROM body)) <= 4000)))",
+  "name": "posts_body_check",
+  "s": "public",
+  "t": "posts",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "posts_pkey",
+  "s": "public",
+  "t": "posts",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((admin_role IS NULL) OR (admin_role = ANY (ARRAY['super_admin'::text, 'manager'::text, 'editor'::text, 'reviewer'::text]))))",
+  "name": "profiles_admin_role_check",
+  "s": "public",
+  "t": "profiles",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((course >= 1) AND (course <= 6)))",
+  "name": "profiles_course_check",
+  "s": "public",
+  "t": "profiles",
+  "type": "c"
+ },
+ {
+  "def": "CHECK (((jsonb_typeof(experience) = 'array'::text) AND (jsonb_array_length(experience) <= 30) AND (octet_length((experience)::text) <= 30000)))",
+  "name": "profiles_experience_shape",
+  "s": "public",
+  "t": "profiles",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (faculty_id) REFERENCES faculties(id) ON DELETE SET NULL",
+  "name": "profiles_faculty_id_fkey",
+  "s": "public",
+  "t": "profiles",
+  "type": "f"
+ },
+ {
+  "def": "CHECK (((gpa >= (0)::numeric) AND (gpa <= (100)::numeric)))",
+  "name": "profiles_gpa_check",
+  "s": "public",
+  "t": "profiles",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE",
+  "name": "profiles_id_fkey",
+  "s": "public",
+  "t": "profiles",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (major_id) REFERENCES majors(id) ON DELETE SET NULL",
+  "name": "profiles_major_id_fkey",
+  "s": "public",
+  "t": "profiles",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "profiles_pkey",
+  "s": "public",
+  "t": "profiles",
+  "type": "p"
+ },
+ {
+  "def": "CHECK (((jsonb_typeof(projects) = 'array'::text) AND (jsonb_array_length(projects) <= 30) AND (octet_length((projects)::text) <= 30000)))",
+  "name": "profiles_projects_shape",
+  "s": "public",
+  "t": "profiles",
+  "type": "c"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "reports_pkey",
+  "s": "public",
+  "t": "reports",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (reporter_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "reports_reporter_id_fkey",
+  "s": "public",
+  "t": "reports",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (reviewed_by) REFERENCES profiles(id)",
+  "name": "reports_reviewed_by_fkey",
+  "s": "public",
+  "t": "reports",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['open'::text, 'reviewing'::text, 'resolved'::text, 'dismissed'::text])))",
+  "name": "reports_status_check",
+  "s": "public",
+  "t": "reports",
+  "type": "c"
+ },
+ {
+  "def": "CHECK ((target_type = ANY (ARRAY['post'::text, 'comment'::text, 'profile'::text, 'company'::text, 'job'::text])))",
+  "name": "reports_target_type_check",
+  "s": "public",
+  "t": "reports",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE",
+  "name": "saved_jobs_job_id_fkey",
+  "s": "public",
+  "t": "saved_jobs",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (student_id, job_id)",
+  "name": "saved_jobs_pkey",
+  "s": "public",
+  "t": "saved_jobs",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE",
+  "name": "saved_jobs_student_id_fkey",
+  "s": "public",
+  "t": "saved_jobs",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (content_key)",
+  "name": "site_content_content_key_key",
+  "s": "public",
+  "t": "site_content",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "site_content_pkey",
+  "s": "public",
+  "t": "site_content",
+  "type": "p"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['Aktiv'::text, 'Qaralama'::text, 'Bitib'::text])))",
+  "name": "site_content_status_check",
+  "s": "public",
+  "t": "site_content",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+  "name": "site_content_updated_by_fkey",
+  "s": "public",
+  "t": "site_content",
+  "type": "f"
+ },
+ {
+  "def": "PRIMARY KEY (subscription_id, feature_key, period_start)",
+  "name": "subscription_usage_pkey",
+  "s": "public",
+  "t": "subscription_usage",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE",
+  "name": "subscription_usage_subscription_id_fkey",
+  "s": "public",
+  "t": "subscription_usage",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((used_count >= 0))",
+  "name": "subscription_usage_used_count_check",
+  "s": "public",
+  "t": "subscription_usage",
+  "type": "c"
+ },
+ {
+  "def": "FOREIGN KEY (approved_by) REFERENCES profiles(id)",
+  "name": "subscriptions_approved_by_fkey",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE",
+  "name": "subscriptions_company_id_fkey",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "f"
+ },
+ {
+  "def": "UNIQUE (company_id)",
+  "name": "subscriptions_company_id_key",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "u"
+ },
+ {
+  "def": "PRIMARY KEY (id)",
+  "name": "subscriptions_pkey",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "p"
+ },
+ {
+  "def": "FOREIGN KEY (plan_id) REFERENCES plans(id)",
+  "name": "subscriptions_plan_id_fkey",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "f"
+ },
+ {
+  "def": "FOREIGN KEY (requested_plan_id) REFERENCES plans(id)",
+  "name": "subscriptions_requested_plan_id_fkey",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "f"
+ },
+ {
+  "def": "CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'past_due'::text, 'cancelled'::text])))",
+  "name": "subscriptions_status_check",
+  "s": "public",
+  "t": "subscriptions",
+  "type": "c"
+ }
+]

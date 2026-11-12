@@ -1,104 +1,116 @@
 # ADNSU Karyera Platforması — İT şöbəsi üçün təhvil sənədi
 
-Tarix: 28 oktyabr 2026 (təhlükəsizlik auditindən sonra yenilənib: 12 noyabr 2026)
+Tarix: 12 noyabr 2026
+
+> **Vəziyyət:**
+> - **Backend:** İT-nin tələbi ilə platformanın backend-i universitetin serverində **MySQL 8.4 + Node.js API** üzərində işləyəcək.
+> - **Supabase:** köhnə Supabase layihəsi 12.11.2026 silinib. Bütün data və fayllar ehtiyat nüsxədədir, nüsxə yoxlanılıb.
+> - **Saytlar:** server qurulana qədər hər iki sayt "texniki işlər" səhifəsini göstərir.
+>
+> Quraşdırma və köçürmə: [`deploy/universitet-mysql/README.md`](../deploy/universitet-mysql/README.md).
 
 ## 1. Platforma nədən ibarətdir
 
-| Hissə | Canlı ünvan | Mənbə (bu paketdə) | Texnologiya |
+| Hissə | Ünvan | Mənbə | Texnologiya |
 |---|---|---|---|
-| Əsas sayt (tələbə, magistr, məzun, şirkət, Karyera Mərkəzi) | https://asoiu-career.vercel.app | `student-web/` | Statik HTML/CSS/JS (framework yoxdur), Supabase JS SDK |
+| Əsas sayt (tələbə, magistr, məzun, şirkət, Karyera Mərkəzi) | https://asoiu-career.vercel.app | `student-web/` | Statik HTML/CSS/JS (framework yoxdur) |
 | Admin panel (Karyera Mərkəzi əməkdaşları) | https://asoiu-career-admin.vercel.app | repo kökü: `app/`, `components/`, `lib/` | Next.js 16 (App Router), React 19, TypeScript |
-| Backend | Supabase layihəsi `ttfsbgbhyomfheglefkn` (EU Central) | `supabase/migrations`, `supabase/functions` | PostgreSQL + RLS, Supabase Auth, Storage, Edge Functions (Deno), pg_cron, pg_net |
-| AI | Google Gemini (açar yalnız Edge Function secret-dədir) | `supabase/functions/*` | gemini-3.8-flash → 3.6-flash → 3.5-flash-lite (avtomatik ehtiyat) |
+| Backend | universitet serveri (məs. `api.career.asoiu.edu.az`) | `server/`, `deploy/universitet-mysql/` | MySQL 8.4, Node.js/TypeScript API (Fastify), Docker, Caddy (HTTPS) |
+| AI funksiyaları | backend-in içində | `supabase/functions/*` (qovluq adı tarixidir; kod API-nin içində dəyişmədən işləyir) | Google Gemini, istəyə bağlı Groq |
 
-Hosting: Vercel (`inspire5` komandası). Hər iki Vercel layihəsi GitHub `Abdulkhaligj/aziukaryera` reposunun `main` budağına bağlıdır:
-- `asoiu-career-main-v3` → Root Directory `student-web`
-- `asoiu-career-admin` → repo kökü (Next.js)
+Saytlar Vercel-dədir (`inspire5` komandası). Hər ikisi GitHub `Abdulkhaligj/aziukaryera` reposunun `main` budağına bağlıdır:
+- `asoiu-career-main-v3`: Root Directory `student-web`.
+- `asoiu-career-admin`: repo kökü (Next.js).
 
-`main`-ə push hər iki saytı avtomatik yenidən yerləşdirir.
+`main`-ə push hər iki saytı avtomatik yenidən yerləşdirir. API saytların istifadə etdiyi HTTP protokolunu verir (supabase-js kitabxanası ilə uyğundur), ona görə saytların kodu backend dəyişəndə dəyişmir.
 
-## 2. Paketdəki ZIP faylları
+## 2. Əsas funksiyalar
 
-1. `1-esas-sayt-student-web.zip` — əsas saytın tam mənbəyi (Vercel-ə olduğu kimi yüklənir).
-2. `2-admin-panel.zip` — Next.js admin paneli (`npm ci && npm run build`).
-3. `3-supabase-backend.zip` — verilənlər bazası miqrasiyaları (tarix sırası ilə), Edge Functions, bu sənəd.
-4. `4-tam-repo.zip` — hamısı bir yerdə (GitHub reposunun surəti, `.git` olmadan).
+**Tələbə / magistr / məzun:**
+- Hesab: qeydiyyat (universitet e-poçtu + e-poçt kodu), profil, **profil şəkli yükləmə**.
+- İş axtarışı: uyğunluq faizi ilə vakansiyalar, müraciət (son tarixdən sonra bağlanır), müraciətlərim, müsahibə sorğuları.
+- Karyera alətləri: CV Mərkəzi (qurucu, şablon, ATS analizi, AI ilə CV mətni), müsahibə simulyatoru (AI), karyera yol xəritəsi, **Mentor dəstəyi**, AIDA köməkçi.
+- Digər: tədbirlər, peşəkar şəbəkə (AI moderasiya), tələbə güzəştləri.
 
-Heç bir ZIP-də gizli açar yoxdur: `.env.local`, service role açarı, Gemini açarı daxil edilməyib. Brauzerdə olan `SUPABASE_PUBLISHABLE_KEY` ictimai açardır, RLS ilə qorunur.
+**Profil şəkli:**
+1. Şəkil brauzerdə WebP-yə çevrilir, şəxsi `avatars` bucket-inə yüklənir və AI yoxlamasına göndərilir (`content-moderation`).
+2. Təsdiqlənənə qədər şəkli yalnız sahibi görür.
+3. Uyğun olmayan şəkil rədd edilir və səbəbi göstərilir.
+4. Başqaları yalnız təsdiqlənmiş şəkli, qısa müddətli imzalı link ilə görür.
 
-## 3. Əsas funksiyalar
+**Mentor dəstəyi:**
+- Tələbə istiqamət, mövzu, ehtiyac, görüş formatı və uyğun vaxtı yazıb müraciət göndərir, sonra müraciətin statusunu öz kabinetində izləyir.
+- **AI mentor** dərhal məsləhət verir; cavabı bir kliklə insan mentora müraciətə köçürmək olur.
+- Admin paneldə "Mentor müraciətləri" bölməsi var: status, mentorun adı və tələbəyə qeyd.
 
-**Tələbə / magistr / məzun:** qeydiyyat (universitet e-poçtu + e-poçt kodu), uyğunluq faizi ilə vakansiyalar, müraciət (son tarixdən sonra bağlanır), müraciətlərim, müsahibə sorğuları, tədbirlər, peşəkar şəbəkə (AI moderasiya), tələbə güzəştləri, profil, **profil şəkli yükləmə**, CV Mərkəzi (qurucu, şablon, ATS analizi, AI ilə CV mətni), müsahibə simulyatoru (AI), karyera yol xəritəsi, **Mentor dəstəyi**, AIDA köməkçi.
+**Şirkət:**
+- Hesab: qeydiyyat (Karyera Mərkəzinin təsdiqi ilə).
+- Vakansiyalar: yaratma (təsdiq növbəsi ilə), müraciətlər.
+- Namizədlər: Talent Pool, namizəd müqayisəsi, müsahibə təqvimi və sorğuları.
+- Digər: işə qəbul analitikası, universitetlə əməkdaşlıq.
 
-**Profil şəkli:** Profil səhifəsində "Şəkil seç və yüklə". Şəkil brauzerdə WebP-yə çevrilir, şəxsi `avatars` bucket-inə yüklənir, `avatar_submit` RPC ilə AI yoxlamasına (`content-moderation` funksiyası) göndərilir. Təsdiqlənənə qədər yalnız sahibi görür ("Yoxlanılır"); uyğun olmayan şəkil rədd edilir və səbəbi göstərilir. Başqaları yalnız təsdiqlənmiş şəkli qısa müddətli imzalı link ilə görür (şirkət namizəd siyahısında, admin paneldə).
+**Admin panel:**
+- Əsas iş: icmal, təsdiq növbəsi, müraciətlər, mentor müraciətləri.
+- Kataloq: vakansiyalar, şirkətlər, tədbirlər, güzəştlər, Awards, reklamlar, sayt məzmunu.
+- İstifadəçilər: tələbələr, magistrlər və məzunlar; əməkdaşlar və rollar (maks. 5 aktiv admin).
+- Nəzarət: şəbəkə moderasiyası, şikayətlər, audit tarixçəsi.
+- Ödənişlər: abunəliklər, ödənişlər, analitika.
+- Alətlər: AI köməkçi (mətn, səs və ya şəkil ilə qaralama), PWA.
 
-**Mentor dəstəyi:** Tələbə menyuda "Mentor dəstəyi" → istiqamət seçir (7 istiqamət), mövzu, ətraflı ehtiyac, görüş formatı və uyğun vaxt yazıb müraciət göndərir (`mentor_requests` cədvəli). Müraciətlərin statusunu, təyin olunan mentoru və Karyera Mərkəzinin qeydini öz kabinetində izləyir. Eyni səhifədə **AI mentor** dərhal məsləhət verir (AIDA backend-i, tələbənin fakültə/ixtisas/bacarıqlarına əsaslanır) və cavabı bir kliklə insan mentora müraciətə köçürmək olur. Ana səhifədə və tələbə kabinetində "Mentora müraciət et" düyməsi; e-poçt (career@asoiu.edu.az) ehtiyat yol kimi qalır.
-Admin paneldə **"Mentor müraciətləri"** bölməsi: siyahı (tələbənin şəkli ilə), status (Yeni / Baxılır / Mentor təyin edilib / Tamamlanıb / Bağlanıb), mentorun adı, tələbəyə qeyd. "Mentor təyin edilib" statusu üçün mentorun adı məcburidir. Yeni müraciətlər idarə panelində sayılır.
+Admin rolları: Super Admin, Menecer, Redaktor, Yoxlayıcı (`lib/permissions.ts`).
 
-**Şirkət:** qeydiyyat (Karyera Mərkəzinin təsdiqi ilə), vakansiya yaratma (təsdiq növbəsi), müraciətlər, Talent Pool, namizəd müqayisəsi, müsahibə təqvimi və sorğuları, işə qəbul analitikası, universitetlə əməkdaşlıq.
+## 3. Quraşdırma
 
-**Admin panel:** icmal, təsdiq növbəsi (qeydlərlə), vakansiyalar, şirkətlər, tədbirlər, güzəştlər, Awards, reklamlar, sayt məzmunu, müraciətlər, tələbələr/magistrlər/məzunlar, mentor müraciətləri, şəbəkə moderasiyası, şikayətlər, abunəliklər, ödənişlər, analitika, əməkdaşlar və rollar (maks. 5 aktiv admin), audit tarixçəsi, AI köməkçi (mətn/səs/şəkil ilə qaralama), telefonda "Ana ekrana əlavə et" (PWA).
+### 3.1 Backend (MySQL, universitet serveri)
+Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/universitet-mysql/README.md).
+1. **Serveri hazırlamaq:** `01-init.sh`.
+2. **Ehtiyat nüsxədən köçürmə:** `02-import.sh`. Şifrə hash-ları da köçür, istifadəçilər köhnə şifrə ilə daxil olur.
+3. **İşə salma və yoxlama:** `03-start.sh` və `04-verify.sh`.
+4. **Saytları yeni serverə keçirmə:** `05-switch-frontend.mjs`. Bu skript texniki işlər səhifəsini də söndürür.
 
-Admin rolları: Super Admin, Menecer, Redaktor, Yoxlayıcı (`lib/permissions.ts`). Verilənlər bazası `is_admin()` ilə admin olmağı yoxlayır (JWT `app_metadata.admin_role` + aktiv admin profili).
+### 3.2 Əsas sayt (`student-web/`)
+- **Backend ünvanı və ictimai açar:** `assets/js/runtime-config.js` faylındadır. Keçid günü `05-switch-frontend.mjs` bu faylı yeniləyir.
+- **Vercel:** Root Directory `student-web`, framework "Other", build yoxdur. `vercel.json` təhlükəsizlik başlıqlarını və təmiz URL-ləri verir. Hazırda texniki işlər yönləndirməsi də buradadır.
+- **Lokal işə salma:** `cd student-web && python3 -m http.server 8080`.
+- **Nümunə hesablar:** `assets/js/auth.js` daxilindəki 3 nümunə hesab yalnız backend qoşulmayan offline demo rejimindədir. Real hesab deyillər.
 
-## 4. Quraşdırma (yeni mühitə köçürmə lazım olarsa)
+### 3.3 Admin panel
+- **Env dəyişənləri:** `NEXT_PUBLIC_SUPABASE_URL` və `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`.env.example`-ə bax). Adlar köhnədir, dəyərlər MySQL API-nin ünvanı və `ANON_KEY` açarıdır. Vercel-də də eyni dəyişənlər.
+- **Texniki işlər rejimi:** `next.config.mjs`-dəki `MAINTENANCE` dəyişənidir.
+- **Qurma və işə salma:** `npm ci && npm run build && npm start` (Node 20+).
+- **Testlər:** `node --test tests/*.test.mjs` (85 test).
 
-### 4.1 Supabase
-1. Yeni layihə yaradın (və ya mövcuddan istifadə edin).
-2. Extensions: `pg_cron`, `pg_net`.
-3. `supabase/migrations/` fayllarını **ad (tarix) sırası ilə** tətbiq edin: `supabase db push` və ya SQL redaktorunda bir-bir.
-   - **Diqqət:** ilkin sxem (əsas cədvəllər, `is_admin()` və s.) layihənin əvvəlində Supabase Dashboard-da yaradılıb və repo-da migration kimi yoxdur. Ona görə boş bazada migration-lar 2-ci fayldan dayanır. Yeni mühit üçün əvvəlcə canlı layihədən sxem nüsxəsi götürün:
-     ```bash
-     supabase db dump --linked --schema public,private,storage -f supabase/baseline/schema.sql
-     ```
-     Yeni bazaya əvvəl bu faylı, sonra yalnız nüsxə tarixindən **sonrakı** migration-ları tətbiq edin. Universitet serverinə köçürmə (`deploy/universitet-server`) buna ehtiyac duymur: o, buluddan tam baza nüsxəsi köçürür.
-   - `20261019130000_network_content_moderation.sql` daxilində `content-moderation` funksiyasının URL-i layihə ünvanı ilə yazılıb — yeni layihədə ünvanı dəyişin.
-4. Edge Functions (hamısı `verify_jwt = false`, çünki zəng edəni funksiyanın özü yoxlayır; `admin-users` istisnadır — `verify_jwt = true`):
-   `supabase functions deploy aida-chat --no-verify-jwt` (eyni qayda ilə `career-ai`, `admin-assistant`, `content-moderation`), `supabase functions deploy admin-users`.
-5. Secrets (`supabase secrets set ...`): `GEMINI_API_KEY` (məcburi). İstəyə bağlı: `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`, `GEMINI_AIDA_MODEL`, `GEMINI_ASSISTANT_MODEL`, `GEMINI_MODERATION_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `PUBLIC_SITE_URL`. `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` avtomatik verilir.
-6. Storage bucket-lər miqrasiyalarla yaranır: `avatars` (şəxsi), `public-media` (ictimai; Super Admin, Menecer və Redaktor yükləyir, yalnız Super Admin və Menecer dəyişir/silir), `assistant-audio` (şəxsi, yalnız admin; `20261112100000_security_audit_fixes.sql`).
+### 3.4 E-poçt (SMTP)
+- **SMTP məcburidir:** e-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`).
+- **Lazım olan məlumatlar:** host, port, istifadəçi, şifrə və göndərən ünvan (`career@asoiu.edu.az`). Bunlar API-nin `api.env` faylına yazılır.
+- **SMTP olmadan:** `03-start.sh` dayanır.
+- **Microsoft (Outlook) ilə giriş:** yeni backend-də hələ yoxdur.
 
-### 4.2 Əsas sayt (`student-web/`)
-- `assets/js/config.js` → `SUPABASE_URL` və `SUPABASE_PUBLISHABLE_KEY` (ictimai açar).
-- Vercel: Root Directory `student-web`, framework "Other", build yoxdur. `vercel.json` təhlükəsizlik başlıqlarını və təmiz URL-ləri verir.
-- Lokal: `cd student-web && python3 -m http.server 8080`.
-- Diqqət: `assets/js/auth.js` daxilindəki 3 nümunə hesab (`demo.telebe@asoiu.edu.az`, `demo.sirket@example.com`, `demo.admin@asoiu.edu.az`) **yalnız Supabase olmayan offline demo rejimindədir**, real hesab deyil və real ünvanlara aid deyil.
+## 4. Təhlükəsizlik xülasəsi
+- **İcazələr:** hər sorğuda API-nin icazə qatı yoxlayır (köhnə bazadakı RLS qaydalarından köçürülüb). Tələbə yalnız öz məlumatını, şirkət yalnız öz elanlarına müraciət edənləri, admin hamısını görür.
+- **Profil şəkilləri:** şəxsi bucket-də saxlanılır, AI yoxlamasından sonra imzalı link ilə göstərilir.
+- **Şəbəkə paylaşımları və şərhlər:** söz siyahısı və AI moderasiya ilə yoxlanılır (fail-closed). AI-yə göstəriş vermək cəhdi olan mətn dərc olunmur.
+- **Şirkətin müraciətlər üzərində icazəsi:** yalnız mərhələni, öz qeydini və etiketləri dəyişə bilir.
+- **AI çağırışları:**
+  - Gündəlik limitlidir.
+  - AIDA qonaqlar üçün IP-nin gündəlik duzlu hash-i ilə məhdudlaşır, IP-nin özü saxlanmır.
+  - Qaydalar AI-yə sistem təlimatı kimi gedir, istifadəçi mətni təsadüfi teq içində.
+  - Namizəd sıralamasında ad, e-poçt, telefon və profil linkləri gizlədilir.
+- **Admin API-ləri:**
+  - Hər sorğuda rolu yoxlayır və əməliyyatları audit jurnalına yazır.
+  - Yazma sorğularını yalnız eyni saytdan və JSON formatında qəbul edir.
+  - Panel CSP, HSTS və `no-store` başlıqları ilə verilir.
+- **Admin hesabları:** heç kim öz rolunu aşağı sala və ya özünü bloklaya bilməz. Sonuncu aktiv Super Admin dəyişdirilə və silinə bilməz.
+- **Təsdiqlənmiş vakansiya:** məzmunu dəyişdirilərsə, yenidən təsdiq növbəsinə düşür.
+- **Linklər:** yalnız `http(s)://` ola bilər.
+- **Server:** MySQL və API kənara açılmır, yalnız Caddy (80/443). Backup-lar AES-256 ilə şifrələnir və serverdən kənara köçürülür.
 
-### 4.3 Admin panel
-- `.env.example` → `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL`.
-- `npm ci && npm run build && npm start` (Node 20+). Vercel-də eyni env dəyişənləri.
-- Testlər: `node --test tests/*.test.mjs` (78 test).
+## 5. Testlər (12.11.2026)
+- **Saytlar və admin panel:** 85/85 test keçir, TypeScript yoxlaması və `next build` uğurludur.
+- **MySQL API:** 89/89 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).
+- **Ehtiyat nüsxə:** lokal bazaya bərpa edildi, 92 cədvəlin sətir sayları eynidir. MySQL-ə sınaq köçürməsi uğurlu oldu: 58 cədvəl, 963 sətir, 10 istifadəçi şifrə hash-i ilə. 15 faylın hamısı yerindədir.
 
-### 4.4 Supabase Auth parametrləri (İT-nin etməli olduğu)
-- **SMTP + e-poçt təsdiqi (təcili, audit H-01):** Hazırda `mailer_autoconfirm = true`-dur, yəni istənilən şəxs başqasının @asoiu.edu.az ünvanı ilə qeydiyyat edə bilər. Düzəliş ardıcıllığı:
-  1. Authentication → **SMTP Settings**: universitet poçt serveri (və ya SendGrid/SES), göndərən `career@asoiu.edu.az`.
-  2. Authentication → **Email Templates** → "Confirm signup": şablona `{{ .Token }}` əlavə edin (sayt 6 rəqəmli kodu qəbul edir).
-  3. Authentication → **Sign In / Providers → Email** → **"Confirm email"**-i aktiv edin.
-  4. Yoxlama: yeni test ünvanı ilə qeydiyyat → kod e-poçtla gəlir, kodsuz giriş olmur.
-
-  Bu addım SMTP olmadan edilməməlidir: təsdiq aktiv olub e-poçt getməsə, heç kim qeydiyyatı bitirə bilməz. Bazada artıq qorunma var: qeydiyyat zamanı `alumni_verified` həmişə `false` yazılır, məzun statusunu yalnız admin təsdiqləyir.
-- **Microsoft (Outlook) ilə giriş:** Kod hazırdır; provayder aktiv deyil. Entra ID-də tətbiq qeydiyyatı (single-tenant, ADNSU tenant `44774b4d-c635-4fa6-8746-23738dd53e9c`), redirect `https://ttfsbgbhyomfheglefkn.supabase.co/auth/v1/callback`, optional claims `xms_edov` + `email`; Supabase → Auth → Providers → Azure: Client ID, Secret, Tenant URL `https://login.microsoftonline.com/44774b4d-c635-4fa6-8746-23738dd53e9c`. Aktiv edildikdən sonra giriş səhifəsində düymə avtomatik görünür.
-- Site URL: `https://asoiu-career.vercel.app`, Redirect URLs-də eyni ünvan.
-
-## 5. Təhlükəsizlik xülasəsi
-- Bütün cədvəllərdə RLS; tələbə yalnız öz məlumatını, şirkət yalnız öz elanlarına müraciət edənləri (Pro funksiyası ilə Talent Pool), admin hamısını görür.
-- Profil şəkilləri şəxsi bucket-də, AI yoxlamasından sonra imzalı link ilə.
-- Şəbəkə paylaşımları və şərhlər: söz siyahısı + AI moderasiya (fail-closed).
-- Şirkət müraciətdə yalnız mərhələni, öz qeydini və etiketləri dəyişə bilər (trigger ilə qorunur).
-- AI çağırışları gündəlik limitlidir (`ai_usage`); AIDA qonaqlar üçün IP-nin gündəlik duzlu hash-i ilə məhdudlaşır, IP saxlanmır.
-- Admin API-ləri hər sorğuda rolu yoxlayır, əməliyyatlar audit jurnalına yazılır. Yazma sorğuları yalnız eyni saytdan və JSON formatında qəbul olunur (CSRF qorunması); panel CSP, HSTS və `no-store` başlıqları ilə verilir.
-- Admin hesabları: heç kim öz rolunu aşağı sala və ya özünü bloklaya bilməz; sonuncu aktiv Super Admin dəyişdirilə/silinə bilməz; şirkət hesabları "Adminlər" bölməsindən idarə olunmur.
-- Təsdiqlənmiş vakansiyanın məzmunu dəyişdirilərsə, vakansiya yenidən təsdiq növbəsinə düşür.
-- Namizəd sıralaması (Career AI) xarici AI-yə göndərilməzdən əvvəl ad, e-poçt, telefon və profil linkləri gizlədilir.
-- Linklər (vakansiya, post, şirkət saytı, şəkillər) yalnız `http(s)://` ola bilər; bazada CHECK qaydası ilə qorunur.
-- Məlum məhdudiyyət: Pro paketli şirkət API vasitəsilə Talent Pool-dakı tələbələrin e-poçt/telefonunu oxuya bilər (ekranda gizlədilir). Tam həll üçün sütun səviyyəli RPC tövsiyə olunur.
-
-## 6. Test nəticələri (28.10.2026)
-- Avtomatlaşdırılmış: `node --test tests/` → 19/19 keçdi; admin `tsc` və `next build` uğurlu.
-- Brauzer testi (demo rejimi, nümunə məlumatla): tələbə 12, şirkət 13, admin 11 görünüş — JS xətası yoxdur; Mentor dəstəyi səhifəsi, AI mentor, profil şəkli kartı, admin "Mentor müraciətləri" bölməsi, status/mentor/qeyd forması.
-- Canlı yoxlama: hər iki saytda HSTS, nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy; `.env`, `.vercel`, `package.json` 404; admin API-ləri sessiyasız 401; Edge Functions icazəsiz zəngləri rədd edir; AIDA canlı cavab verir.
-- Real hesabla (tələbə/şirkət/admin) giriş edərək son yoxlama İT tərəfindən aparılmalıdır — test hesabları canlı bazada yaradılmayıb.
-
-## 7. Əlaqə və məsul şəxslər
-- Platforma sahibi: ADNSU Karyera Mərkəzi (career@asoiu.edu.az)
-- Hosting/backend hesabları: Vercel `inspire5`, Supabase layihəsi `ttfsbgbhyomfheglefkn`, GitHub `Abdulkhaligj/aziukaryera` — girişləri sahibi ayrıca təhvil verir.
+## 6. Əlaqə və məsul şəxslər
+- **Platforma sahibi:** ADNSU Karyera Mərkəzi (career@asoiu.edu.az).
+- **Hesablar:** Vercel `inspire5` və GitHub `Abdulkhaligj/aziukaryera`. Girişləri sahibi ayrıca təhvil verir.
+- **Ehtiyat nüsxə** (`supabase-final-backup-20261112`): layihə rəhbərindədir. Serverə köçürmə üçün ondan alınır.

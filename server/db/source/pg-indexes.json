@@ -1,0 +1,950 @@
+[
+ {
+  "def": "CREATE INDEX ai_reservations_budget_created ON private.ai_reservations USING btree (budget, created_at)",
+  "name": "ai_reservations_budget_created",
+  "s": "private",
+  "t": "ai_reservations"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX ai_reservations_pkey ON private.ai_reservations USING btree (id)",
+  "name": "ai_reservations_pkey",
+  "s": "private",
+  "t": "ai_reservations"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX avatar_generations_pkey ON private.avatar_generations USING btree (path)",
+  "name": "avatar_generations_pkey",
+  "s": "private",
+  "t": "avatar_generations"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_quota_counters_pkey ON private.company_quota_counters USING btree (subject_id, feature_key, period_start)",
+  "name": "company_quota_counters_pkey",
+  "s": "private",
+  "t": "company_quota_counters"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX moderation_claims_claim_id_key ON private.moderation_claims USING btree (claim_id)",
+  "name": "moderation_claims_claim_id_key",
+  "s": "private",
+  "t": "moderation_claims"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX moderation_claims_pkey ON private.moderation_claims USING btree (target_table, target_id)",
+  "name": "moderation_claims_pkey",
+  "s": "private",
+  "t": "moderation_claims"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX moderation_webhook_config_pkey ON private.moderation_webhook_config USING btree (singleton)",
+  "name": "moderation_webhook_config_pkey",
+  "s": "private",
+  "t": "moderation_webhook_config"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX payment_entitlements_pkey ON private.payment_entitlements USING btree (payment_id)",
+  "name": "payment_entitlements_pkey",
+  "s": "private",
+  "t": "payment_entitlements"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX admin_audit_logs_pkey ON public.admin_audit_logs USING btree (id)",
+  "name": "admin_audit_logs_pkey",
+  "s": "public",
+  "t": "admin_audit_logs"
+ },
+ {
+  "def": "CREATE INDEX audit_actor_idx ON public.admin_audit_logs USING btree (actor_id)",
+  "name": "audit_actor_idx",
+  "s": "public",
+  "t": "admin_audit_logs"
+ },
+ {
+  "def": "CREATE INDEX ads_live_idx ON public.ads USING btree (placement, priority DESC) WHERE (status = 'active'::text)",
+  "name": "ads_live_idx",
+  "s": "public",
+  "t": "ads"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX ads_pkey ON public.ads USING btree (id)",
+  "name": "ads_pkey",
+  "s": "public",
+  "t": "ads"
+ },
+ {
+  "def": "CREATE INDEX ai_usage_company_created_idx ON public.ai_usage USING btree (company_id, created_at DESC) WHERE (company_id IS NOT NULL)",
+  "name": "ai_usage_company_created_idx",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE INDEX ai_usage_created_idx ON public.ai_usage USING btree (created_at DESC)",
+  "name": "ai_usage_created_idx",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX ai_usage_pkey ON public.ai_usage USING btree (id)",
+  "name": "ai_usage_pkey",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE INDEX ai_usage_profile_created_idx ON public.ai_usage USING btree (profile_id, created_at DESC)",
+  "name": "ai_usage_profile_created_idx",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE INDEX ai_usage_profile_idx ON public.ai_usage USING btree (profile_id)",
+  "name": "ai_usage_profile_idx",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE INDEX ai_usage_task_client_created ON public.ai_usage USING btree (task, client_hash, created_at) WHERE (client_hash IS NOT NULL)",
+  "name": "ai_usage_task_client_created",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE INDEX ai_usage_task_created ON public.ai_usage USING btree (task, created_at)",
+  "name": "ai_usage_task_created",
+  "s": "public",
+  "t": "ai_usage"
+ },
+ {
+  "def": "CREATE INDEX application_history_actor_idx ON public.application_status_history USING btree (changed_by)",
+  "name": "application_history_actor_idx",
+  "s": "public",
+  "t": "application_status_history"
+ },
+ {
+  "def": "CREATE INDEX application_history_application_idx ON public.application_status_history USING btree (application_id, created_at DESC)",
+  "name": "application_history_application_idx",
+  "s": "public",
+  "t": "application_status_history"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX application_status_history_pkey ON public.application_status_history USING btree (id)",
+  "name": "application_status_history_pkey",
+  "s": "public",
+  "t": "application_status_history"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX applications_job_id_student_id_key ON public.applications USING btree (job_id, student_id)",
+  "name": "applications_job_id_student_id_key",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "def": "CREATE INDEX applications_job_idx ON public.applications USING btree (job_id)",
+  "name": "applications_job_idx",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX applications_pkey ON public.applications USING btree (id)",
+  "name": "applications_pkey",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "def": "CREATE INDEX applications_student_idx ON public.applications USING btree (student_id)",
+  "name": "applications_student_idx",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "def": "CREATE INDEX applications_student_updated_idx ON public.applications USING btree (student_id, updated_at DESC)",
+  "name": "applications_student_updated_idx",
+  "s": "public",
+  "t": "applications"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX audit_logs_pkey ON public.audit_logs USING btree (id)",
+  "name": "audit_logs_pkey",
+  "s": "public",
+  "t": "audit_logs"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX benefit_claims_code_key ON public.benefit_claims USING btree (code)",
+  "name": "benefit_claims_code_key",
+  "s": "public",
+  "t": "benefit_claims"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX benefit_claims_pkey ON public.benefit_claims USING btree (id)",
+  "name": "benefit_claims_pkey",
+  "s": "public",
+  "t": "benefit_claims"
+ },
+ {
+  "def": "CREATE INDEX claims_code_idx ON public.benefit_claims USING btree (code)",
+  "name": "claims_code_idx",
+  "s": "public",
+  "t": "benefit_claims"
+ },
+ {
+  "def": "CREATE INDEX claims_profile_idx ON public.benefit_claims USING btree (profile_id, claimed_at DESC)",
+  "name": "claims_profile_idx",
+  "s": "public",
+  "t": "benefit_claims"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX benefit_partners_pkey ON public.benefit_partners USING btree (id)",
+  "name": "benefit_partners_pkey",
+  "s": "public",
+  "t": "benefit_partners"
+ },
+ {
+  "def": "CREATE INDEX benefits_active_idx ON public.benefits USING btree (active, valid_to)",
+  "name": "benefits_active_idx",
+  "s": "public",
+  "t": "benefits"
+ },
+ {
+  "def": "CREATE INDEX benefits_partner_idx ON public.benefits USING btree (partner_id)",
+  "name": "benefits_partner_idx",
+  "s": "public",
+  "t": "benefits"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX benefits_pkey ON public.benefits USING btree (id)",
+  "name": "benefits_pkey",
+  "s": "public",
+  "t": "benefits"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX broadcast_notification_reads_pkey ON public.broadcast_notification_reads USING btree (broadcast_id, profile_id)",
+  "name": "broadcast_notification_reads_pkey",
+  "s": "public",
+  "t": "broadcast_notification_reads"
+ },
+ {
+  "def": "CREATE INDEX broadcast_notification_reads_profile_idx ON public.broadcast_notification_reads USING btree (profile_id, read_at DESC)",
+  "name": "broadcast_notification_reads_profile_idx",
+  "s": "public",
+  "t": "broadcast_notification_reads"
+ },
+ {
+  "def": "CREATE INDEX broadcast_notifications_created_idx ON public.broadcast_notifications USING btree (created_at DESC)",
+  "name": "broadcast_notifications_created_idx",
+  "s": "public",
+  "t": "broadcast_notifications"
+ },
+ {
+  "def": "CREATE INDEX broadcast_notifications_creator_idx ON public.broadcast_notifications USING btree (created_by) WHERE (created_by IS NOT NULL)",
+  "name": "broadcast_notifications_creator_idx",
+  "s": "public",
+  "t": "broadcast_notifications"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX broadcast_notifications_pkey ON public.broadcast_notifications USING btree (id)",
+  "name": "broadcast_notifications_pkey",
+  "s": "public",
+  "t": "broadcast_notifications"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX broadcast_notifications_source_type_source_id_key ON public.broadcast_notifications USING btree (source_type, source_id)",
+  "name": "broadcast_notifications_source_type_source_id_key",
+  "s": "public",
+  "t": "broadcast_notifications"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX companies_name_ci_idx ON public.companies USING btree (lower(name))",
+  "name": "companies_name_ci_idx",
+  "s": "public",
+  "t": "companies"
+ },
+ {
+  "def": "CREATE INDEX companies_owner_idx ON public.companies USING btree (owner_id)",
+  "name": "companies_owner_idx",
+  "s": "public",
+  "t": "companies"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX companies_pkey ON public.companies USING btree (id)",
+  "name": "companies_pkey",
+  "s": "public",
+  "t": "companies"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_awards_pkey ON public.company_awards USING btree (id)",
+  "name": "company_awards_pkey",
+  "s": "public",
+  "t": "company_awards"
+ },
+ {
+  "def": "CREATE INDEX company_awards_public_idx ON public.company_awards USING btree (year DESC) WHERE published",
+  "name": "company_awards_public_idx",
+  "s": "public",
+  "t": "company_awards"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_awards_year_nomination_company_name_key ON public.company_awards USING btree (year, nomination, company_name)",
+  "name": "company_awards_year_nomination_company_name_key",
+  "s": "public",
+  "t": "company_awards"
+ },
+ {
+  "def": "CREATE INDEX company_interview_slots_application_idx ON public.company_interview_slots USING btree (application_id)",
+  "name": "company_interview_slots_application_idx",
+  "s": "public",
+  "t": "company_interview_slots"
+ },
+ {
+  "def": "CREATE INDEX company_interview_slots_no_overlap ON public.company_interview_slots USING gist (application_id, tstzrange(starts_at, private.interview_end(starts_at, duration_minutes), '[)'::text)) WHERE (status = 'scheduled'::text)",
+  "name": "company_interview_slots_no_overlap",
+  "s": "public",
+  "t": "company_interview_slots"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_interview_slots_pkey ON public.company_interview_slots USING btree (id)",
+  "name": "company_interview_slots_pkey",
+  "s": "public",
+  "t": "company_interview_slots"
+ },
+ {
+  "def": "CREATE INDEX company_interview_slots_start_idx ON public.company_interview_slots USING btree (starts_at)",
+  "name": "company_interview_slots_start_idx",
+  "s": "public",
+  "t": "company_interview_slots"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_members_company_id_profile_id_key ON public.company_members USING btree (company_id, profile_id)",
+  "name": "company_members_company_id_profile_id_key",
+  "s": "public",
+  "t": "company_members"
+ },
+ {
+  "def": "CREATE INDEX company_members_company_idx ON public.company_members USING btree (company_id, status)",
+  "name": "company_members_company_idx",
+  "s": "public",
+  "t": "company_members"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_members_pkey ON public.company_members USING btree (id)",
+  "name": "company_members_pkey",
+  "s": "public",
+  "t": "company_members"
+ },
+ {
+  "def": "CREATE INDEX company_members_profile_idx ON public.company_members USING btree (profile_id)",
+  "name": "company_members_profile_idx",
+  "s": "public",
+  "t": "company_members"
+ },
+ {
+  "def": "CREATE INDEX company_partnership_requests_company_idx ON public.company_partnership_requests USING btree (company_id, created_at DESC)",
+  "name": "company_partnership_requests_company_idx",
+  "s": "public",
+  "t": "company_partnership_requests"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX company_partnership_requests_pkey ON public.company_partnership_requests USING btree (id)",
+  "name": "company_partnership_requests_pkey",
+  "s": "public",
+  "t": "company_partnership_requests"
+ },
+ {
+  "def": "CREATE INDEX company_partnership_requests_status_idx ON public.company_partnership_requests USING btree (status, created_at DESC)",
+  "name": "company_partnership_requests_status_idx",
+  "s": "public",
+  "t": "company_partnership_requests"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX connections_pair_idx ON public.connections USING btree (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id))",
+  "name": "connections_pair_idx",
+  "s": "public",
+  "t": "connections"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX connections_pkey ON public.connections USING btree (id)",
+  "name": "connections_pkey",
+  "s": "public",
+  "t": "connections"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX content_content_key_key ON public.content USING btree (content_key)",
+  "name": "content_content_key_key",
+  "s": "public",
+  "t": "content"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX content_pkey ON public.content USING btree (id)",
+  "name": "content_pkey",
+  "s": "public",
+  "t": "content"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX cv_documents_pkey ON public.cv_documents USING btree (id)",
+  "name": "cv_documents_pkey",
+  "s": "public",
+  "t": "cv_documents"
+ },
+ {
+  "def": "CREATE INDEX cv_documents_profile_idx ON public.cv_documents USING btree (profile_id, updated_at DESC)",
+  "name": "cv_documents_profile_idx",
+  "s": "public",
+  "t": "cv_documents"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX education_pkey ON public.education USING btree (id)",
+  "name": "education_pkey",
+  "s": "public",
+  "t": "education"
+ },
+ {
+  "def": "CREATE INDEX education_profile_idx ON public.education USING btree (profile_id)",
+  "name": "education_profile_idx",
+  "s": "public",
+  "t": "education"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX event_registrations_pkey ON public.event_registrations USING btree (event_id, profile_id)",
+  "name": "event_registrations_pkey",
+  "s": "public",
+  "t": "event_registrations"
+ },
+ {
+  "def": "CREATE INDEX event_regs_profile_idx ON public.event_registrations USING btree (profile_id)",
+  "name": "event_regs_profile_idx",
+  "s": "public",
+  "t": "event_registrations"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)",
+  "name": "events_pkey",
+  "s": "public",
+  "t": "events"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX faculties_name_key ON public.faculties USING btree (name)",
+  "name": "faculties_name_key",
+  "s": "public",
+  "t": "faculties"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX faculties_pkey ON public.faculties USING btree (id)",
+  "name": "faculties_pkey",
+  "s": "public",
+  "t": "faculties"
+ },
+ {
+  "def": "CREATE INDEX follows_company_idx ON public.follows USING btree (followed_company_id) WHERE (followed_company_id IS NOT NULL)",
+  "name": "follows_company_idx",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX follows_pkey ON public.follows USING btree (id)",
+  "name": "follows_pkey",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "def": "CREATE INDEX follows_profile_idx ON public.follows USING btree (followed_profile_id) WHERE (followed_profile_id IS NOT NULL)",
+  "name": "follows_profile_idx",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX follows_unique_company_idx ON public.follows USING btree (follower_id, followed_company_id) WHERE (followed_company_id IS NOT NULL)",
+  "name": "follows_unique_company_idx",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX follows_unique_profile_idx ON public.follows USING btree (follower_id, followed_profile_id) WHERE (followed_profile_id IS NOT NULL)",
+  "name": "follows_unique_profile_idx",
+  "s": "public",
+  "t": "follows"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX interview_requests_application_id_key ON public.interview_requests USING btree (application_id)",
+  "name": "interview_requests_application_id_key",
+  "s": "public",
+  "t": "interview_requests"
+ },
+ {
+  "def": "CREATE INDEX interview_requests_company_status_idx ON public.interview_requests USING btree (company_id, status, created_at DESC)",
+  "name": "interview_requests_company_status_idx",
+  "s": "public",
+  "t": "interview_requests"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX interview_requests_pkey ON public.interview_requests USING btree (id)",
+  "name": "interview_requests_pkey",
+  "s": "public",
+  "t": "interview_requests"
+ },
+ {
+  "def": "CREATE INDEX interview_requests_student_status_idx ON public.interview_requests USING btree (student_id, status, created_at DESC)",
+  "name": "interview_requests_student_status_idx",
+  "s": "public",
+  "t": "interview_requests"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX interview_sessions_pkey ON public.interview_sessions USING btree (id)",
+  "name": "interview_sessions_pkey",
+  "s": "public",
+  "t": "interview_sessions"
+ },
+ {
+  "def": "CREATE INDEX interview_sessions_profile_idx ON public.interview_sessions USING btree (profile_id, created_at DESC)",
+  "name": "interview_sessions_profile_idx",
+  "s": "public",
+  "t": "interview_sessions"
+ },
+ {
+  "def": "CREATE INDEX interviews_company_idx ON public.interview_sessions USING btree (company_id)",
+  "name": "interviews_company_idx",
+  "s": "public",
+  "t": "interview_sessions"
+ },
+ {
+  "def": "CREATE INDEX interviews_job_idx ON public.interview_sessions USING btree (job_id)",
+  "name": "interviews_job_idx",
+  "s": "public",
+  "t": "interview_sessions"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX invites_company_id_student_id_job_id_key ON public.invites USING btree (company_id, student_id, job_id)",
+  "name": "invites_company_id_student_id_job_id_key",
+  "s": "public",
+  "t": "invites"
+ },
+ {
+  "def": "CREATE INDEX invites_job_idx ON public.invites USING btree (job_id)",
+  "name": "invites_job_idx",
+  "s": "public",
+  "t": "invites"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX invites_pkey ON public.invites USING btree (id)",
+  "name": "invites_pkey",
+  "s": "public",
+  "t": "invites"
+ },
+ {
+  "def": "CREATE INDEX invites_student_idx ON public.invites USING btree (student_id)",
+  "name": "invites_student_idx",
+  "s": "public",
+  "t": "invites"
+ },
+ {
+  "def": "CREATE INDEX jobs_company_idx ON public.jobs USING btree (company_id)",
+  "name": "jobs_company_idx",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE INDEX jobs_company_status_idx ON public.jobs USING btree (company_id, status, created_at DESC)",
+  "name": "jobs_company_status_idx",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE INDEX jobs_deadline_idx ON public.jobs USING btree (deadline)",
+  "name": "jobs_deadline_idx",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE INDEX jobs_faculty_idx ON public.jobs USING gin (faculty_ids)",
+  "name": "jobs_faculty_idx",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX jobs_pkey ON public.jobs USING btree (id)",
+  "name": "jobs_pkey",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE INDEX jobs_skills_idx ON public.jobs USING gin (skills)",
+  "name": "jobs_skills_idx",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE INDEX jobs_status_idx ON public.jobs USING btree (status)",
+  "name": "jobs_status_idx",
+  "s": "public",
+  "t": "jobs"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX majors_faculty_id_name_key ON public.majors USING btree (faculty_id, name)",
+  "name": "majors_faculty_id_name_key",
+  "s": "public",
+  "t": "majors"
+ },
+ {
+  "def": "CREATE INDEX majors_faculty_idx ON public.majors USING btree (faculty_id)",
+  "name": "majors_faculty_idx",
+  "s": "public",
+  "t": "majors"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX majors_pkey ON public.majors USING btree (id)",
+  "name": "majors_pkey",
+  "s": "public",
+  "t": "majors"
+ },
+ {
+  "def": "CREATE INDEX mentor_requests_admin_status_idx ON public.mentor_requests USING btree (status, created_at DESC)",
+  "name": "mentor_requests_admin_status_idx",
+  "s": "public",
+  "t": "mentor_requests"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX mentor_requests_pkey ON public.mentor_requests USING btree (id)",
+  "name": "mentor_requests_pkey",
+  "s": "public",
+  "t": "mentor_requests"
+ },
+ {
+  "def": "CREATE INDEX mentor_requests_student_created_idx ON public.mentor_requests USING btree (student_id, created_at DESC)",
+  "name": "mentor_requests_student_created_idx",
+  "s": "public",
+  "t": "mentor_requests"
+ },
+ {
+  "def": "CREATE INDEX messages_inbox_idx ON public.messages USING btree (recipient_id, created_at DESC)",
+  "name": "messages_inbox_idx",
+  "s": "public",
+  "t": "messages"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX messages_pkey ON public.messages USING btree (id)",
+  "name": "messages_pkey",
+  "s": "public",
+  "t": "messages"
+ },
+ {
+  "def": "CREATE INDEX messages_thread_idx ON public.messages USING btree (sender_id, recipient_id, created_at DESC)",
+  "name": "messages_thread_idx",
+  "s": "public",
+  "t": "messages"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX moderation_allow_pkey ON public.moderation_allow USING btree (word)",
+  "name": "moderation_allow_pkey",
+  "s": "public",
+  "t": "moderation_allow"
+ },
+ {
+  "def": "CREATE INDEX moderation_logs_actor_idx ON public.moderation_logs USING btree (actor_id)",
+  "name": "moderation_logs_actor_idx",
+  "s": "public",
+  "t": "moderation_logs"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX moderation_logs_pkey ON public.moderation_logs USING btree (id)",
+  "name": "moderation_logs_pkey",
+  "s": "public",
+  "t": "moderation_logs"
+ },
+ {
+  "def": "CREATE INDEX moderation_logs_report_idx ON public.moderation_logs USING btree (report_id)",
+  "name": "moderation_logs_report_idx",
+  "s": "public",
+  "t": "moderation_logs"
+ },
+ {
+  "def": "CREATE INDEX moderation_logs_target_idx ON public.moderation_logs USING btree (target_type, target_id, created_at DESC)",
+  "name": "moderation_logs_target_idx",
+  "s": "public",
+  "t": "moderation_logs"
+ },
+ {
+  "def": "CREATE INDEX moderation_terms_infix_idx ON public.moderation_terms USING btree (script) WHERE (match = 'infix'::text)",
+  "name": "moderation_terms_infix_idx",
+  "s": "public",
+  "t": "moderation_terms"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX moderation_terms_pkey ON public.moderation_terms USING btree (term)",
+  "name": "moderation_terms_pkey",
+  "s": "public",
+  "t": "moderation_terms"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)",
+  "name": "notifications_pkey",
+  "s": "public",
+  "t": "notifications"
+ },
+ {
+  "def": "CREATE INDEX notifications_profile_idx ON public.notifications USING btree (profile_id, read_at, created_at DESC)",
+  "name": "notifications_profile_idx",
+  "s": "public",
+  "t": "notifications"
+ },
+ {
+  "def": "CREATE INDEX payments_company_idx ON public.payments USING btree (company_id, created_at DESC)",
+  "name": "payments_company_idx",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "def": "CREATE INDEX payments_company_status_idx ON public.payments USING btree (company_id, status)",
+  "name": "payments_company_status_idx",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX payments_invoice_number_key ON public.payments USING btree (invoice_number) WHERE (invoice_number IS NOT NULL)",
+  "name": "payments_invoice_number_key",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX payments_pkey ON public.payments USING btree (id)",
+  "name": "payments_pkey",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "def": "CREATE INDEX payments_subscription_idx ON public.payments USING btree (subscription_id)",
+  "name": "payments_subscription_idx",
+  "s": "public",
+  "t": "payments"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX plan_features_pkey ON public.plan_features USING btree (plan_id, feature_key)",
+  "name": "plan_features_pkey",
+  "s": "public",
+  "t": "plan_features"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX plans_pkey ON public.plans USING btree (id)",
+  "name": "plans_pkey",
+  "s": "public",
+  "t": "plans"
+ },
+ {
+  "def": "CREATE INDEX post_comments_author_idx ON public.post_comments USING btree (author_id)",
+  "name": "post_comments_author_idx",
+  "s": "public",
+  "t": "post_comments"
+ },
+ {
+  "def": "CREATE INDEX post_comments_moderation_pending_idx ON public.post_comments USING btree (moderation_requested_at) WHERE (moderation_status = 'pending'::text)",
+  "name": "post_comments_moderation_pending_idx",
+  "s": "public",
+  "t": "post_comments"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX post_comments_pkey ON public.post_comments USING btree (id)",
+  "name": "post_comments_pkey",
+  "s": "public",
+  "t": "post_comments"
+ },
+ {
+  "def": "CREATE INDEX post_comments_post_idx ON public.post_comments USING btree (post_id, created_at)",
+  "name": "post_comments_post_idx",
+  "s": "public",
+  "t": "post_comments"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX post_likes_pkey ON public.post_likes USING btree (post_id, profile_id)",
+  "name": "post_likes_pkey",
+  "s": "public",
+  "t": "post_likes"
+ },
+ {
+  "def": "CREATE INDEX post_likes_profile_idx ON public.post_likes USING btree (profile_id)",
+  "name": "post_likes_profile_idx",
+  "s": "public",
+  "t": "post_likes"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX post_media_pkey ON public.post_media USING btree (id)",
+  "name": "post_media_pkey",
+  "s": "public",
+  "t": "post_media"
+ },
+ {
+  "def": "CREATE INDEX post_media_post_idx ON public.post_media USING btree (post_id, sort_order)",
+  "name": "post_media_post_idx",
+  "s": "public",
+  "t": "post_media"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX post_saves_pkey ON public.post_saves USING btree (post_id, profile_id)",
+  "name": "post_saves_pkey",
+  "s": "public",
+  "t": "post_saves"
+ },
+ {
+  "def": "CREATE INDEX post_saves_profile_idx ON public.post_saves USING btree (profile_id)",
+  "name": "post_saves_profile_idx",
+  "s": "public",
+  "t": "post_saves"
+ },
+ {
+  "def": "CREATE INDEX posts_author_idx ON public.posts USING btree (author_id)",
+  "name": "posts_author_idx",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "def": "CREATE INDEX posts_created_idx ON public.posts USING btree (created_at DESC)",
+  "name": "posts_created_idx",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "def": "CREATE INDEX posts_feed_idx ON public.posts USING btree (moderation_status, created_at DESC)",
+  "name": "posts_feed_idx",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "def": "CREATE INDEX posts_kind_idx ON public.posts USING btree (kind, created_at DESC)",
+  "name": "posts_kind_idx",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "def": "CREATE INDEX posts_moderation_pending_idx ON public.posts USING btree (moderation_requested_at) WHERE (moderation_status = 'pending'::text)",
+  "name": "posts_moderation_pending_idx",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)",
+  "name": "posts_pkey",
+  "s": "public",
+  "t": "posts"
+ },
+ {
+  "def": "CREATE INDEX profiles_avatar_path_idx ON public.profiles USING btree (avatar_path) WHERE (avatar_path IS NOT NULL)",
+  "name": "profiles_avatar_path_idx",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE INDEX profiles_avatar_pending_idx ON public.profiles USING btree (avatar_requested_at) WHERE (avatar_pending_path IS NOT NULL)",
+  "name": "profiles_avatar_pending_idx",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE INDEX profiles_faculty_idx ON public.profiles USING btree (faculty_id)",
+  "name": "profiles_faculty_idx",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE INDEX profiles_major_idx ON public.profiles USING btree (major_id)",
+  "name": "profiles_major_idx",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)",
+  "name": "profiles_pkey",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE INDEX profiles_role_idx ON public.profiles USING btree (role)",
+  "name": "profiles_role_idx",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE INDEX profiles_skills_idx ON public.profiles USING gin (skills)",
+  "name": "profiles_skills_idx",
+  "s": "public",
+  "t": "profiles"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX reports_pkey ON public.reports USING btree (id)",
+  "name": "reports_pkey",
+  "s": "public",
+  "t": "reports"
+ },
+ {
+  "def": "CREATE INDEX reports_reporter_idx ON public.reports USING btree (reporter_id)",
+  "name": "reports_reporter_idx",
+  "s": "public",
+  "t": "reports"
+ },
+ {
+  "def": "CREATE INDEX reports_reviewer_idx ON public.reports USING btree (reviewed_by)",
+  "name": "reports_reviewer_idx",
+  "s": "public",
+  "t": "reports"
+ },
+ {
+  "def": "CREATE INDEX reports_status_idx ON public.reports USING btree (status, created_at DESC)",
+  "name": "reports_status_idx",
+  "s": "public",
+  "t": "reports"
+ },
+ {
+  "def": "CREATE INDEX saved_jobs_job_idx ON public.saved_jobs USING btree (job_id)",
+  "name": "saved_jobs_job_idx",
+  "s": "public",
+  "t": "saved_jobs"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX saved_jobs_pkey ON public.saved_jobs USING btree (student_id, job_id)",
+  "name": "saved_jobs_pkey",
+  "s": "public",
+  "t": "saved_jobs"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX site_content_content_key_key ON public.site_content USING btree (content_key)",
+  "name": "site_content_content_key_key",
+  "s": "public",
+  "t": "site_content"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX site_content_pkey ON public.site_content USING btree (id)",
+  "name": "site_content_pkey",
+  "s": "public",
+  "t": "site_content"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX subscription_usage_pkey ON public.subscription_usage USING btree (subscription_id, feature_key, period_start)",
+  "name": "subscription_usage_pkey",
+  "s": "public",
+  "t": "subscription_usage"
+ },
+ {
+  "def": "CREATE INDEX subscriptions_approver_idx ON public.subscriptions USING btree (approved_by)",
+  "name": "subscriptions_approver_idx",
+  "s": "public",
+  "t": "subscriptions"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX subscriptions_company_id_key ON public.subscriptions USING btree (company_id)",
+  "name": "subscriptions_company_id_key",
+  "s": "public",
+  "t": "subscriptions"
+ },
+ {
+  "def": "CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (id)",
+  "name": "subscriptions_pkey",
+  "s": "public",
+  "t": "subscriptions"
+ },
+ {
+  "def": "CREATE INDEX subscriptions_plan_idx ON public.subscriptions USING btree (plan_id)",
+  "name": "subscriptions_plan_idx",
+  "s": "public",
+  "t": "subscriptions"
+ },
+ {
+  "def": "CREATE INDEX subscriptions_status_idx ON public.subscriptions USING btree (status, plan_id)",
+  "name": "subscriptions_status_idx",
+  "s": "public",
+  "t": "subscriptions"
+ }
+]
