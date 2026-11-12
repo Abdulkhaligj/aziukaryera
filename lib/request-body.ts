@@ -1,5 +1,6 @@
 // Bound streamed JSON before parsing, including chunked requests without a
 // Content-Length header. Never partially accept an oversized document.
+import 'server-only';
 import { crossSite } from '@/lib/admin-input';
 
 export async function readAdminJson(request: Request, maxBytes = 262144): Promise<
