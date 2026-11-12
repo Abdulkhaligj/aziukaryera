@@ -92,7 +92,7 @@ create trigger profiles_guard_privileges before update on public.profiles
 
 -- H-01: a new account never starts as a verified alumnus; staff verify it.
 -- (The other half of H-01, email confirmation, is an Auth setting: see
--- supabase/config.toml and docs/IT-HANDOVER.md.)
+-- docs/IT-HANDOVER.md §4.4.)
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -223,7 +223,8 @@ alter table private.moderation_webhook_config add constraint moderation_webhook_
 
 -- ---------------------------------------------------------------------------
 -- Low finding: links people click and images the pages load must be web URLs
--- (no javascript:, data: or other schemes).
+-- (no javascript:, data: or other schemes). Event images already have
+-- events_image_url_https; ads, award and partner logos have their own checks.
 -- ---------------------------------------------------------------------------
 alter table public.jobs drop constraint if exists jobs_application_url_web;
 alter table public.jobs add constraint jobs_application_url_web
@@ -243,9 +244,6 @@ alter table public.companies add constraint companies_cover_url_web
 alter table public.benefit_partners drop constraint if exists benefit_partners_website_web;
 alter table public.benefit_partners add constraint benefit_partners_website_web
   check (website is null or website = '' or website ~* '^https?://[^[:space:]]+$') not valid;
-alter table public.events drop constraint if exists events_image_url_web;
-alter table public.events add constraint events_image_url_web
-  check (image_url is null or image_url = '' or image_url ~* '^https://[^[:space:]]+$') not valid;
 
 -- Existing rows: validate where they already comply; otherwise the constraint
 -- still protects every new or edited row and a notice lists it for cleanup.
@@ -254,7 +252,7 @@ declare c record;
 begin
   for c in select conrelid::regclass as tbl, conname from pg_constraint
     where conname in ('jobs_application_url_web','posts_link_url_web','companies_website_web','companies_logo_url_web',
-                      'companies_cover_url_web','benefit_partners_website_web','events_image_url_web') and not convalidated
+                      'companies_cover_url_web','benefit_partners_website_web') and not convalidated
   loop
     begin
       execute format('alter table %s validate constraint %I', c.tbl, c.conname);
