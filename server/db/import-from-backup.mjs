@@ -1,18 +1,11 @@
-// Copies every row from the Supabase Postgres database into the MySQL schema
-// created by db/setup.mjs, then checks row counts and foreign keys.
+// Copies every row of the final backup of the old (Supabase, deleted on
+// 2026-11-12) Postgres database into the MySQL schema created by db/setup.mjs,
+// then checks row counts and foreign keys. The backup (supabase-full.dump) is
+// first restored into a throwaway Postgres; scripts/02-import.sh does that.
 //
-// Production (cutover):
-//   SOURCE_DB_URL=postgresql://… MYSQL_URL=mysql://… node db/import-from-supabase.mjs
-// Local test through a logged-in Supabase CLI (password hashes are blanked
-// unless --keep-password-hashes is given):
-//   SUPABASE_PROJECT_REF=… MYSQL_URL=mysql://… node db/import-from-supabase.mjs --source supabase-cli
+//   SOURCE_DB_URL=postgresql://…restored-backup… MYSQL_URL=mysql://… node db/import-from-backup.mjs
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import mysql from 'mysql2/promise';
-
-const args = process.argv.slice(2);
-const source = args.includes('--source') ? args[args.indexOf('--source') + 1] : 'pg';
-const keepHashes = source === 'pg' || args.includes('--keep-password-hashes');
 
 const pgColumns = JSON.parse(readFileSync(new URL('source/pg-columns.json', import.meta.url), 'utf8'));
 const pgTables = [...new Map(pgColumns.map(c => [`${c.s}.${c.t}`, { schema: c.s, table: c.t }])).values()];
@@ -20,7 +13,7 @@ const target = ({ schema, table }) => schema === 'public' ? table : `${schema}_$
 
 // Source tables that are not part of the public/private schema dump.
 const extra = [
-  { from: 'auth.users', to: 'auth_users', select: `select id, email, ${keepHashes ? 'encrypted_password' : 'null::text as encrypted_password'},
+  { from: 'auth.users', to: 'auth_users', select: `select id, email, encrypted_password,
       coalesce(email_confirmed_at, confirmed_at) as email_confirmed_at, last_sign_in_at,
       coalesce(raw_app_meta_data, '{}'::jsonb) as raw_app_meta_data, coalesce(raw_user_meta_data, '{}'::jsonb) as raw_user_meta_data,
       banned_until, created_at, updated_at, deleted_at from auth.users` },
@@ -35,7 +28,7 @@ const jobs = [
   ...extra
 ];
 
-// ---- source adapters: both return plain JSON rows (to_jsonb semantics) ----
+// ---- source: plain JSON rows (to_jsonb semantics) ----
 async function pgSource() {
   const { default: pg } = await import('pg');
   const client = new pg.Client({ connectionString: process.env.SOURCE_DB_URL });
@@ -49,22 +42,6 @@ async function pgSource() {
     end: () => client.end()
   };
 }
-function cliSource() {
-  const ref = process.env.SUPABASE_PROJECT_REF;
-  if (!ref) throw new Error('SUPABASE_PROJECT_REF is required for --source supabase-cli.');
-  const bin = process.env.SUPABASE_BIN || 'supabase';
-  return {
-    async rows(sql) {
-      const out = execFileSync(bin, ['db', 'query', '--linked', '--project-ref', ref, '--workdir', process.env.SUPABASE_WORKDIR || '.',
-        `select coalesce(json_agg(to_jsonb(x)), '[]'::json) as j from (${sql}) x`], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
-      const parsed = JSON.parse(out.slice(out.indexOf('{')));
-      const value = parsed.rows[0].j;
-      return typeof value === 'string' ? JSON.parse(value) : value;
-    },
-    end: async () => {}
-  };
-}
-
 // ---- value conversion by MySQL column type ----
 function toDatetime(value) {
   const m = String(value).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}(?::?\d{2})?)?$/);
@@ -97,7 +74,7 @@ for (const job of jobs) {
   if (n) throw new Error(`target table ${job.to} already has ${n} rows; import into an empty database.`);
 }
 
-const src = source === 'supabase-cli' ? cliSource() : await pgSource();
+const src = await pgSource();
 const report = [];
 try {
   await db.query('SET FOREIGN_KEY_CHECKS = 0');
@@ -152,5 +129,4 @@ for (const fk of fks) {
 }
 await db.end();
 console.log(problems ? `XƏTA: ${problems} problem tapıldı.` : `Hazırdır: ${report.length} cədvəl, ${report.reduce((s, r) => s + r.source, 0)} sətir; saylar və xarici açarlar düzgündür.`);
-if (!keepHashes) console.log('Qeyd: şifrə hash-ları bu sınaqda köçürülmədi (--keep-password-hashes).');
 process.exitCode = problems ? 1 : 0;

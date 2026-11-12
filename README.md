@@ -37,10 +37,10 @@ Yoxlama: `npm ci --ignore-scripts`, `npm test`, `npm audit --audit-level=moderat
 ```text
 student-web/                 əsas tələbə və şirkət portalı
 app/, components/, lib/     Next.js admin paneli
-supabase/migrations/         verilənlər bazası sxemi və təhlükəsizlik qaydaları
-supabase/functions/          admin istifadəçiləri və AI funksiyaları
+server/                      backend: MySQL sxemi və Node.js API (giriş, data, icazələr, fayllar)
+supabase/functions/          AI və admin funksiyaları (API-nin içində işləyir; qovluq adı tarixidir)
+deploy/universitet-mysql/    universitet serveri üçün quraşdırma dəsti (Docker)
 docs/                        texniki və istifadəçi təlimatları
-output/pdf/                  yekun layihə sənədi
 ```
 
 ## Lokal işə salma

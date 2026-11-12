@@ -14,7 +14,7 @@
     "keys": "node tools/generate-keys.mjs",
     "db:schema": "node tools/pg-to-mysql.mjs",
     "db:setup": "node db/setup.mjs",
-    "db:import": "node db/import-from-supabase.mjs",
+    "db:import": "node db/import-from-backup.mjs",
     "storage:import": "node db/import-storage-files.mjs"
   },
   "dependencies": {

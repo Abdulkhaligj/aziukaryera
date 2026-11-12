@@ -90,7 +90,7 @@ Supabase Storage-in supabase-js-in istifadə etdiyi hissəsi: yükləmə (`uploa
 - 3 bucket, Postgres-dəki kimi: `avatars` (gizli, 1 MB, webp/jpeg), `public-media` (açıq, 5 MB, şəkil), `assistant-audio` (gizli, 10 MB, wav).
 - `storage.objects`-in 13 icazə qaydası `src/storage/policy.ts`-dədir. Məsələn, tələbə yalnız öz qovluğuna yazır, profilin göstərdiyi şəkli silmək olmur, admin şəkillərini yalnız staff yükləyir. İki avatar trigger-i də köçürülüb: eyni yol təkrar istifadə olunmur.
 - İmzalı linklər eyni JWT secret ilə imzalanır, müddəti bitəndə işləmir.
-- Keçid günü faylların özü `db/import-storage-files.mjs` ilə Supabase-dən diskə köçürülür. `import-from-supabase.mjs` yalnız sətirləri köçürür. Skript təkrar işə salına bilər: artıq olan fayllar atlanır.
+- Keçid günü faylların özü `db/import-storage-files.mjs` ilə ehtiyat nüsxənin `storage/` qovluğundan diskə köçürülür (`import-from-backup.mjs` yalnız sətirləri köçürür). Skript təkrar işə salına bilər: artıq olan fayllar atlanır.
 
 ## Edge Functions (`/functions/v1/:name`)
 
@@ -141,8 +141,8 @@ server/
     schema-followups.md     MySQL-in ifadə edə bilmədiyi, API-nin yoxlamalı olduğu qaydalar
     migrations/*.sql        əl ilə yazılmış əlavələr (auth, storage, …)
     setup.mjs               bazanı qurur: schema.sql + yeni migration-lar
-    import-from-supabase.mjs  datanı Supabase-dən köçürür, sayları və xarici açarları yoxlayır
-    import-storage-files.mjs  faylların özünü Supabase Storage-dən diskə köçürür
+    import-from-backup.mjs    datanı köhnə bazanın son ehtiyat nüsxəsindən köçürür, sayları və xarici açarları yoxlayır
+    import-storage-files.mjs  faylların özünü ehtiyat nüsxədən diskə köçürür
   tools/pg-to-mysql.mjs     Postgres → MySQL sxem çeviricisi
   tools/generate-keys.mjs   JWT secret və anon/service açarları
   src/
@@ -164,12 +164,12 @@ server/
 ```bash
 cd server && npm install
 MYSQL_URL=mysql://root@127.0.0.1:3307/asoiu_career ALLOW_RESET=1 node db/setup.mjs --reset
-# Supabase CLI ilə daxil olmuş developer kompüterində datanı sınaq üçün köçürmək (şifrə hash-ları köçmür):
-SUPABASE_PROJECT_REF=ttfsbgbhyomfheglefkn MYSQL_URL=mysql://root@127.0.0.1:3307/asoiu_career \
-  node db/import-from-supabase.mjs --source supabase-cli
+# Datanı sınaq üçün köçürmək: ehtiyat nüsxə (supabase-full.dump) əvvəl lokal Postgres-ə bərpa olunur
+SOURCE_DB_URL=postgresql://postgres@127.0.0.1:5432/restored MYSQL_URL=mysql://root@127.0.0.1:3307/asoiu_career \
+  node db/import-from-backup.mjs
 ```
 
-Keçid günü mənbə Postgres bağlantı sətri olur (`SOURCE_DB_URL`). Bu halda şifrə hash-ları da köçür və istifadəçilər eyni şifrə ilə daxil olur.
+Serverdə bunu `deploy/universitet-mysql/scripts/02-import.sh` edir. Şifrə hash-ları da köçür, istifadəçilər eyni şifrə ilə daxil olur.
 
 ## Tip uyğunluğu
 

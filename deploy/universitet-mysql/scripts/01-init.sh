@@ -35,5 +35,5 @@ dc up -d mysql
 dc run --rm -T api node server/db/setup.mjs
 
 echo
-echo "Hazırdır. Növbəti addım: scripts/02-import.sh (Supabase-dən data və fayllar)."
+echo "Hazırdır. Növbəti addım: scripts/02-import.sh (ehtiyat nüsxədən data və fayllar)."
 echo "api.env-də SMTP_* və GEMINI_API_KEY dəyərlərini doldurun."

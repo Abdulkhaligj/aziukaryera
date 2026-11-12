@@ -1,6 +1,7 @@
-// Points the student site at the new server: runtime-config.js and the CSP
-// connect-src in every place it is declared. Run from the repository root:
-//   node deploy/universitet-server/scripts/07-switch-frontend.mjs --url https://api.example.az --key <ANON_KEY>
+// Cutover: points the student site at the MySQL API (runtime-config.js and the
+// CSP connect-src in every place it is declared) and turns the maintenance page
+// off on both sites. Run from the repository root:
+//   node deploy/universitet-mysql/scripts/05-switch-frontend.mjs --url https://api.example.az --key <ANON_KEY>
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, arg, i, all) =>
@@ -40,11 +41,21 @@ for (const file of ['index.html', 'cv-builder.html']) {
   edit(`${web}/${file}`, text => text.replace(/runtime-config\.js\?v=[0-9a-z]+/, `runtime-config.js?v=${stamp}`));
 }
 
+// The maintenance page (shown while there was no backend) goes away on both sites.
+edit(`${web}/vercel.json`, text => {
+  const config = JSON.parse(text);
+  delete config.redirects;
+  return JSON.stringify(config, null, 2) + '\n';
+});
+edit('next.config.mjs', text => replaceOnce(text, 'const MAINTENANCE = true;', 'const MAINTENANCE = false;', 'next.config.mjs'));
+
 console.log(`
 Növbəti addımlar:
-  1. Testlər:  node --test tests/*.test.mjs
-  2. Commit və push: git add -A && git commit -m "chore: point the portal at ${host}" && git push origin main
-  3. Admin panel (Vercel → asoiu-career-admin → Settings → Environment Variables, Production):
+  1. Admin panel (Vercel → asoiu-career-admin → Settings → Environment Variables, Production),
+     push-dan ƏVVƏL:
        NEXT_PUBLIC_SUPABASE_URL = ${url}
        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = <ANON_KEY>
-     sonra admin layihəsini yenidən deploy edin.`);
+     (adlar köhnədir, dəyərlər yeni MySQL API-nin ünvanı və açarıdır)
+  2. Testlər:  node --test tests/*.test.mjs
+  3. Commit və push: git add -A && git commit -m "chore: switch the sites to ${host}" && git push origin main
+     Vercel hər iki saytı yenidən yığır; texniki işlər səhifəsi yox olur.`);

@@ -26,9 +26,3 @@ test('only the light theme ships', () => {
   assert.match(index, /<meta name="color-scheme" content="light">/);
 });
 
-test('avatar paths come from a definer RPC limited to visible profiles', () => {
-  const sql = read('supabase/migrations/20261104100000_profile_avatar_paths.sql');
-  assert.match(sql, /create or replace function public\.profile_avatar_paths\(p_ids uuid\[\]\)/);
-  assert.match(sql, /p\.id in \(select cp\.id from public\.candidate_profiles\(\) cp\)/);
-  assert.match(sql, /revoke all on function public\.profile_avatar_paths\(uuid\[\]\) from public, anon;/);
-});

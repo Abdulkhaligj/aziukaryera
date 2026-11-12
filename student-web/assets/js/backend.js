@@ -9,8 +9,8 @@
  * görünüşləri (`app.js`) dəyişmədən işləyir.
  *
  * Təhlükəsizlik: burada heç bir icazə yoxlanışı YOXDUR və olmamalıdır.
- * Kim nəyi görə və dəyişə bilər — bunu Postgres-dəki RLS siyasətləri həll edir
- * (bax: supabase/migrations/0001_init.sql). Bu fayl sadəcə sorğu göndərir;
+ * Kim nəyi görə və dəyişə bilər — bunu backend-in icazə qatı həll edir
+ * (bax: server/src/rest/). Bu fayl sadəcə sorğu göndərir;
  * icazəsiz sorğu bazadan boş nəticə və ya xəta ilə qayıdır.
  *
  */

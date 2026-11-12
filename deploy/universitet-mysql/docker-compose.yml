@@ -40,6 +40,16 @@ services:
       mysql:
         condition: service_healthy
 
+  # Only during scripts/02-import.sh (profile "import"): a throwaway Postgres
+  # that reads the final backup of the old database. No ports, no volume.
+  pgrestore:
+    image: postgres:17
+    profiles: ["import"]
+    environment:
+      POSTGRES_PASSWORD: ${PGRESTORE_PASSWORD:-unused}
+    volumes:
+      - ${IMPORT_BACKUP_DIR:-./import-backup}:/backup:ro
+
   caddy:
     image: caddy:2
     restart: unless-stopped
