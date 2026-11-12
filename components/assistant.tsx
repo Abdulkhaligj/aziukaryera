@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { uploadPublicImage } from '@/components/image-field';
 import { can } from '@/lib/permissions';
 import type { AdminRole, AdminRow, ResourceKey } from '@/lib/types';
+import { readJson } from '@/lib/read-json';
 
 export type AssistantAction = { type: string; summary: string; data: Record<string, unknown>; missing: string[] };
 type Message = { role: 'user' | 'assistant'; text: string; image?: string; actions?: AssistantAction[]; error?: boolean; pending?: boolean };
@@ -206,7 +207,7 @@ export default function Assistant({ open, onClose, role, userId, companies, comp
       }
       if (attached) image_url = await uploadPublicImage(attached.file, 'assistant');
       const response = await fetch('/api/admin/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: prompt, audio_path, image_url, history }) });
-      const result = await response.json();
+      const result = await readJson(response);
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'AI cavab vermədi');
       setMessages(m => m.map((msg, i) => i === userIndex ? { ...msg, text: result.transcript || msg.text.replace('…', ''), pending: false }

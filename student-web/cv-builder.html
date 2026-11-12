@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4' 'sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z' 'sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1' 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU' 'sha256-2FijLVW+Cyl3LivPVpmNzLc+9iw6Tuwkq0E6TEs7MJ0=' 'sha256-6j1I0vi2T2PHVI5z8FgczKKiIaEI07T5x1/b3qhXrQY=' 'sha256-QPIs62GP3u5zxpxAUFYRESWv5Hx+MzfIf0nlEtWYk6U=' 'sha256-qUajXYZD56UEVAJtuglhxBQnaEKAMpopJBy1R8jGvqs=' 'sha256-lqE2UXJxoqPej9siVlnHxX+vq6Jph6gEtJ2x5c+ITQ4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'self'; worker-src 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha384-WmjsOVSSw3JNqIKfmDU35+uddOzBdP9PlYIWCg7xdnVOesjWVGpRcooOVheFFwH4' 'sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z' 'sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1' 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU' 'sha256-2FijLVW+Cyl3LivPVpmNzLc+9iw6Tuwkq0E6TEs7MJ0=' 'sha256-6j1I0vi2T2PHVI5z8FgczKKiIaEI07T5x1/b3qhXrQY=' 'sha256-QPIs62GP3u5zxpxAUFYRESWv5Hx+MzfIf0nlEtWYk6U=' 'sha256-qUajXYZD56UEVAJtuglhxBQnaEKAMpopJBy1R8jGvqs=' 'sha256-DbuWZf5TCAoUamWlvELlWtPsRmgTgQXuSdtWOleruYw='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'self'; worker-src 'self'; form-action 'self'">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -942,70 +942,6 @@ const Check = makeIcon(["M20 6 9 17l-5-5"]);
    SAMPLE DATA
    ============================================================ */
 
-/* ============================================================
-   PAYWALL CONFIG — replace with your own Gumroad product URL.
-   Create a product at gumroad.com (e.g. $5), then paste its
-   permalink URL here. Format: https://YOURNAME.gumroad.com/l/PRODUCT
-   ============================================================ */
-const GUMROAD_PRODUCT_URL = "https://khalig0.gumroad.com/l/fsdzy";
-
-/* ============================================================
-   LAUNCH DISCOUNT — first 20 buyers get $3 instead of $6.
-   Set LAUNCH_ACTIVE to false once the 20 spots are gone (Gumroad
-   will also auto-block sales once its own quantity limit is hit —
-   this flag just controls the on-site messaging/strikethrough).
-   Replace LAUNCH_PRODUCT_URL with the $3 product's permalink.
-   ============================================================ */
-const LAUNCH_ACTIVE = true;
-const LAUNCH_PRODUCT_URL = "https://khalig0.gumroad.com/l/fsdzy"; // TODO: swap for the $3 launch product link
-const LAUNCH_PRICE = "$3";
-const REGULAR_PRICE = "$6";
-const CHECKOUT_URL = LAUNCH_ACTIVE ? LAUNCH_PRODUCT_URL : GUMROAD_PRODUCT_URL;
-function PaywallModal({
-  onClose
-}) {
-  const lang = useRGLang();
-  const t = window.RG_I18N && window.RG_I18N[lang] || {
-    paywallTitle: 'Unlock your download',
-    paywallBody: 'Pay once, export as many résumés as you like — forever. No account, no recurring charge.',
-    paywallCta: 'Unlock & download',
-    paywallCancel: 'Not now',
-    sealArc: '· ONE-TIME PAYMENT · NO SUBSCRIPTION'
-  };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "rg-paywall-overlay"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "rg-paywall-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "rg-seal",
-    "aria-hidden": "true"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "rg-ticket"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "rg-ticket-price"
-  }, LAUNCH_ACTIVE ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
-    className: "rg-ticket-strike"
-  }, REGULAR_PRICE), /*#__PURE__*/React.createElement("span", {
-    className: "rg-ticket-now"
-  }, LAUNCH_PRICE)) : REGULAR_PRICE), /*#__PURE__*/React.createElement("div", {
-    className: "rg-ticket-divider"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "rg-ticket-info"
-  }, LAUNCH_ACTIVE ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("b", null, t.launchBadge || 'FIRST 20 ONLY'), t.launchSub || 'One-time price, forever') : t.sealArc.replace(/^·\s*/, '').split(' · ').map((line, idx) => /*#__PURE__*/React.createElement("span", {
-    key: idx
-  }, idx === 0 ? /*#__PURE__*/React.createElement("b", null, line) : line))))), /*#__PURE__*/React.createElement("h3", {
-    className: "rg-paywall-title"
-  }, t.paywallTitle), /*#__PURE__*/React.createElement("p", {
-    className: "rg-paywall-body"
-  }, t.paywallBody), /*#__PURE__*/React.createElement("a", {
-    href: CHECKOUT_URL,
-    className: "gumroad-button rg-paywall-cta",
-    target: "_blank", rel: "noopener noreferrer"
-  }, t.paywallCta), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
-    className: "rg-paywall-cancel"
-  }, t.paywallCancel)));
-}
 const SAMPLE_RESUME_TEXT = `EMMA LARSEN
 Brooklyn, NY  |  emma.larsen@gmail.com  |  (917) 555-0142  |  linkedin.com/in/emmalarsen
 
@@ -3103,38 +3039,6 @@ function ResumeGenerator() {
   const t = useT();
   const mktDict = window.RG_I18N && window.RG_I18N[uiLang] || {};
   const toolBadgeText = 'ASOIU CV Studio';
-  const [hasPaid, setHasPaid] = useState(() => {
-    try {
-      return localStorage.getItem('resumegen_paid') === 'true';
-    } catch (e) {
-      return false;
-    }
-  });
-  const [showPaywall, setShowPaywall] = useState(false);
-  const pendingExportRef = useRef(null); // 'pdf' | 'docx' — remembers what to run after payment
-
-  // Listen for Gumroad's postMessage on successful purchase (overlay checkout)
-  useEffect(() => {
-    function onMessage(e) {
-      if (!e.data || typeof e.data !== 'object') return;
-      if (e.data.name === 'gumroad-purchase' || e.data.type === 'gumroad:purchase') {
-        try {
-          localStorage.setItem('resumegen_paid', 'true');
-        } catch (err) {}
-        setHasPaid(true);
-        setShowPaywall(false);
-        if (pendingExportRef.current) {
-          const kind = pendingExportRef.current;
-          pendingExportRef.current = null;
-          setTimeout(() => {
-            kind === 'pdf' ? runExportPDF() : runExportDocx();
-          }, 300);
-        }
-      }
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, []);
   const [previewScale, setPreviewScale] = useState(0.78);
   const [previewHeight, setPreviewHeight] = useState(11 * 96);
   const previewRef = useRef(null);
@@ -3159,7 +3063,6 @@ function ResumeGenerator() {
       setRawText('');
       setStep('empty');
       setParseError(null);
-      pendingExportRef.current = null;
       setIsExporting(null);
     };
     const restore = scope => {
@@ -3661,12 +3564,7 @@ function ResumeGenerator() {
     data: data,
     accent: effectiveAccent,
     accent2: effectiveAccent2
-  })), showPaywall && /*#__PURE__*/React.createElement(PaywallModal, {
-    onClose: () => {
-      setShowPaywall(false);
-      pendingExportRef.current = null;
-    }
-  }));
+  })));
 }
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(LangProvider, null, React.createElement(ResumeGenerator)));

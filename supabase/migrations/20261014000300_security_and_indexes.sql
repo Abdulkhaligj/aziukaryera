@@ -1,27 +1,39 @@
 -- Restrict direct RPC access to trigger-only functions and add covering indexes
 -- for the highest-traffic relationships.
 
-revoke execute on function public.enforce_company_job_limit() from public, anon, authenticated;
-revoke execute on function public.guard_profile_privileges() from public, anon, authenticated;
-revoke execute on function public.guard_company_status() from public, anon, authenticated;
-revoke execute on function public.guard_job_status() from public, anon, authenticated;
-revoke execute on function public.handle_new_user() from public, anon, authenticated;
-
-revoke execute on function public.select_company_plan(text) from public, anon;
-revoke execute on function public.app_role() from public, anon;
-revoke execute on function public.owns_company(uuid) from public, anon;
-revoke execute on function public.has_active_company() from public, anon;
-revoke execute on function public.ranked_jobs_for() from public, anon;
-revoke execute on function public.claim_benefit(uuid) from public, anon;
-revoke execute on function public.redeem_benefit_code(text) from public, anon;
-
-grant execute on function public.select_company_plan(text) to authenticated;
-grant execute on function public.app_role() to authenticated;
-grant execute on function public.owns_company(uuid) to authenticated;
-grant execute on function public.has_active_company() to authenticated;
-grant execute on function public.ranked_jobs_for() to authenticated;
-grant execute on function public.claim_benefit(uuid) to authenticated;
-grant execute on function public.redeem_benefit_code(text) to authenticated;
+-- Some of these functions are created later in the history (or were created in
+-- the dashboard), so on a clean database each statement runs only when the
+-- function exists. On the live database every one of them exists.
+do $$
+declare
+  stmt text;
+begin
+  foreach stmt in array array[
+    'revoke execute on function public.enforce_company_job_limit() from public, anon, authenticated',
+    'revoke execute on function public.guard_profile_privileges() from public, anon, authenticated',
+    'revoke execute on function public.guard_company_status() from public, anon, authenticated',
+    'revoke execute on function public.guard_job_status() from public, anon, authenticated',
+    'revoke execute on function public.handle_new_user() from public, anon, authenticated',
+    'revoke execute on function public.select_company_plan(text) from public, anon',
+    'revoke execute on function public.app_role() from public, anon',
+    'revoke execute on function public.owns_company(uuid) from public, anon',
+    'revoke execute on function public.has_active_company() from public, anon',
+    'revoke execute on function public.ranked_jobs_for() from public, anon',
+    'revoke execute on function public.claim_benefit(uuid) from public, anon',
+    'revoke execute on function public.redeem_benefit_code(text) from public, anon',
+    'grant execute on function public.select_company_plan(text) to authenticated',
+    'grant execute on function public.app_role() to authenticated',
+    'grant execute on function public.owns_company(uuid) to authenticated',
+    'grant execute on function public.has_active_company() to authenticated',
+    'grant execute on function public.ranked_jobs_for() to authenticated',
+    'grant execute on function public.claim_benefit(uuid) to authenticated',
+    'grant execute on function public.redeem_benefit_code(text) to authenticated'
+  ] loop
+    if to_regprocedure(substring(stmt from 'function (public\.[a-z_]+\([a-z]*\))')) is not null then
+      execute stmt;
+    end if;
+  end loop;
+end $$;
 
 create index if not exists profiles_major_idx on public.profiles(major_id);
 create index if not exists saved_jobs_job_idx on public.saved_jobs(job_id);

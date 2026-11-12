@@ -237,8 +237,28 @@ async function callModel(reservationId: string, prompt: string, maxTokens: numbe
   return await callGroq(reservationId, groqKey as string, prompt, maxTokens);
 }
 
+// Personal data does not leave for the AI providers: e-mail addresses, phone
+// numbers and profile links are masked, and (for ranking) candidates' names.
+const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const PHONE = /\+?\(?\d[\d\s().-]{6,}\d/g;
+const PROFILE_LINK = /\bhttps?:\/\/\S+|\b(?:www\.)?(?:linkedin\.com|github\.com|t\.me|facebook\.com|instagram\.com)\/\S*/gi;
+function redactContacts(text: string, names: string[] = []) {
+  let out = text.replace(EMAIL, "[e-poçt]").replace(PROFILE_LINK, "[link]")
+    .replace(PHONE, (match) => {
+      const digits = match.replace(/\D/g, "").length;
+      // Phone numbers have 9-15 digits; year ranges such as 2019-2023 are kept.
+      return digits >= 9 && digits <= 15 && !/^\d{4}\s*[-–]\s*\d{4}$/.test(match.trim()) ? "[telefon]" : match;
+    });
+  for (const name of names) {
+    for (const part of name.split(/\s+/).filter((p) => p.length >= 3)) {
+      out = out.replace(new RegExp(`(?<![\\p{L}])${part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])`, "giu"), "[ad]");
+    }
+  }
+  return out;
+}
+
 // Candidates go to the model as C1..Cn without names or contacts.
-function candidateInput(candidates: Candidate[]) {
+function candidateInput(candidates: Candidate[], names: Map<string, string> = new Map()) {
   const cvBudget = Math.max(400, Math.floor(CANDIDATE_INPUT_BUDGET / candidates.length) - 900);
   return candidates.map((c, i) => ({
     key: `C${i + 1}`,
@@ -250,9 +270,9 @@ function candidateInput(candidates: Candidate[]) {
     skills: c.skills ?? [],
     languages: c.languages ?? "",
     certificates: (c.certificates ?? "").slice(0, 400),
-    summary: (c.summary ?? "").slice(0, 600),
+    summary: redactContacts((c.summary ?? "").slice(0, 600), [names.get(c.student_id) ?? ""]),
     education: c.education,
-    cv_text: (c.cv_text ?? "").slice(0, cvBudget),
+    cv_text: redactContacts((c.cv_text ?? "").slice(0, cvBudget), [names.get(c.student_id) ?? ""]),
   }));
 }
 
@@ -393,7 +413,9 @@ Deno.serve(async (req: Request) => {
         result: { summary: "Bu vakansiyaya hələ aktiv müraciət yoxdur.", total, offset, count: 0, has_more: false, ranking: [] },
       });
     }
-    input = { job: pack.job, candidates: candidateInput(candidates) };
+    const { data: people } = await db.from("profiles").select("id, full_name").in("id", candidates.map((c) => c.student_id));
+    const names = new Map((people ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? ""]));
+    input = { job: pack.job, candidates: candidateInput(candidates, names) };
     maxTokens = 8192;
   } else if (task === "job_post_write") {
     const title = str(payload.title, 160);
@@ -416,7 +438,9 @@ Deno.serve(async (req: Request) => {
     maxTokens = 3000;
   }
 
-  const inputText = task === "candidate_rank" ? JSON.stringify(input) : JSON.stringify(input).slice(0, 24000);
+  const rawInput = task === "candidate_rank" ? JSON.stringify(input) : JSON.stringify(input).slice(0, 24000);
+  // A vacancy draft carries company facts only; every other task may carry personal data.
+  const inputText = task === "job_post_write" ? rawInput : redactContacts(rawInput);
 
   if (!Deno.env.get("GEMINI_API_KEY") && !Deno.env.get("GROQ_API_KEY")) {
     await logUsage({ ...usage, provider: "none", model: "none", input_chars: inputText.length, output_chars: 0, success: false, error_code: "not_configured" });

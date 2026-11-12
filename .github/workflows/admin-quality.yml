@@ -8,6 +8,8 @@ on:
       - 'lib/**'
       - 'tests/**'
       - 'student-web/**'
+      - 'supabase/**'
+      - 'deploy/**'
       - 'package*.json'
       - 'next.config.mjs'
       - '.github/workflows/admin-quality.yml'
@@ -18,6 +20,9 @@ on:
       - 'components/**'
       - 'lib/**'
       - 'tests/**'
+      - 'student-web/**'
+      - 'supabase/**'
+      - 'deploy/**'
       - 'package*.json'
       - 'next.config.mjs'
       - '.github/workflows/admin-quality.yml'
@@ -42,5 +47,7 @@ jobs:
         run: node --test tests/*.test.mjs
       - name: TypeScript type check
         run: npm run typecheck
+      - name: Deploy kit shell syntax
+        run: for f in deploy/*/scripts/*.sh; do bash -n "$f"; done
       - name: Production build
         run: npm run build

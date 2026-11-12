@@ -1,6 +1,7 @@
 import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminContext, writeAudit } from '@/lib/admin-data';
+import { AUDIT_WARNING, getAdminContext, writeAudit } from '@/lib/admin-data';
+import { crossSite, escapeLike, functionError, httpsUrl, publicError, sent, webUrl } from '@/lib/admin-input';
 import { can } from '@/lib/permissions';
 import type { ResourceKey } from '@/lib/types';
 
@@ -13,7 +14,6 @@ function list(value: unknown, separator = ',') { return text(value).split(separa
 function bool(value: unknown) { return value === true || value === 'true' || value === 'on'; }
 /* Formadakı "YYYY-MM-DDTHH:MM" Bakı vaxtıdır (UTC+4, yay vaxtı yoxdur) */
 function bakuTime(value: unknown) { const s = text(value); return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? `${s}:00+04:00` : s; }
-function httpsUrl(value: unknown) { const s = text(value); return /^https:\/\//i.test(s) ? s : null; }
 const placements = new Set(['landing_hero', 'landing_strip', 'dashboard']);
 const adStatuses = new Set(['draft', 'active', 'paused', 'ended']);
 
@@ -50,10 +50,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     const { data, error } = await context.supabase.from('jobs')
       .update(update).eq('id', id).select('id,status').maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
     if (!data) return NextResponse.json({ error: 'Vakansiya tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
-    await writeAudit(context, 'pending_jobs', id, 'update', 'Vakansiyanın təsdiq statusu dəyişdirildi');
-    return NextResponse.json({ ok: true, status: data.status });
+    const audited = await writeAudit(context, 'pending_jobs', id, 'update', 'Vakansiyanın təsdiq statusu dəyişdirildi');
+    return NextResponse.json({ ok: true, status: data.status, ...(audited ? {} : { warning: AUDIT_WARNING }) });
   }
 
   if (people.has(key)) {
@@ -63,14 +63,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { data, error } = await context.supabase.functions.invoke('admin-users', {
       body: { ...body, action, resource: key, id }
     });
-    if (error || !data?.ok) return NextResponse.json({ error: data?.error || error?.message || 'İstifadəçi yenilənmədi' }, { status: 400 });
+    if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'İstifadəçi yenilənmədi') }, { status: 400 });
     return NextResponse.json(data);
   }
 
   let table = resource;
   let payload: Record<string, unknown>;
-  if (resource === 'companies') payload = { name: text(body.title), sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: text(body.website), company_size: text(body.company_size), address: text(body.address), logo_url: text(body.logo_url) || null, about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: body.verified === true || body.verified === 'true', status: text(body.status) };
-  else if (resource === 'jobs' || resource === 'pending_jobs') { table = 'jobs'; payload = { company_id: text(body.company_id), title: text(body.title), type: text(body.type), mode: text(body.mode), location: text(body.location), deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: nullableNumber(body.salary_min), salary_max: nullableNumber(body.salary_max), currency: text(body.currency) || 'AZN', salary_visible: body.salary_visible === true || body.salary_visible === 'true', positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: text(body.application_url) || null, changes_requested: text(body.changes_requested) || null, rejection_reason: text(body.status) === 'rejected' ? text(body.changes_requested) || null : null, status: text(body.status) }; }
+  if (resource === 'companies') payload = { name: text(body.title), sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: webUrl(body.website) ?? '', company_size: text(body.company_size), address: text(body.address), logo_url: httpsUrl(body.logo_url), about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: body.verified === true || body.verified === 'true', status: text(body.status) };
+  else if (resource === 'jobs' || resource === 'pending_jobs') { table = 'jobs'; payload = { company_id: text(body.company_id), title: text(body.title), type: text(body.type), mode: text(body.mode), location: text(body.location), deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: nullableNumber(body.salary_min), salary_max: nullableNumber(body.salary_max), currency: text(body.currency) || 'AZN', salary_visible: body.salary_visible === true || body.salary_visible === 'true', positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: webUrl(body.application_url), changes_requested: text(body.changes_requested) || null, rejection_reason: text(body.status) === 'rejected' ? text(body.changes_requested) || null : null, status: text(body.status) }; }
   else if (resource === 'events') payload = { title: text(body.title), kind: text(body.kind), starts_at: bakuTime(body.starts_at), place: text(body.place), seats: number(body.seats), description: text(body.description) || null, organizers: list(body.organizers), image_url: httpsUrl(body.image_url) };
   else if (resource === 'ads') {
     const placement = text(body.placement);
@@ -81,11 +81,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     let partnerId = text(body.partner_id);
     const partnerName = text(body.partner_name);
     if (partnerName) {
-      const { data: partner } = await context.supabase.from('benefit_partners').select('id').ilike('name', partnerName).maybeSingle();
+      const { data: partner } = await context.supabase.from('benefit_partners').select('id').ilike('name', escapeLike(partnerName)).maybeSingle();
       if (partner?.id) partnerId = partner.id;
       else {
         const { data: created, error: partnerError } = await context.supabase.from('benefit_partners').insert({ name: partnerName, status: 'active', logo_url: httpsUrl(body.partner_logo_url) }).select('id').single();
-        if (partnerError) return NextResponse.json({ error: partnerError.message }, { status: 400 });
+        if (partnerError) return NextResponse.json({ error: publicError(partnerError) }, { status: 400 });
         partnerId = created.id;
       }
     }
@@ -111,7 +111,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (company?.name) companyName = company.name;
     }
     if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
-    payload = { year: number(body.year, new Date().getFullYear()), nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: text(body.logo_url) || null, citation: text(body.citation) || null, published: body.published === true || body.published === 'true' || body.published === 'on' };
+    payload = { year: number(body.year, new Date().getFullYear()), nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: httpsUrl(body.logo_url), citation: text(body.citation) || null, published: body.published === true || body.published === 'true' || body.published === 'on' };
   }
   else if (resource === 'mentor_requests') {
     table = 'mentor_requests';
@@ -134,20 +134,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       ...[['candidate_search','Namizəd axtarışı'],['ai_candidate_matching','AI namizəd uyğunluğu'],['ai_cv_ranking','AI CV sıralaması'],['advanced_analytics','Qabaqcıl analitika'],['bulk_messaging','Kütləvi mesajlaşma'],['premium_branding','Premium şirkət səhifəsi']].map(([feature_key, label]) => ({ feature_key, label, enabled: body[feature_key] === true || body[feature_key] === 'true', limit_value: body[feature_key] === true || body[feature_key] === 'true' ? null : 0 }))
     ];
     const { error: featureError } = await context.supabase.from('plan_features').upsert(features.map(feature => ({ ...feature, plan_id: id, updated_at: new Date().toISOString() })), { onConflict: 'plan_id,feature_key' });
-    if (featureError) return NextResponse.json({ error: featureError.message }, { status: 400 });
+    if (featureError) return NextResponse.json({ error: publicError(featureError) }, { status: 400 });
   }
   else { table = 'site_content'; payload = { title: text(body.title), content_key: text(body.content_key), summary: text(body.summary), body: text(body.body), status: text(body.status), updated_by: context.userId }; }
 
-  const { error } = await context.supabase.from(table).update(payload).eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  await writeAudit(context, resource, id, 'update', `${text(body.title) || resource} yeniləndi`);
+  // Full edit forms: change only the fields the request sends, so a field the
+  // form does not show is never blanked or reset to a default.
+  const sourceField: Record<string, string> = { name: 'title' };
+  const derived = new Set(['updated_by', 'partner_id', 'company_name']);
+  if (['companies', 'jobs', 'pending_jobs', 'events', 'ads', 'awards', 'content', 'benefits'].includes(resource)) {
+    payload = Object.fromEntries(Object.entries(payload).filter(([field]) =>
+      derived.has(field) || sent(body, sourceField[field] ?? field) || (field === 'rejection_reason' && sent(body, 'status'))));
+  }
+  if (Object.keys(payload).length) {
+    const { error } = await context.supabase.from(table).update(payload).eq('id', id);
+    if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
+  }
+  const audited = await writeAudit(context, resource, id, 'update', `${text(body.title) || resource} yeniləndi`);
   if (resource === 'network') {
     await context.supabase.from('moderation_logs').insert({ target_type: 'post', target_id: id, action: text(body.moderation_status) === 'hidden' ? 'hide' : 'approve', actor_id: context.userId, reason: 'Admin panelindən moderasiya' });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(audited ? {} : { warning: AUDIT_WARNING }) });
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ resource: string; id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ resource: string; id: string }> }) {
+  if (crossSite(request)) return NextResponse.json({ error: 'Sorğu başqa saytdan göndərilib.' }, { status: 403 });
   const { resource, id } = await params;
   const key = resource as ResourceKey;
   const context = await getAdminContext();
@@ -158,7 +169,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ res
     const { data, error } = await context.supabase.functions.invoke('admin-users', {
       body: { action: 'delete', resource: key, id }
     });
-    if (error || !data?.ok) return NextResponse.json({ error: data?.error || error?.message || 'İstifadəçi silinmədi' }, { status: 400 });
+    if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'İstifadəçi silinmədi') }, { status: 400 });
     return NextResponse.json(data);
   }
 
@@ -168,7 +179,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ res
   };
   const target = table[resource] || resource;
   const { error } = await context.supabase.from(target).delete().eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  await writeAudit(context, resource, id, 'delete', `${resource} qeydi silindi`);
-  return NextResponse.json({ ok: true });
+  if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
+  const audited = await writeAudit(context, resource, id, 'delete', `${resource} qeydi silindi`);
+  return NextResponse.json({ ok: true, ...(audited ? {} : { warning: AUDIT_WARNING }) });
 }
