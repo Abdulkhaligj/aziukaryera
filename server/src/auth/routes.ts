@@ -420,12 +420,16 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     const field = (name: string, value: unknown) => `<input type="hidden" name="${name}" value="${escapeHtml(String(value ?? '').slice(0, 2048))}">`;
     const type = String(req.query.type ?? '');
     const action = type === 'recovery' ? 'Davam et və yeni şifrə təyin et' : 'Təsdiqlə';
+    // The answer to the button is a redirect to the site; form-action covers redirects
+    // too, so the (allow-listed) site origin is permitted besides this API.
+    let target = '';
+    try { target = new URL(redirectTarget(req.query.redirect_to)).origin; } catch { target = ''; }
     return reply.code(200)
       .header('content-type', 'text/html; charset=utf-8')
       .header('cache-control', 'no-store')
       .header('referrer-policy', 'no-referrer')
       .header('x-frame-options', 'DENY')
-      .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+      .header('content-security-policy', `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${target}; base-uri 'none'; frame-ancestors 'none'`)
       .send(`<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ADNSU Karyera</title><style>body{font-family:system-ui,sans-serif;background:#f3f5fb;display:grid;place-items:center;min-height:100vh;margin:0}
 main{background:#fff;padding:32px 28px;border-radius:16px;max-width:420px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.08)}

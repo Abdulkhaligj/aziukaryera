@@ -20,4 +20,18 @@ env_set() {
   cat "$tmp" > "$file"; rm -f "$tmp"
 }
 random() { LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$1"; }
-mysql_app() { dc exec -T -e MYSQL_PWD="$MYSQL_PASSWORD" mysql mysql -uasoiu asoiu_career "$@"; }
+# Passwords reach the client through the environment (-e NAME without a
+# value), never as a command-line argument that "ps" would show (#83).
+mysql_app() { ( export MYSQL_PWD="$MYSQL_PASSWORD"; dc exec -T -e MYSQL_PWD mysql mysql -uasoiu asoiu_career "$@" ); }
+mysql_root() { ( export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; dc exec -T -e MYSQL_PWD mysql mysql -uroot "$@" ); }
+# The API's own account reads and writes rows and calls the functions; the
+# schema and the migrations are applied as root (audit 2026-11-13, #55).
+app_grants() {
+  printf "REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'asoiu'@'%%';\nGRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON asoiu_career.* TO 'asoiu'@'%%';\nFLUSH PRIVILEGES;\n" | mysql_root
+}
+# Schema and migrations (db/setup.mjs) as root, then the limited grants.
+migrate() {
+  ROOT="$MYSQL_ROOT_PASSWORD" dc run --rm -T -e ROOT api \
+    sh -c 'MYSQL_URL="mysql://root:$ROOT@mysql:3306/asoiu_career" node server/db/setup.mjs'
+  app_grants
+}

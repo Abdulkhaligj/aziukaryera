@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const portal=fs.existsSync(path.join(repo,'student-web'))?path.join(repo,'student-web'):path.resolve(repo,'../esas-sayt-student-web');
+// This repository only, no sibling folder (audit 2026-11-13, #86).
+const portal=path.join(repo,'student-web');
 const read=name=>fs.readFileSync(path.join(portal,'assets/js',name),'utf8');
 const app=read('app.js');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,8));
@@ -129,9 +130,9 @@ test('AIDA clears DOM/history and discards late replies; B next request never ca
 });
 
 test('real data client preserves fluent queries, functions getter, synchronous public URLs and signed URLs under the lifecycle wrapper',async()=>{
-  let require=createRequire(path.join(repo,'package.json'));
-  let createClient;
-  try{({createClient}=require('@supabase/supabase-js'));}catch{require=createRequire(path.resolve(repo,'../admin-panel/package.json'));({createClient}=require('@supabase/supabase-js'));}
+  // The client library of this repository only, no sibling folder (#86).
+  const require=createRequire(path.join(repo,'package.json'));
+  const {createClient}=require('@supabase/supabase-js');
   const calls=[];
   const sdk=createClient('https://fixture.invalid','public-fixture',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch:async(input)=>{
     const url=new URL(typeof input==='string'?input:input.url);assert.equal(url.origin,'https://fixture.invalid');calls.push(url.pathname);
@@ -147,8 +148,9 @@ test('real data client preserves fluent queries, functions getter, synchronous p
 });
 
 test('retained real SDK write builders and storage clients cannot start work after their owner changes',async()=>{
-  let require=createRequire(path.join(repo,'package.json'));let createClient;
-  try{({createClient}=require('@supabase/supabase-js'));}catch{require=createRequire(path.resolve(repo,'../admin-panel/package.json'));({createClient}=require('@supabase/supabase-js'));}
+  // The client library of this repository only, no sibling folder (#86).
+  const require=createRequire(path.join(repo,'package.json'));
+  const {createClient}=require('@supabase/supabase-js');
   let owner='student-A',emit;const calls=[];
   const sdk=createClient('https://fixture.invalid','public-fixture',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch:async(input,init)=>{
     calls.push({body:init.body,authorization:init.headers.get('authorization')});

@@ -1,10 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
-// The standalone admin export keeps the portal and backend in sibling folders.
+// Sources are read from this repository only (audit 2026-11-13, #86): no
+// fallback to sibling folders, so a test never passes on files outside it.
 export function readSource(path) {
-  let url = new URL('../' + path, import.meta.url);
-  if (!existsSync(url) && path.startsWith('student-web/')) {
-    url = new URL('../../esas-sayt-student-web/' + path.slice('student-web/'.length), import.meta.url);
-  }
-  return readFileSync(url, 'utf8');
+  return readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 }

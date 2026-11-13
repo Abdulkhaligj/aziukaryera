@@ -9,8 +9,8 @@ import { createHash } from 'node:crypto';
 // Actual application functions execute with browser/React/Auth I/O boundaries
 // mocked. No production requests, token, personal record, payment or AI use.
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const portal = fs.existsSync(path.join(repo, 'student-web'))
-  ? path.join(repo, 'student-web') : path.resolve(repo, '../esas-sayt-student-web');
+// This repository only, no sibling folder (audit 2026-11-13, #86).
+const portal = path.join(repo, 'student-web');
 const read = name => fs.readFileSync(path.join(portal, name), 'utf8');
 const backendSource = read('assets/js/backend.js');
 const authSource = read('assets/js/auth.js');

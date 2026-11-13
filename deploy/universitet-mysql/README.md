@@ -35,10 +35,23 @@ deploy/universitet-mysql/scripts/01-init.sh api.career.asoiu.edu.az
 ```
 
 `01-init.sh` nə edir:
-- MySQL şifrələrini, JWT secret-i, `ANON_KEY`/`SERVICE_ROLE_KEY` açarlarını və moderasiya secret-ini yaradır. Hamısı `kit.env` və `api.env` fayllarına yazılır (hər ikisi `chmod 600`, git-ə düşmür).
-- API imicini qurur, MySQL-i işə salır, sxemi və migration-ları tətbiq edir.
+- MySQL şifrələrini, JWT secret-i, `ANON_KEY`/`SERVICE_ROLE_KEY` açarlarını, moderasiya secret-ini və `DATA_ENCRYPTION_KEY` açarını yaradır. Hamısı `kit.env` və `api.env` fayllarına yazılır (hər ikisi `chmod 600`, git-ə düşmür).
+- Backup açarını (`deploy/universitet-mysql/backup.key`, `chmod 600`) yaradır. Backup-lar həmişə bu açarla şifrələnir; açarın nüsxəsini serverdən kənarda saxlayın.
+- API imicini qurur, MySQL-i işə salır, sxemi və migration-ları **root** ilə tətbiq edir. API-nin öz hesabı (`asoiu`) yalnız `SELECT, INSERT, UPDATE, DELETE, EXECUTE` hüququ alır: cədvəl yarada, silə və ya dəyişə bilmir.
 
 Sonra `deploy/universitet-mysql/api.env` faylında `SMTP_*` və `GEMINI_API_KEY` dəyərlərini doldurun.
+
+`api.env`-də əlavə parametrlər (13.11.2026 auditindən):
+
+| Dəyişən | Mənası |
+|---|---|
+| `DATA_ENCRYPTION_KEY` | Bazada şifrələnən sahələrin (güzəşt kodları) açarı. `01-init.sh` yaradır. Backup açarı ilə birlikdə serverdən kənarda saxlayın: açar itsə, həmin kodlar oxunmur. |
+| `CORS_ORIGINS` | `SITE_URL` və `ADDITIONAL_REDIRECT_URLS`-dən başqa, API-yə brauzerdən müraciət edə bilən saytlar (vergüllə). Adətən boş qalır. |
+| `MODERATION_WEBHOOK_SECRET` | Yalnız `api.env`-də saxlanılır, bazaya yazılmır. |
+| `STORAGE_SIGNING_KEY` | İstəyə bağlı: imzalı fayl linkləri üçün ayrıca açar. Boşdursa, JWT secret-dən törədilir. |
+| `MYSQL_POOL_SIZE`, `MYSQL_QUEUE_LIMIT`, `MYSQL_LOCK_WAIT_SECONDS`, `MYSQL_MAX_EXECUTION_MS` | İstəyə bağlı: bağlantı hovuzu (20), növbə (200), kilid gözləmə (10 s) və oxuma sorğusunun maksimum müddəti (15 000 ms). |
+
+Şifrələr Docker əmrlərinə arqument kimi yox, mühit dəyişəni ilə ötürülür; `ps` siyahısında görünmür.
 
 ## 3. Datanın köçürülməsi (ehtiyat nüsxədən)
 
@@ -84,14 +97,17 @@ Saytlar hazırda "texniki işlər" səhifəsini göstərir, yazı artıq dayanı
 |---|---|
 | Vəziyyət | `docker compose -f deploy/universitet-mysql/docker-compose.yml --env-file deploy/universitet-mysql/kit.env ps` |
 | Loglar | `… logs -f api` |
-| Yeniləmə | `git pull && deploy/universitet-mysql/scripts/03-start.sh` (migration-lar API başlayanda yox, `01-init.sh`/`02-import.sh` ilə tətbiq olunur; yeni migration olanda: `… run --rm api node server/db/setup.mjs`) |
+| Yeniləmə | `git pull && deploy/universitet-mysql/scripts/03-start.sh` (yeni migration-ları root ilə tətbiq edir, `asoiu` hesabının hüquqlarını yeniləyir, sonra API-ni yenidən qurur; migration-lar təkrar işlədilə bilər) |
 | Backup | `deploy/universitet-mysql/scripts/backup.sh /srv/backups/asoiu`, cron ilə gündəlik: `30 3 * * *` |
-| Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması. Şifrələnmiş nüsxədə əvvəlcə: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:/root/asoiu-backup.key -in db-….sql.gz.enc \| gunzip -c \| …` |
+| Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması. Nüsxələr həmişə şifrələnir; əvvəlcə: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:deploy/universitet-mysql/backup.key -in db-….sql.gz.enc \| gunzip -c \| …` |
 
-Planlı işlər (moderasiya təkrarları hər dəqiqə, paket müddətləri hər saat) API-nin içində işləyir, ayrıca cron lazım deyil.
+Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiya təkrarları (hər dəqiqə), paket müddətləri və bitmiş vakansiyaların bağlanması (hər saat), köhnə sessiya, link, AI rezervasiyası və bildirişlərin silinməsi (hər gün 23:30 UTC).
 
 ## 7. Təhlükəsizlik
 
 - `kit.env` və `api.env` serverdə qalır, heç vaxt git-ə və ya çata yazılmır. `SERVICE_ROLE_KEY` serverdən çıxmır: admin panel istifadəçi idarəsini `admin-users` funksiyası ilə edir.
 - MySQL və API portları kənara açılmır, yalnız Caddy (80/443).
-- Backup fayllarında şəxsi data və şifrə hash-ləri var: `kit.env`-də `BACKUP_KEY_FILE` (AES-256 şifrələmə) və `BACKUP_REMOTE` (serverdən kənar nüsxə) doldurun. Açar faylının nüsxəsini serverdən kənarda saxlayın.
+- Backup fayllarında şəxsi data və şifrə hash-ləri var: həmişə AES-256 ilə şifrələnir (`BACKUP_KEY_FILE` boş olsa, `backup.sh` dayanır). `BACKUP_REMOTE` ilə serverdən kənar nüsxəni də doldurun. Açar faylının nüsxəsini serverdən kənarda saxlayın.
+- API-nin MySQL hesabı yalnız sətirləri oxuyub-yazır və funksiyaları çağırır; sxem dəyişiklikləri root ilə edilir.
+- Caddy HSTS, `nosniff`, `Referrer-Policy`, `X-Frame-Options` başlıqlarını əlavə edir və 60 MB-dan böyük sorğuları qəbul etmir.
+- Docker imicləri digest ilə sabitlənib; hər servisin yaddaş, CPU və proses limiti var. Paketlər quraşdırma skriptləri işlədilmədən (`--ignore-scripts`) qurulur.

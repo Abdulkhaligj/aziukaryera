@@ -4,7 +4,8 @@
 name: asoiu-career
 services:
   mysql:
-    image: mysql:8.4
+    # Images are pinned by digest (audit 2026-11-13, #84); update them on purpose.
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?kit.env}
@@ -19,10 +20,14 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      # The password through the environment, not the process list (#83).
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
       interval: 10s
       timeout: 5s
       retries: 30
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 512
 
   api:
     build:
@@ -39,11 +44,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
 
   # Only during scripts/02-import.sh (profile "import"): a throwaway Postgres
   # that reads the final backup of the old database. No ports, no volume.
   pgrestore:
-    image: postgres:17
+    image: postgres:17@sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07
     profiles: ["import"]
     environment:
       POSTGRES_PASSWORD: ${PGRESTORE_PASSWORD:-unused}
@@ -51,7 +59,7 @@ services:
       - ${IMPORT_BACKUP_DIR:-./import-backup}:/backup:ro
 
   caddy:
-    image: caddy:2
+    image: caddy:2@sha256:4e2425f6009577e7c651010f16679c28f7d12df3e7b1914f941a7a3370746b3c
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
@@ -61,6 +69,9 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on: [api]
+    mem_limit: 256m
+    cpus: 1
+    pids_limit: 128
 
 volumes:
   mysql-data:

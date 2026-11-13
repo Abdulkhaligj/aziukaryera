@@ -15,6 +15,9 @@ async function openLink(link: string) {
   const page = await fetch(link);
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-type') || '', /text\/html/);
+  // The button's answer redirects to the site, so its origin must be a form-action source.
+  const target = new URL(new URL(link).searchParams.get('redirect_to') || h.config.siteUrl).origin;
+  assert.ok((page.headers.get('content-security-policy') || '').includes(`form-action 'self' ${target};`));
   const html = await page.text();
   const unescape = (v: string) => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
   const fields = Object.fromEntries([...html.matchAll(/name="(\w+)" value="([^"]*)"/g)].map(m => [m[1], unescape(m[2])]));

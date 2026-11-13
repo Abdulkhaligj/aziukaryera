@@ -42,7 +42,8 @@ dc stop api >/dev/null 2>&1 || true
 # As root (dropping the database needs it); the password goes through the environment.
 ROOT="$MYSQL_ROOT_PASSWORD" dc run --rm -T -e ALLOW_RESET=1 -e ROOT api \
   sh -c 'MYSQL_URL="mysql://root:$ROOT@mysql:3306/asoiu_career" node server/db/setup.mjs --reset'
-dc exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql mysql -uroot -e "GRANT ALL ON asoiu_career.* TO 'asoiu'@'%'; FLUSH PRIVILEGES;"
+# The API's account gets rows and functions only, not the schema (#55).
+app_grants
 
 step "Data (sətir sayları və xarici açarlar yoxlanılır)"
 export SOURCE_DB_URL="postgresql://postgres:${PGRESTORE_PASSWORD}@pgrestore:5432/postgres"
