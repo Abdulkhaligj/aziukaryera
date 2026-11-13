@@ -8,6 +8,8 @@ import { exec, one, rows } from '../src/db.ts';
 import { runJob } from '../src/jobs/scheduler.ts';
 import { loadSchema } from '../src/schema.ts';
 import { startHarness, type Harness } from './helpers.ts';
+import { SignJWT } from 'jose';
+import { contextFromHeaders, keyExpiresIn } from '../src/context.ts';
 
 let h: Harness;
 let student: ApiClient, company: ApiClient, admin: ApiClient, editor: ApiClient, manager: ApiClient;
@@ -237,4 +239,20 @@ test('#72: the audit migrations can run again', async () => {
   } finally {
     await connection.end();
   }
+});
+
+test('M-08: an API key past its expiry is refused even though it matches exactly', async () => {
+  const secret = 'k'.repeat(48);
+  const key = new TextEncoder().encode(secret);
+  const sign = (role: string, exp: number) => new SignJWT({ role }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt(exp - 10).setExpirationTime(exp).sign(key);
+  const now = Math.floor(Date.now() / 1000);
+  const config = { ...h.config, jwtSecret: secret, anonKey: await sign('anon', now - 60), serviceRoleKey: await sign('service_role', now + 3600) };
+  assert.equal(await contextFromHeaders(config, config.anonKey, undefined), null, 'expired anon key');
+  assert.equal((await contextFromHeaders(config, config.serviceRoleKey, undefined))?.role, 'service_role');
+  assert.ok(keyExpiresIn(config.serviceRoleKey)! > 3500);
+});
+
+test('M-32: a logo link sent at company sign-up is not stored', async () => {
+  const { id } = await signedIn('loqo@audit.az', { role: 'company', company_name: 'Loqo MMC', full_name: 'HR Loqo', logo_url: 'https://tracker.example/pixel.png' });
+  assert.deepEqual(await one(h.pool, 'SELECT logo_url FROM companies WHERE owner_id = ?', [id]), { logo_url: null });
 });

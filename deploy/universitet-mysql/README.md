@@ -99,6 +99,7 @@ Saytlar hazırda "texniki işlər" səhifəsini göstərir, yazı artıq dayanı
 | Loglar | `… logs -f api` |
 | Yeniləmə | `git pull && deploy/universitet-mysql/scripts/03-start.sh` (yeni migration-ları root ilə tətbiq edir, `asoiu` hesabının hüquqlarını yeniləyir, sonra API-ni yenidən qurur; migration-lar təkrar işlədilə bilər) |
 | Backup | `deploy/universitet-mysql/scripts/backup.sh /srv/backups/asoiu`, cron ilə gündəlik: `30 3 * * *` |
+| Açarların yenilənməsi | `ANON_KEY` və `SERVICE_ROLE_KEY` 2 il yaşayır; `04-verify.sh` və API logu bitməyə 30–60 gün qalmış xəbərdarlıq edir. `deploy/universitet-mysql/scripts/rotate-keys.sh` yeni açarları yazır və API-ni yenidən başladır; sonra yeni `ANON_KEY` saytın `runtime-config.js` faylına və Vercel-də `NEXT_PUBLIC_API_KEY`-ə yazılır. |
 | Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması. Nüsxələr həmişə şifrələnir; əvvəlcə: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:deploy/universitet-mysql/backup.key -in db-….sql.gz.enc \| gunzip -c \| …` |
 
 Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiya təkrarları (hər dəqiqə), paket müddətləri və bitmiş vakansiyaların bağlanması (hər saat), köhnə sessiya, link, AI rezervasiyası və bildirişlərin silinməsi (hər gün 23:30 UTC).

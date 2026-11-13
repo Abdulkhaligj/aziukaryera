@@ -2,7 +2,7 @@
 // authenticated and service_role come from the request's key or JWT;
 // system stands for SECURITY DEFINER code (signup, scheduled jobs).
 import { timingSafeEqual } from 'node:crypto';
-import { jwtVerify } from 'jose';
+import { decodeJwt, jwtVerify } from 'jose';
 import type { Pool } from 'mysql2/promise';
 import type { Config } from './config.ts';
 import { one } from './db.ts';
@@ -47,6 +47,16 @@ const same = (a: string, b: string) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
+/** Seconds until an API key expires (its exp claim); null when it has none. */
+export function keyExpiresIn(key: string, now = Date.now()): number | null {
+  try {
+    const { exp } = decodeJwt(key);
+    return typeof exp === 'number' ? exp - Math.floor(now / 1000) : null;
+  } catch { return null; }
+}
+// An API key past its exp claim is refused, even though it is compared exactly (M-08).
+const live = (key: string) => (keyExpiresIn(key) ?? 1) > 0;
+
 // The state of a session, read for every request that carries a user token
 // and kept for a few seconds: a revoked, expired, banned or deleted account
 // stops working at once instead of when its access token expires (H-10).
@@ -77,8 +87,8 @@ export async function contextFromHeaders(config: Config, apikey: string | undefi
   const bearer = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
   const token = bearer || apikey;
   if (!token) return null;
-  if (same(token, config.serviceRoleKey)) return { role: 'service_role', uid: null, claims: null };
-  if (same(token, config.anonKey)) return anonContext;
+  if (same(token, config.serviceRoleKey)) return live(config.serviceRoleKey) ? { role: 'service_role', uid: null, claims: null } : null;
+  if (same(token, config.anonKey)) return live(config.anonKey) ? anonContext : null;
   const claims = await verifyJwt(config, token);
   if (!claims || claims.role !== 'authenticated' || typeof claims.sub !== 'string') return null;
   if (!db) return { role: 'authenticated', uid: claims.sub, claims };

@@ -1,5 +1,5 @@
 /* ADNSU Career PWA - network first for executable code, cache v20261102. */
-const CACHE_NAME = 'adnsu-career-shell-20261102-session-v2';
+const CACHE_NAME = 'adnsu-career-shell-20261113-audit-v2';
 const OFFLINE = ['/','/index.html','/manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE)));
