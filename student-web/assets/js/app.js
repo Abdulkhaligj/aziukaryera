@@ -2804,7 +2804,7 @@ function authRegisterForm(busy) {
         ${field('address', 'Ünvan', input('address', 'autocomplete="street-address" required'), { req: true })}
       </div>
       ${field('description', 'Qısa şirkət təsviri', `<textarea id="rg-description" name="description" maxlength="500" placeholder="Fəaliyyət sahəsi, missiya və tələbələr üçün imkanlar">${esc(a.description)}</textarea>`, { help: 'Ən çox 500 simvol.' })}
-      ${field('logoUrl', 'Loqo linki', input('logoUrl', 'type="url" inputmode="url" autocapitalize="none" placeholder="https://..."'))}`),
+      <p class="hint">Loqonu şirkət təsdiqləndikdən sonra Karyera Mərkəzi əlavə edir (göndərdiyiniz şəkil faylı ilə).</p>`),
     pane(2, `<div class="grid c2">
         ${field('contact', 'Ad və soyad', input('contact', 'autocomplete="name" required'), { req: true })}
         ${field('contactPosition', 'Vəzifə', input('contactPosition', 'autocomplete="organization-title" placeholder="HR menecer" required'), { req: true })}

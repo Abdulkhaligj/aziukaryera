@@ -113,10 +113,12 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
   - Yüklənən faylın məzmunu elan olunan növə uyğun olmalıdır; fayllar `nosniff` və `sandbox` ilə verilir; şəkillər yalnız platformanın öz storage-ındandır.
   - AI: CV mətni yalnız tələbənin razılığı ilə göndərilir; namizəd sıralamasında hər namizəd ayrıca blokdadır.
   - Admin panel: HttpOnly cookie, nonce ilə CSP, URL-dən yalnız tanınan mesaj kodları.
+  - API açarları 2 il yaşayır, vaxtı keçmiş açar qəbul edilmir; `rotate-keys.sh` onları yeniləyir.
+  - Şirkət qeydiyyatda loqo linki vermir; loqonu Karyera Mərkəzi admin paneldən yükləyir.
 
 ## 5. Testlər (13.11.2026)
 - **Saytlar və admin panel:** 95/95 test keçir, TypeScript yoxlaması və `next build` uğurludur.
-- **MySQL API:** 106/106 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).
+- **MySQL API:** 108/108 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).
 - **CI:** `npm audit` (yüksək və kritik zəifliklər build-i dayandırır).
 - **Ehtiyat nüsxə:** lokal bazaya bərpa edildi, 92 cədvəlin sətir sayları eynidir. MySQL-ə sınaq köçürməsi uğurlu oldu: 58 cədvəl, 963 sətir, 10 istifadəçi şifrə hash-i ilə. 15 faylın hamısı yerindədir.
 

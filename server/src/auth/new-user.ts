@@ -63,7 +63,9 @@ export async function handleNewUser(env: WriteEnv, user: { id: string; email: st
     const company = await insertRow(env, 'companies', {
       owner_id: user.id, name: nonEmpty(meta, 'company_name') ?? display, email: user.email,
       phone: text(meta, 'phone') ?? '', website: nonEmpty(meta, 'website'), sector: text(meta, 'sector') ?? '',
-      company_size: text(meta, 'company_size') ?? '', address: text(meta, 'address') ?? '', logo_url: nonEmpty(meta, 'logo_url'),
+      company_size: text(meta, 'company_size') ?? '', address: text(meta, 'address') ?? '',
+      // Logos are uploaded by the Career Centre (own storage); a link sent at sign-up is ignored (audit 2026-11-13, M-32).
+      logo_url: null,
       about: text(meta, 'description') ?? '', contact: text(meta, 'contact_name') ?? '',
       contact_position: text(meta, 'contact_position') ?? '', contact_email: text(meta, 'contact_email') ?? '',
       contact_phone: text(meta, 'contact_phone') ?? '', status: 'pending'
