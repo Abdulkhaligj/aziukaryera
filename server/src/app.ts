@@ -13,15 +13,29 @@ import { functionRoutes } from './functions/routes.ts';
 import { startScheduler } from './jobs/scheduler.ts';
 import type { Mailer } from './auth/mailer.ts';
 import './write/rules/index.ts';
+import { setStoragePublicBase } from './write/rules/hardening.ts';
+import { setModerationSecret } from './write/rules/moderation.ts';
+import { setEncryptionKey } from './crypto.ts';
 
 export interface AppDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer; logger?: boolean }
 
 export async function buildApp(deps: AppDeps) {
-  // One trusted hop (Caddy): req.ip is the address Caddy saw, not whatever a
-  // client wrote into X-Forwarded-For.
-  const app = Fastify({ logger: deps.logger ?? false, trustProxy: (_address, hop) => hop < 1, bodyLimit: 1024 * 1024 });
+  setStoragePublicBase(deps.config.publicUrl);
+  setModerationSecret(deps.config.moderationSecret);
+  setEncryptionKey(deps.config.dataEncryptionKey, deps.config.jwtSecret);
+  // One trusted hop, and only from the internal network (Caddy): a client that
+  // reaches the API port directly cannot pick its address with X-Forwarded-For (#23).
+  const internal = (address: string) => /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|::ffff:(127|10)\.|f[cd][0-9a-f]{2}:)/i.test(address);
+  // Logs keep the path, never the query (tokens, keys, signed URLs) or credentials (#19).
+  const logger = deps.logger ? {
+    redact: ['req.headers.authorization', 'req.headers.apikey', 'req.headers.cookie', 'req.headers["x-moderation-secret"]'],
+    serializers: { req: (req: { method: string; url: string; ip?: string }) => ({ method: req.method, url: String(req.url).split('?')[0], ip: req.ip }) }
+  } : false;
+  const app = Fastify({ logger, trustProxy: (address, hop) => hop < 1 && internal(address), bodyLimit: 1024 * 1024 });
+  // Only the platform's own sites may call the API from a browser (#60).
+  const origins = new Set(deps.config.corsOrigins);
   await app.register(cors, {
-    origin: '*',
+    origin: (origin, cb) => cb(null, !origin || origins.has(origin)),
     allowedHeaders: ['authorization', 'apikey', 'content-type', 'x-client-info', 'x-supabase-api-version', 'prefer', 'range',
       'accept-profile', 'content-profile', 'x-upsert', 'cache-control', 'x-moderation-secret', 'x-metadata'],
     exposedHeaders: ['content-range', 'x-total-count', 'x-supabase-api-version'],

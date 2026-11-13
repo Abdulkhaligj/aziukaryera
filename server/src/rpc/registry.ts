@@ -18,6 +18,9 @@ export interface RpcFunction {
   /** STABLE / IMMUTABLE functions may also be called with GET. */
   readOnly?: boolean;
   returns: Returns;
+  /** Calls per client (IP and account) in a window; over it the call is
+   *  refused, or skipped without an error when silent (audit 2026-11-13, H-11). */
+  limits?: { name: string; count: number; windowMs: number; key?: (args: Args) => string; silent?: boolean }[];
   run(env: WriteEnv, args: Args): Promise<unknown>;
 }
 

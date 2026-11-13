@@ -3,6 +3,7 @@ import './accounts.ts';
 import './billing.ts';
 import './checks.ts';
 import './content.ts';
+import './hardening.ts';
 import './interviews.ts';
 import './moderation.ts';
 import './storage.ts';

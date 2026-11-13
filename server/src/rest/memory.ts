@@ -14,8 +14,26 @@ function compare(value: unknown, raw: string): number {
   return text < raw ? -1 : text > raw ? 1 : 0;
 }
 
-const likeRegex = (pattern: string, insensitive: boolean) =>
-  new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[%*]/g, '.*').replace(/_/g, '.')}$`, insensitive ? 'is' : 's');
+/** LIKE / ILIKE (`%` or `*` any run, `_` one character) without a regular
+ *  expression: the greedy wildcard matcher backtracks at most to the last `%`,
+ *  so the time is linear in text × pattern, never exponential (audit
+ *  2026-11-13, H-03). Patterns are capped like PostgREST inputs. */
+const MAX_PATTERN = 1000;
+export function likeMatch(text: string, pattern: string, insensitive: boolean): boolean {
+  if ([...pattern].length > MAX_PATTERN) throw pgErrors.parse('pattern too long');
+  const fold = (x: string) => (insensitive ? x.toLowerCase() : x);
+  const t = [...fold(text)];
+  const p = [...fold(pattern)].map(c => (c === '*' ? '%' : c));
+  let ti = 0, pi = 0, star = -1, mark = 0;
+  while (ti < t.length) {
+    if (pi < p.length && (p[pi] === '_' || (p[pi] !== '%' && p[pi] === t[ti]))) { ti++; pi++; }
+    else if (pi < p.length && p[pi] === '%') { star = pi++; mark = ti; }
+    else if (star !== -1) { pi = star + 1; ti = ++mark; }
+    else return false;
+  }
+  while (pi < p.length && p[pi] === '%') pi++;
+  return pi === p.length;
+}
 
 function contains(container: unknown, items: unknown): boolean {
   if (!Array.isArray(container) || !Array.isArray(items)) return false;
@@ -44,8 +62,8 @@ function comparison(row: Row, f: Filter): boolean {
     case 'gte': ok = compare(value, f.value) >= 0; break;
     case 'lt': ok = compare(value, f.value) < 0; break;
     case 'lte': ok = compare(value, f.value) <= 0; break;
-    case 'like': ok = likeRegex(f.value, false).test(String(value)); break;
-    case 'ilike': ok = likeRegex(f.value, true).test(String(value)); break;
+    case 'like': ok = likeMatch(String(value), f.value, false); break;
+    case 'ilike': ok = likeMatch(String(value), f.value, true); break;
     case 'in': ok = parseList(f.value).some(v => compare(value, v) === 0); break;
     case 'cs': ok = contains(value, arrayValue(f.value)); break;
     default: ok = contains(arrayValue(f.value), value); break; // cd

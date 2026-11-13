@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { ImagePlus, LoaderCircle, Trash2 } from 'lucide-react';
-import { createClient } from '@/lib/backend/client';
 
 /* Şəkli brauzerdə kiçildib yenidən kodlayır: fayl yüngülləşir, EXIF/GPS silinir.
    Şəffaf loqolar üçün WebP (alfa kanalı saxlanır); WebP yaza bilməyən brauzerdə PNG/JPEG. */
@@ -27,18 +26,26 @@ async function resizeImage(file: File, max: number): Promise<Blob> {
   }
 }
 
+/* Panelin öz serveri ilə yüklənir: sessiya cookie-si HttpOnly-dir, brauzer API ilə birbaşa danışmır (audit 2026-11-13, #58). */
+export async function uploadFile(kind: 'image' | 'audio', blob: Blob, folder = ''): Promise<{ path: string; url?: string }> {
+  const form = new FormData();
+  form.set('kind', kind);
+  form.set('folder', folder);
+  form.set('file', blob, kind === 'audio' ? 'audio.wav' : 'image');
+  const response = await fetch('/api/admin/upload', { method: 'POST', body: form });
+  const result = await response.json().catch(() => ({}));
+  if (response.status === 401) { window.location.href = '/login'; throw new Error('Sessiya bitib'); }
+  if (!response.ok || !result.path) throw new Error(result.error || 'Fayl yüklənmədi');
+  return result;
+}
+
 /* public-media bucket-inə yükləyib ictimai linki qaytarır (yükləməni yalnız admin edə bilər) */
 export async function uploadPublicImage(file: File, folder: string): Promise<string> {
   if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('Yalnız PNG, JPG və ya WebP şəkil seçin');
   if (file.size > 15 * 1024 * 1024) throw new Error('Şəkil 15 MB-dan böyük olmamalıdır');
-  const db = createClient();
-  if (!db) throw new Error('Bağlantı qurulmayıb');
   const blob = await resizeImage(file, 1600);
-  const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
-  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await db.storage.from('public-media').upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
-  if (error) throw new Error(/row-level|unauthor/i.test(error.message) ? 'Şəkil yükləməyə icazəniz yoxdur' : error.message);
-  return db.storage.from('public-media').getPublicUrl(path).data.publicUrl;
+  if (blob.size > 5 * 1024 * 1024) throw new Error('Şəkil kiçildildikdən sonra da 5 MB-dan böyükdür');
+  return (await uploadFile('image', blob, folder)).url!;
 }
 
 export default function ImageField({ name, label, defaultValue, folder, hint, wide = false }: { name: string; label: string; defaultValue?: string; folder: string; hint?: string; wide?: boolean }) {

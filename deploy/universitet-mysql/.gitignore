@@ -2,3 +2,4 @@
 kit.env
 api.env
 backups/
+backup.key

@@ -76,9 +76,9 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 
 ### 3.3 Admin panel
 - **Env dəyişənləri:** `NEXT_PUBLIC_API_URL` və `NEXT_PUBLIC_API_KEY` (`.env.example`-ə bax). Adlar köhnədir, dəyərlər MySQL API-nin ünvanı və `ANON_KEY` açarıdır. Vercel-də də eyni dəyişənlər.
-- **Texniki işlər rejimi:** `next.config.mjs`-dəki `MAINTENANCE` dəyişənidir.
+- **Texniki işlər rejimi:** `next.config.mjs`-dəki `MAINTENANCE` dəyişənidir (standart: açıq; yerli yoxlama üçün build zamanı `ADMIN_MAINTENANCE=false`). Keçid skripti (`05-switch-frontend.mjs`) onu söndürür.
 - **Qurma və işə salma:** `npm ci && npm run build && npm start` (Node 20+).
-- **Testlər:** `node --test tests/*.test.mjs` (85 test).
+- **Testlər:** `node --test tests/*.test.mjs` (95 test).
 
 ### 3.4 E-poçt (SMTP)
 - **SMTP məcburidir:** e-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`).
@@ -103,11 +103,21 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 - **Admin hesabları:** heç kim öz rolunu aşağı sala və ya özünü bloklaya bilməz. Sonuncu aktiv Super Admin dəyişdirilə və silinə bilməz.
 - **Təsdiqlənmiş vakansiya:** məzmunu dəyişdirilərsə, yenidən təsdiq növbəsinə düşür.
 - **Linklər:** yalnız `http(s)://` ola bilər.
-- **Server:** MySQL və API kənara açılmır, yalnız Caddy (80/443). Backup-lar AES-256 ilə şifrələnir və serverdən kənara köçürülür.
+- **Server:** MySQL və API kənara açılmır, yalnız Caddy (80/443). Backup-lar həmişə AES-256 ilə şifrələnir və serverdən kənara köçürülür. API-nin MySQL hesabı sxemi dəyişə bilmir.
+- **13.11.2026 auditi (86 bənd) üzrə əsas əlavələr:**
+  - Sessiyalar: çıxış, ban, hesabın silinməsi və şifrə dəyişikliyi köhnə tokenləri dərhal etibarsız edir. Bərpa linki ilə açılan sessiya yalnız yeni şifrə qura bilir.
+  - Şifrə dəyişmək üçün cari şifrə serverdə yoxlanılır; Karyera Mərkəzinin verdiyi müvəqqəti şifrə ilk girişdə dəyişdirilməlidir.
+  - E-poçt linkləri düymə ilə təsdiqlənir (poçt skanerləri linki yandırmır).
+  - API brauzerdən yalnız platformanın öz saytlarına açıqdır (CORS); MySQL xəta mətnləri klientə getmir; loglarda token və açar yoxdur.
+  - Dayandırılmış şirkət vakansiyalarını dəyişə bilmir və vakansiyaları görünmür; ödənişləri işçilərdən yalnız Super Admin və Menecer görür; qonaq şirkətin əlaqə məlumatlarını görmür.
+  - Yüklənən faylın məzmunu elan olunan növə uyğun olmalıdır; fayllar `nosniff` və `sandbox` ilə verilir; şəkillər yalnız platformanın öz storage-ındandır.
+  - AI: CV mətni yalnız tələbənin razılığı ilə göndərilir; namizəd sıralamasında hər namizəd ayrıca blokdadır.
+  - Admin panel: HttpOnly cookie, nonce ilə CSP, URL-dən yalnız tanınan mesaj kodları.
 
-## 5. Testlər (12.11.2026)
-- **Saytlar və admin panel:** 85/85 test keçir, TypeScript yoxlaması və `next build` uğurludur.
-- **MySQL API:** 89/89 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).
+## 5. Testlər (13.11.2026)
+- **Saytlar və admin panel:** 95/95 test keçir, TypeScript yoxlaması və `next build` uğurludur.
+- **MySQL API:** 106/106 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).
+- **CI:** `npm audit` (yüksək və kritik zəifliklər build-i dayandırır).
 - **Ehtiyat nüsxə:** lokal bazaya bərpa edildi, 92 cədvəlin sətir sayları eynidir. MySQL-ə sınaq köçürməsi uğurlu oldu: 58 cədvəl, 963 sətir, 10 istifadəçi şifrə hash-i ilə. 15 faylın hamısı yerindədir.
 
 ## 6. Əlaqə və məsul şəxslər

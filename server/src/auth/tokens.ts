@@ -15,7 +15,7 @@ export const newSecret = () => randomBytes(32).toString('base64url');
 
 interface SessionRow extends Row { id: string; user_id: string; aal: string; amr_method: string; created_at: string; expires_at: string; revoked_at: string | null }
 
-export async function signAccessToken(config: Config, user: AuthUser, session: Pick<SessionRow, 'id' | 'aal' | 'amr_method' | 'created_at'>) {
+export async function signAccessToken(config: Config, user: AuthUser, session: Pick<SessionRow, 'id' | 'aal' | 'amr_method' | 'created_at'> & { restricted?: unknown }) {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + config.accessTokenTtl;
   const token = await new SignJWT({
@@ -23,7 +23,9 @@ export async function signAccessToken(config: Config, user: AuthUser, session: P
     app_metadata: user.raw_app_meta_data || {}, user_metadata: user.raw_user_meta_data || {},
     role: 'authenticated', aal: session.aal,
     amr: [{ method: session.amr_method, timestamp: Math.floor(new Date(session.created_at).getTime() / 1000) }],
-    session_id: session.id, is_anonymous: false
+    session_id: session.id, is_anonymous: false,
+    // The site shows the new-password screen for such a session (#15).
+    ...(session.restricted ? { restricted: true } : {})
   })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuer(`${config.publicUrl}/auth/v1`)
@@ -46,11 +48,12 @@ async function issue(tx: Tx, config: Config, user: AuthUser, session: SessionRow
 }
 
 /** Sign-in: a new session (device) with its first refresh token. */
-export async function startSession(tx: Tx, config: Config, user: AuthUser, method: string, meta: { userAgent?: string; ip?: string }) {
+/** `restricted`: a session from a recovery link, which may only set a new password (#15). */
+export async function startSession(tx: Tx, config: Config, user: AuthUser, method: string, meta: { userAgent?: string; ip?: string }, restricted = false) {
   const id = randomUUID();
   const expires = new Date(Date.now() + config.refreshTokenTtlDays * 86_400_000);
-  await exec(tx, `INSERT INTO auth_sessions (id, user_id, amr_method, expires_at, user_agent, ip) VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, user.id, method, toMysqlDatetime(expires), meta.userAgent?.slice(0, 255) ?? null, meta.ip ?? null]);
+  await exec(tx, `INSERT INTO auth_sessions (id, user_id, amr_method, expires_at, user_agent, ip, restricted) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, user.id, method, toMysqlDatetime(expires), meta.userAgent?.slice(0, 255) ?? null, meta.ip ?? null, restricted ? 1 : 0]);
   await exec(tx, 'UPDATE auth_users SET last_sign_in_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [user.id]);
   const session = (await one<SessionRow>(tx, 'SELECT * FROM auth_sessions WHERE id = ?', [id]))!;
   const fresh = (await one<AuthUser>(tx, 'SELECT * FROM auth_users WHERE id = ?', [user.id]))!;

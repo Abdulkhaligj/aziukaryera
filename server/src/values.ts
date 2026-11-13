@@ -19,8 +19,18 @@ export function timestampText(value: string | Date, digits = 6): string {
   return `${text.slice(0, 10)}T${text.slice(11, 19)}${digits ? '.' + text.slice(20, 20 + digits) : ''}+00:00`;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function canonical(column: Column, value: unknown): unknown {
   if (value === null || value === undefined) return value;
+  // An allowed value written in another case is that value: MySQL would store
+  // or accept 'APPROVED' as 'approved', and every rule must see what MySQL sees.
+  if (column.enumValues && typeof value === 'string' && !column.enumValues.includes(value)) {
+    const lower = value.toLowerCase();
+    const match = column.enumValues.find(v => v.toLowerCase() === lower);
+    if (match !== undefined) return match;
+  }
+  if (column.uuid && typeof value === 'string' && UUID.test(value.trim())) return value.trim().toLowerCase();
   switch (column.dataType) {
     case 'datetime': case 'timestamp':
       if (typeof value !== 'string' && !(value instanceof Date)) return value;
@@ -44,6 +54,10 @@ export function canonical(column: Column, value: unknown): unknown {
 /** JSON value → MySQL parameter for a column. */
 export function toParam(column: Column, value: unknown): unknown {
   if (value === null || value === undefined) return null;
+  // A uuid column holds a uuid, as in Postgres: no markup can hide in an id (H-05).
+  if (column.uuid && (typeof value !== 'string' || !UUID.test(value))) {
+    throw new DbRuleError(`invalid input syntax for type uuid: "${String(value)}"`, '22P02');
+  }
   switch (column.dataType) {
     case 'json': return JSON.stringify(value);
     case 'datetime': case 'timestamp':

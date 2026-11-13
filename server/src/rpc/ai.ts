@@ -23,19 +23,22 @@ export async function aiRequestContext(env: WriteEnv, profileId: string, task: s
 
   if (task === 'candidate_rank' || task === 'job_post_write') {
     if (role !== 'company' && role !== 'admin') return { allowed: false, reason: 'company_only' };
+    // #66: ranking reads the applicants' CVs: the owner and company admins only;
+    // a viewer does not write vacancies either.
+    const memberRoles = task === 'candidate_rank' ? ['owner', 'admin'] : ['owner', 'admin', 'recruiter'];
     let company: string | null = null;
     if (jobId != null) {
       company = (await one<{ company_id: string }>(env.tx, 'SELECT company_id FROM jobs WHERE id = ?', [jobId]))?.company_id ?? null;
       if (company == null) return { allowed: false, reason: 'job_not_found' };
       if (role !== 'admin'
         && !await one(env.tx, 'SELECT 1 AS ok FROM companies WHERE id = ? AND owner_id = ?', [company, profileId])
-        && !await one(env.tx, `SELECT 1 AS ok FROM company_members WHERE company_id = ? AND profile_id = ? AND status = 'active'`, [company, profileId])) {
+        && !await one(env.tx, `SELECT 1 AS ok FROM company_members WHERE company_id = ? AND profile_id = ? AND status = 'active' AND member_role IN (${inList(memberRoles)})`, [company, profileId, ...memberRoles])) {
         return { allowed: false, reason: 'not_member' };
       }
     } else {
       company = (await one<{ id: string }>(env.tx, `SELECT c.id FROM companies c WHERE c.owner_id = ?
-          OR EXISTS (SELECT 1 FROM company_members m WHERE m.company_id = c.id AND m.profile_id = ? AND m.status = 'active')
-        ORDER BY c.owner_id = ? DESC LIMIT 1`, [profileId, profileId, profileId]))?.id ?? null;
+          OR EXISTS (SELECT 1 FROM company_members m WHERE m.company_id = c.id AND m.profile_id = ? AND m.status = 'active' AND m.member_role IN (${inList(memberRoles)}))
+        ORDER BY c.owner_id = ? DESC LIMIT 1`, [profileId, profileId, ...memberRoles, profileId]))?.id ?? null;
     }
     if (role === 'admin') return { allowed: true, role, company_id: company, used: 0, limit: null, period: 'month' };
     if (company == null) return { allowed: false, reason: 'no_company' };
@@ -57,10 +60,12 @@ export async function aiRequestContext(env: WriteEnv, profileId: string, task: s
     };
   }
 
-  if (role === 'admin') return { allowed: true, role, used: 0, limit: null, period: 'day' };
+  // #52: the person's own texts go to the AI providers only after they agreed.
+  const consent = !!(await one<{ at: string | null }>(env.tx, 'SELECT ai_consent_at AS at FROM profiles WHERE id = ?', [profileId]))?.at;
+  if (role === 'admin') return { allowed: true, role, used: 0, limit: null, period: 'day', ai_consent: consent };
   const used = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM ai_usage
       WHERE profile_id = ? AND company_id IS NULL AND success AND created_at >= ?`, [profileId, toMysqlDatetime(bakuStart(env.now, 'day'))]))!.n);
-  return { allowed: used < STUDENT_DAILY, reason: used >= STUDENT_DAILY ? 'quota_exceeded' : null, role, used, limit: STUDENT_DAILY, period: 'day' };
+  return { allowed: used < STUDENT_DAILY, reason: used >= STUDENT_DAILY ? 'quota_exceeded' : null, role, used, limit: STUDENT_DAILY, period: 'day', ai_consent: consent };
 }
 
 rpc({
@@ -69,9 +74,18 @@ rpc({
 });
 
 /** public.ai_reserve_request: one reservation per AI call, within its budget. */
-export async function aiReserveRequest(env: WriteEnv, profileId: string | null, task: string | null, jobId: string | null, clientHash: string | null): Promise<Row> {
-  // pg_advisory_xact_lock: one global lock also makes the anonymous cap independent of client headers.
-  await one(env.tx, `SELECT value FROM private_sequences WHERE name = 'ai_reservation_lock' FOR UPDATE`);
+/** A row lock per budget until the transaction ends (pg_advisory_xact_lock):
+ *  reservations of different people no longer wait for each other (#48). */
+async function lockBudget(env: WriteEnv, budget: string) {
+  await exec(env.tx, 'INSERT IGNORE INTO private_ai_budget_locks (budget) VALUES (?)', [budget]);
+  await one(env.tx, 'SELECT budget FROM private_ai_budget_locks WHERE budget = ? FOR UPDATE', [budget]);
+}
+
+/** Moderation calls one person's texts and photos may use in a day (H-12). */
+const MODERATION_PER_AUTHOR = 150;
+
+export async function aiReserveRequest(env: WriteEnv, profileId: string | null, task: string | null, jobId: string | null, clientHash: string | null,
+  author: string | null = null): Promise<Row> {
   let ctx: Row = {};
   let role: string | null = null;
   if (profileId != null) {
@@ -92,6 +106,8 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
   if (task === 'aida_chat') {
     if (profileId == null) {
       if (clientHash == null || !/^[0-9a-f]{40}$/.test(clientHash)) throw new DbRuleError('Invalid anonymous client', '22023');
+      // One lock for every guest: the shared guest cap does not depend on client headers.
+      await one(env.tx, `SELECT value FROM private_sequences WHERE name = 'ai_reservation_lock' FOR UPDATE`);
       const used = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
           WHERE task = 'aida_chat' AND profile_id IS NULL AND created_at >= ?`, [toMysqlDatetime(since)]))!.n);
       if (used >= 2000) return { allowed: false, reason: 'quota_exceeded', limit: 2000, used };
@@ -102,6 +118,13 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
     budget = `admin:${profileId}`; limit = 200;
   } else if (task === 'content_moderation' || task === 'avatar_moderation') {
     budget = 'moderation'; limit = 5000;
+    // H-12: one person cannot use up the moderation budget of the whole platform.
+    if (author != null) {
+      await lockBudget(env, `moderation:author:${author}`);
+      const mine = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
+          WHERE task IN ('content_moderation', 'avatar_moderation') AND profile_id = ? AND created_at >= ?`, [author, toMysqlDatetime(since)]))!.n);
+      if (mine >= MODERATION_PER_AUTHOR) return { allowed: false, reason: 'author_quota_exceeded', used: mine, limit: MODERATION_PER_AUTHOR };
+    }
   } else if (task != null && CAREER_TASKS.includes(task)) {
     if (profileId == null) return { allowed: false, reason: 'forbidden' };
     ctx = await aiRequestContext(env, profileId, task, jobId);
@@ -115,10 +138,11 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
       limit = Math.min((ctx.limit as number | null) ?? 10000, 10000);
     } else { budget = `career:profile:${profileId}`; limit = 25; }
   } else throw new DbRuleError('Unsupported AI task', '22023');
+  await lockBudget(env, budget);
   const used = Number((await one<{ n: number }>(env.tx, 'SELECT COUNT(*) AS n FROM private_ai_reservations WHERE budget = ? AND created_at >= ?',
     [budget, toMysqlDatetime(since)]))!.n);
   if (used >= limit) return { ...ctx, allowed: false, reason: 'quota_exceeded', used, limit };
-  const reservation = await insertRow(env, 'private_ai_reservations', { profile_id: profileId, company_id: company, client_hash: clientHash, task, budget });
+  const reservation = await insertRow(env, 'private_ai_reservations', { profile_id: profileId ?? author, company_id: company, client_hash: clientHash, task, budget });
   return { ...ctx, allowed: true, reservation_id: reservation.id, used: used + 1, limit };
 }
 
@@ -145,7 +169,7 @@ rpc({
       return list.length ? (await rows<{ name: string }>(env.tx, `SELECT name FROM ${table} WHERE id IN (${inList(list)}) ORDER BY id`, list)).map(r => r.name) : [];
     };
     const apps = job ? await rows<Row>(env.tx, `SELECT a.id AS application_id, a.student_id, a.status, a.created_at,
-          p.faculty_id, p.major_id, p.course, p.gpa, p.skills, p.languages, p.certificates, p.summary
+          p.faculty_id, p.major_id, p.course, p.gpa, p.skills, p.languages, p.certificates, p.summary, p.ai_consent_at
         FROM applications a JOIN profiles p ON p.id = a.student_id
        WHERE a.job_id = ? AND a.status NOT IN ('geri_goturuldu', 'imtina', 'rejected')`, [job.id]) : [];
     const scored = apps.map(x => ({ ...x, deterministic_score: matchScore(job!.faculty_ids, job!.major_ids, job!.skills, x.faculty_id, x.major_id, x.skills) }) as Row & { deterministic_score: number })
@@ -163,6 +187,7 @@ rpc({
          ORDER BY updated_at DESC LIMIT 1`, [c.student_id]);
       candidates.push({
         application_id: c.application_id, student_id: c.student_id, status: c.status, deterministic_score: c.deterministic_score,
+        ai_consent: c.ai_consent_at != null,
         created_at: c.created_at, faculty, major, course: c.course, gpa: c.gpa, skills: c.skills, languages: c.languages,
         certificates: c.certificates, summary: left(c.summary, 800), education, cv_text: cv ? left(cv.source_text, 2500) : null
       });

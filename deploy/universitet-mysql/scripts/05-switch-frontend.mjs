@@ -1,5 +1,5 @@
 // Cutover: points the student site at the MySQL API (runtime-config.js and the
-// CSP connect-src in every place it is declared) and turns the maintenance page
+// CSP connect-src and img-src in every place they are declared) and turns the maintenance page
 // off on both sites. Run from the repository root:
 //   node deploy/universitet-mysql/scripts/05-switch-frontend.mjs --url https://api.example.az --key <ANON_KEY>
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -31,12 +31,16 @@ edit(`${web}/assets/js/runtime-config.js`, text => text
   .replace(/apiKey: '[^']*'/, `apiKey: '${key}'`));
 
 // Until the cutover the sites may only connect to themselves; now also to the API.
+// Images come from the site and the API's own storage only (audit 2026-11-13, #81).
 const ownCsp = `connect-src 'self' https://${host} wss://${host}`;
+const ownImg = `img-src 'self' data: blob: https://${host}`;
 for (const file of ['index.html', 'cv-builder.html', 'vercel.json', 'nginx-security-headers.conf']) {
-  edit(`${web}/${file}`, text => replaceOnce(text, "connect-src 'self';", `${ownCsp};`, file));
+  edit(`${web}/${file}`, text => replaceOnce(replaceOnce(text, "connect-src 'self';", `${ownCsp};`, file),
+    "img-src 'self' data: blob:;", `${ownImg};`, file));
 }
 edit(`${web}/scripts/update-security-policy.mjs`, text =>
-  replaceOnce(text, `"connect-src 'self'",`, `"${ownCsp}",`, 'scripts/update-security-policy.mjs'));
+  replaceOnce(replaceOnce(text, `"connect-src 'self'",`, `"${ownCsp}",`, 'scripts/update-security-policy.mjs'),
+    `"img-src 'self' data: blob:",`, `"${ownImg}",`, 'scripts/update-security-policy.mjs'));
 
 const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '') + 's';
 for (const file of ['index.html', 'cv-builder.html']) {
@@ -49,7 +53,7 @@ edit(`${web}/vercel.json`, text => {
   delete config.redirects;
   return JSON.stringify(config, null, 2) + '\n';
 });
-edit('next.config.mjs', text => replaceOnce(text, 'const MAINTENANCE = true;', 'const MAINTENANCE = false;', 'next.config.mjs'));
+edit('next.config.mjs', text => replaceOnce(text, "const MAINTENANCE = process.env.ADMIN_MAINTENANCE !== 'false';", 'const MAINTENANCE = false;', 'next.config.mjs'));
 
 console.log(`
 Növbəti addımlar:

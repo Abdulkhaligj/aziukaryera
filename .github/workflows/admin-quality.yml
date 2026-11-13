@@ -43,6 +43,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      # Known vulnerabilities in the shipped dependencies fail the build (audit 2026-11-13, #86).
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: Security regression checks
         run: node --test tests/*.test.mjs
       - name: TypeScript type check
@@ -80,6 +83,8 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci --ignore-scripts
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: API type check
         run: npm run typecheck
       - name: API integration tests

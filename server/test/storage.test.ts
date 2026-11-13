@@ -4,9 +4,10 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { decodeJwt } from 'jose';
 import type { ApiClient } from './helpers.ts';
 import { exec, one } from '../src/db.ts';
-import { startHarness, type Harness } from './helpers.ts';
+import { fileBytes, startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
 let student: ApiClient, other: ApiClient, admin: ApiClient;
@@ -20,7 +21,7 @@ async function signedIn(email: string, data: Record<string, unknown>) {
 }
 
 const hex = (n: number) => n.toString(16).padStart(32, '0');
-const image = (bytes = 64, type = 'image/webp') => new Blob([new Uint8Array(bytes).map((_, i) => i % 251)], { type });
+const image = (bytes = 64, type = 'image/webp') => new Blob([fileBytes(bytes, type)], { type });
 
 before(async () => {
   h = await startHarness();
@@ -50,6 +51,8 @@ test('avatar upload: own folder only, bucket size and type limits, no overwrite'
   assert.equal(foreign.error?.message, 'new row violates row-level security policy');
   const png = await student.storage.from('avatars').upload(`${studentId}/${hex(3)}.png`, image(64, 'image/png'));
   assert.equal(png.error?.message, 'mime type image/png is not supported');
+  const fake = await student.storage.from('avatars').upload(`${studentId}/${hex(7)}.webp`, new Blob([new TextEncoder().encode('<html><script>alert(1)</script>')], { type: 'image/webp' }));
+  assert.equal(fake.error?.message, 'The file content is not image/webp', 'the bytes must match the type (#56)');
   const big = await student.storage.from('avatars').upload(`${studentId}/${hex(4)}.webp`, image(1048577));
   assert.equal(big.error?.message, 'The object exceeded the maximum allowed size');
   assert.equal((await h.anon().storage.from('avatars').upload(`x/${hex(5)}.webp`, image())).error?.message, 'new row violates row-level security policy');
@@ -72,6 +75,8 @@ test('download, signed URLs and listing respect the select policy', async () => 
   const fetched = await fetch(signed.data!.signedUrl);
   assert.equal(fetched.status, 200);
   assert.equal(fetched.headers.get('content-type'), 'image/webp');
+  assert.equal(fetched.headers.get('x-content-type-options'), 'nosniff', 'audit 2026-11-13, #56');
+  assert.match(fetched.headers.get('content-security-policy') || '', /sandbox/);
   assert.equal((await fetched.arrayBuffer()).byteLength, 64);
   const tampered = await fetch(signed.data!.signedUrl.replace(hex(1), hex(9)));
   assert.equal(tampered.status, 400);
@@ -81,6 +86,16 @@ test('download, signed URLs and listing respect the select policy', async () => 
   assert.equal(many.data![0].error, null);
   assert.ok(many.data![0].signedUrl);
   assert.equal(many.data![1].signedUrl, null);
+
+  // #21: a URL signature is not a session token, and a URL dies with the version it signed.
+  const signature = new URL(signed.data!.signedUrl).searchParams.get('token')!;
+  const asSession = await fetch(`${h.url}/rest/v1/profiles?select=id`, { headers: { apikey: h.config.anonKey, authorization: `Bearer ${signature}` } });
+  assert.equal(asSession.status, 401);
+  const week = await student.storage.from('avatars').createSignedUrl(path, 365 * 24 * 3600);
+  const { exp, iat } = decodeJwt(new URL(week.data!.signedUrl).searchParams.get('token')!);
+  assert.equal(exp! - iat!, 7 * 24 * 3600, 'signed URLs live at most a week');
+  await exec(h.pool, 'UPDATE storage_objects SET updated_at = updated_at + INTERVAL 1 SECOND WHERE bucket_id = ? AND name = ?', ['avatars', path]);
+  assert.equal((await fetch(week.data!.signedUrl)).status, 404, 'a replaced file needs a new URL');
 
   const listed = await student.storage.from('avatars').list(studentId, { limit: 100 });
   assert.deepEqual(listed.data!.map(f => f.name), [`${hex(1)}.webp`]);
@@ -130,13 +145,13 @@ test('public-media: staff upload, anyone reads the public URL', async () => {
 
 test('assistant-audio: an admin\'s own folder, wav only', async () => {
   const name = `${adminId}/${hex(8)}.wav`;
-  assert.equal((await admin.storage.from('assistant-audio').upload(name, image(8, 'audio/wav'), { contentType: 'audio/wav' })).error, null);
+  assert.equal((await admin.storage.from('assistant-audio').upload(name, image(16, 'audio/wav'), { contentType: 'audio/wav' })).error, null);
   assert.equal((await admin.storage.from('assistant-audio').upload(`${adminId}/x.mp3`, image(8, 'audio/mpeg'))).error?.message,
     'mime type audio/mpeg is not supported');
-  assert.equal((await student.storage.from('assistant-audio').upload(`${studentId}/a.wav`, image(8, 'audio/wav'))).error?.message,
+  assert.equal((await student.storage.from('assistant-audio').upload(`${studentId}/a.wav`, image(16, 'audio/wav'))).error?.message,
     'new row violates row-level security policy');
   const service = h.service();
-  assert.equal((await service.storage.from('assistant-audio').download(name)).data?.size, 8);
+  assert.equal((await service.storage.from('assistant-audio').download(name)).data?.size, 16);
 });
 
 test('public-media (audit 2026-11-12): editors upload, only super admins and managers replace or delete', async () => {

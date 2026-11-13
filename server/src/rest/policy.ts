@@ -10,6 +10,35 @@ interface TableRules { rls: boolean; grants: { anon: string[]; authenticated: st
 
 const { tables } = JSON.parse(readFileSync(new URL('./policies.generated.json', import.meta.url), 'utf8')) as { tables: Record<string, TableRules> };
 
+// Security audit of 2026-11-13: rules on top of the translated policies.
+{
+  const restrict = (table: string, cmd: Cmd, name: string, using: string) =>
+    tables[table]?.policies.push({ name, cmd, permissive: false, roles: ['anon', 'authenticated'], using, check: null });
+  // H-06: a suspended or pending company, or one whose owner is suspended,
+  // changes nothing through its policies (reading its own data still works).
+  for (const rules of Object.values(tables)) {
+    for (const p of rules.policies) {
+      if (p.cmd === 'SELECT' || p.cmd === 'ALL') continue;
+      p.using = p.using?.split('owns_company(').join('owns_active_company(') ?? null;
+      p.check = p.check?.split('owns_company(').join('owns_active_company(') ?? null;
+    }
+  }
+  // H-06: the vacancies of a company that is not active are not public.
+  restrict('jobs', 'SELECT', 'audit_jobs_active_company',
+    "(@is_admin = 1) OR owns_company(company_id) OR EXISTS (SELECT 1 FROM companies c WHERE c.id = jobs.company_id AND c.status = 'active')");
+  // #29: among the staff, only super admins and managers see payments and plans.
+  for (const t of ['payments', 'subscriptions', 'subscription_usage']) {
+    restrict(t, 'SELECT', 'audit_billing_senior_staff', "(NOT (@actor_is_staff = 1)) OR (COALESCE(@admin_role, '') IN ('super_admin', 'manager'))");
+  }
+}
+
+/** Columns a visitor without an account does not read (#62): the contact
+ *  details of a company are for signed-in students and staff. */
+export const ANON_HIDDEN: Record<string, string[]> = {
+  companies: ['owner_id', 'email', 'phone', 'contact', 'contact_position', 'contact_email', 'contact_phone']
+};
+export const hiddenFor = (ctx: Context, table: string): string[] => (ctx.role === 'anon' ? ANON_HIDDEN[table] ?? [] : []);
+
 /** security_invoker views: rows are governed by their base table's policies. */
 export const VIEW_BASE: Record<string, { base: string; key: string }> = {
   company_subscriptions: { base: 'subscriptions', key: 'id' }

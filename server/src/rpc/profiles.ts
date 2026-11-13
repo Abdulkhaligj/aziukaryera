@@ -1,6 +1,6 @@
 // Profile cards, photos and candidate lists: candidate_profiles, profile_cards,
 // profile_avatar_paths, avatar_submit, avatar_remove, ranked_jobs_for (match_score).
-import { one, rows, toMysqlDatetime, type Row } from '../db.ts';
+import { exec, one, rows, toMysqlDatetime, type Row } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
 import { nowText, updateRow, type WriteEnv } from '../write/pipeline.ts';
 import { rpc } from './registry.ts';
@@ -17,19 +17,36 @@ async function hasCandidateSearch(env: WriteEnv): Promise<boolean> {
        AND pf.feature_key = 'candidate_search' AND pf.enabled LIMIT 1`, [env.ctx.uid, now, now]);
 }
 
+/** Profiles that take part in the company search; a student who chose a
+ *  private profile is shown only to companies they applied to (#38). */
+const SEARCHABLE = `p.profile_visibility IN ('platform', 'companies', 'public')`;
 /** The candidate_profiles() condition on alias p (can_read_profile reads the session variables). */
-async function candidateSql(env: WriteEnv): Promise<string> {
-  return `(p.role IN ('student', 'graduate') AND p.status = 'active' AND (can_read_profile(p.id) OR ${await hasCandidateSearch(env) ? 'TRUE' : 'FALSE'}))`;
+async function candidateSql(env: WriteEnv, search?: boolean): Promise<string> {
+  const entitled = search ?? await hasCandidateSearch(env);
+  return `(p.role IN ('student', 'graduate') AND p.status = 'active' AND (can_read_profile(p.id) OR ${entitled ? SEARCHABLE : 'FALSE'}))`;
 }
+
+/** One answer lists at most this many candidates, newest profiles first (#50). */
+const MAX_CANDIDATES = 500;
 
 /** public.candidate_profiles() */
 export async function candidateProfiles(env: WriteEnv): Promise<Row[]> {
   if (!env.ctx.uid) return [];
-  return rows(env.tx, `SELECT p.id, p.full_name, p.role, p.status, p.faculty_id, p.major_id, p.course, p.gpa, p.skills, p.summary, p.account_status
-      FROM profiles p WHERE ${await candidateSql(env)}`);
+  const search = await hasCandidateSearch(env);
+  const found = await rows(env.tx, `SELECT p.id, p.full_name, p.role, p.status, p.faculty_id, p.major_id, p.course, p.gpa, p.skills, p.summary, p.account_status
+      FROM profiles p WHERE ${await candidateSql(env, search)} ORDER BY p.updated_at DESC, p.id LIMIT ${MAX_CANDIDATES}`);
+  // A company's use of the candidate search is recorded (#50).
+  if (search) {
+    await exec(env.tx, 'INSERT INTO private_candidate_search_log (profile_id, results) VALUES (?, ?)', [env.ctx.uid, found.length]);
+  }
+  return found;
 }
 
-rpc({ name: 'candidate_profiles', readOnly: true, args: {}, roles: ['authenticated'], security: 'definer', returns: 'rows', run: env => candidateProfiles(env) });
+rpc({
+  name: 'candidate_profiles', readOnly: true, args: {}, roles: ['authenticated'], security: 'definer', returns: 'rows',
+  limits: [{ name: 'per-client', count: 120, windowMs: 3_600_000 }],
+  run: env => candidateProfiles(env)
+});
 
 /** p_ids[1:500] */
 const firstIds = (ids: (string | null)[] | null) => (ids ?? []).slice(0, 500).filter((id): id is string => id != null);

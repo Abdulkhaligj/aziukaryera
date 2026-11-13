@@ -2,20 +2,22 @@
 // JWT only for functions deployed with verify_jwt = true (admin-users); the
 // others verify their callers themselves.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { Pool } from 'mysql2/promise';
 import type { Config } from '../config.ts';
-import { verifyJwt } from '../context.ts';
+import { contextFromHeaders } from '../context.ts';
 import { FunctionRuntime } from './runtime.ts';
 
 const VERIFY_JWT = new Set(['admin-users']);
 const HOP_BY_HOP = new Set(['host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive', 'upgrade']);
 
-export async function functionRoutes(app: FastifyInstance, deps: { config: Config }) {
-  const { config } = deps;
+export async function functionRoutes(app: FastifyInstance, deps: { config: Config; pool: Pool }) {
+  const { config, pool } = deps;
   const runtime = new FunctionRuntime(config);
 
   // The function reads the body itself, so it arrives unparsed.
   app.removeAllContentTypeParsers();
-  app.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit: 25 * 1024 * 1024 }, (_req, body, done) => done(null, body));
+  // Requests are small JSON documents (audio goes to storage first): 1 MB (#78).
+  app.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit: 1024 * 1024 }, (_req, body, done) => done(null, body));
 
   async function invoke(req: FastifyRequest, reply: FastifyReply) {
     const name = (req.params as { name: string }).name;
@@ -23,7 +25,8 @@ export async function functionRoutes(app: FastifyInstance, deps: { config: Confi
     if (VERIFY_JWT.has(name)) {
       const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
       if (!token) return reply.code(401).send({ code: 401, message: 'Missing authorization header' });
-      if (!await verifyJwt(config, token)) return reply.code(401).send({ code: 401, message: 'Invalid JWT' });
+      const ctx = await contextFromHeaders(config, undefined, req.headers.authorization, pool);
+      if (!ctx || ctx.restricted) return reply.code(401).send({ code: 401, message: 'Invalid JWT' });
     }
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {

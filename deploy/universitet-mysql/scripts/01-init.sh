@@ -29,10 +29,23 @@ if [ -z "$(api_env_get JWT_SECRET)" ]; then
   done
 fi
 [ -n "$(api_env_get MODERATION_WEBHOOK_SECRET)" ] || env_set "$KIT_DIR/api.env" MODERATION_WEBHOOK_SECRET "$(random 48)"
+# Fields encrypted at rest (benefit claim codes): their own key (#73).
+[ -n "$(api_env_get DATA_ENCRYPTION_KEY)" ] || env_set "$KIT_DIR/api.env" DATA_ENCRYPTION_KEY "$(openssl rand -base64 32)"
+
+step "Backup açarı"
+# Backups are always encrypted (#57). The key stays here (chmod 600); keep a
+# copy off the server too, or the backups cannot be restored.
+if [ -z "${BACKUP_KEY_FILE:-}" ]; then
+  ( umask 077; openssl rand -base64 48 > "$KIT_DIR/backup.key" )
+  env_set "$KIT_DIR/kit.env" BACKUP_KEY_FILE "$KIT_DIR/backup.key"
+  echo "Yaradıldı: $KIT_DIR/backup.key — nüsxəsini serverdən kənarda saxlayın."
+  load_env
+fi
 
 step "MySQL"
 dc up -d mysql
-dc run --rm -T api node server/db/setup.mjs
+for _ in $(seq 1 60); do [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q mysql)" 2>/dev/null)" = healthy ] && break; sleep 2; done
+migrate
 
 echo
 echo "Hazırdır. Növbəti addım: scripts/02-import.sh (ehtiyat nüsxədən data və fayllar)."

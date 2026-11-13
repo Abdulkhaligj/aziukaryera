@@ -37,8 +37,14 @@ export interface Config {
   functionsDir: string;
   /** Environment the Edge Functions read with Deno.env.get (AI keys, webhook secret, …). */
   functionEnv: Record<string, string | undefined>;
+  /** DATA_ENCRYPTION_KEY: base64 32 bytes for fields encrypted at rest (#73). */
+  dataEncryptionKey?: string;
+  /** MODERATION_WEBHOOK_SECRET, sent to the moderation function. */
+  moderationSecret?: string;
   /** Run the scheduled jobs (pg_cron equivalents) in this process. */
   jobs: boolean;
+  /** Browser origins allowed to call the API (CORS). */
+  corsOrigins: string[];
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -68,7 +74,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mailerAutoconfirm: (env.ENABLE_EMAIL_AUTOCONFIRM ?? 'false') === 'true',
     secureEmailChange: (env.SECURE_EMAIL_CHANGE ?? 'true') === 'true',
     disableSignup: env.DISABLE_SIGNUP === 'true',
-    passwordMinLength: Number(env.PASSWORD_MIN_LENGTH || 6),
+    // At least 8 characters (#64).
+    passwordMinLength: Math.max(8, Number(env.PASSWORD_MIN_LENGTH || 8)),
     universityDomain: env.UNIVERSITY_EMAIL_DOMAIN || 'asoiu.edu.az',
     smtp: env.SMTP_HOST ? {
       host: env.SMTP_HOST,
@@ -79,7 +86,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     } : null,
     storageDir: env.STORAGE_DIR || new URL('../storage/', import.meta.url).pathname,
     functionsDir: env.FUNCTIONS_DIR || new URL('../functions/', import.meta.url).pathname,
-    functionEnv: { ...env },
-    jobs: (env.ENABLE_JOBS ?? 'true') === 'true'
+    // Only what the functions need; not the database URL or other secrets (#63).
+    functionEnv: Object.fromEntries(Object.entries(env).filter(([k]) => /^(GEMINI_|GROQ_|MODERATION_WEBHOOK_SECRET$|PUBLIC_SITE_URL$|SITE_URL$|TZ$|NODE_ENV$)/.test(k))),
+    dataEncryptionKey: env.DATA_ENCRYPTION_KEY || undefined,
+    moderationSecret: env.MODERATION_WEBHOOK_SECRET || undefined,
+    jobs: (env.ENABLE_JOBS ?? 'true') === 'true',
+    corsOrigins: [...new Set([siteUrl, ...(env.CORS_ORIGINS || '').split(','), ...(env.ADDITIONAL_REDIRECT_URLS || '').split(',')]
+      .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))]
   };
 }

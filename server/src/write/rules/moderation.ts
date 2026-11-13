@@ -12,6 +12,10 @@ import { audited, changed, companyHasFeature, privileged } from './core.ts';
 const MAX_TEXT = 6000;
 const MODERATION_FIELDS = ['moderation_status', 'moderation_reason', 'moderated_at', 'moderation_requested_at', 'moderation_attempts'];
 
+/** The webhook secret, from the API environment (not the database: #73). */
+let webhookSecret: string | null = null;
+export function setModerationSecret(secret: string | undefined) { webhookSecret = secret || null; }
+
 /** private.moderation_send: POST {table, id} to the configured endpoint once committed. */
 export async function moderationSend(env: WriteEnv, tableName: string, id: unknown) {
   const config = await one<{ endpoint: string; secret: string }>(env.tx,
@@ -21,14 +25,15 @@ export async function moderationSend(env: WriteEnv, tableName: string, id: unkno
   onCommit(env.tx, async () => {
     const response = await fetch(config.endpoint, {
       method: 'POST', signal: AbortSignal.timeout(30_000),
-      headers: { 'Content-Type': 'application/json', 'x-moderation-secret': config.secret },
+      headers: { 'Content-Type': 'application/json', 'x-moderation-secret': webhookSecret ?? config.secret },
       body: JSON.stringify({ table: tableName, id })
     });
     await response.body?.cancel();
   });
 }
 
-async function blocked(env: WriteEnv, text: string): Promise<boolean> {
+/** True when the text contains an active moderation term (the word filter). */
+export async function blocked(env: WriteEnv, text: string): Promise<boolean> {
   const terms = await rows<Term>(env.tx, 'SELECT term, `match`, script, tier FROM moderation_terms WHERE active');
   const allowed = await rows<Allowed>(env.tx, 'SELECT word, script FROM moderation_allow');
   return blockedTerm(text, terms, allowed) !== null;

@@ -1,5 +1,5 @@
 // public.select_company_plan: a company owner or admin requests a package.
-import { one, rows, type Row } from '../db.ts';
+import { one, rows, toMysqlDatetime, type Row } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
 import { insertRow, nowText, updateRow } from '../write/pipeline.ts';
 import { ensureInvoice } from '../write/rules/billing.ts';
@@ -29,6 +29,12 @@ rpc({
       const stored = await updateRow(env, 'subscriptions', { id: sub.id }, { requested_plan_id: null });
       return { ...stored, invoice: null };
     }
+    // #42: at most three paid-plan requests (invoices) a day per company.
+    await one(env.tx, 'SELECT id FROM subscriptions WHERE id = ? FOR UPDATE', [sub.id]);
+    const today = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM payments WHERE company_id = ? AND plan_id IS NOT NULL AND created_at >= ?`,
+      [company.id, toMysqlDatetime(new Date(env.now.getTime() - 86_400_000))]))!.n);
+    const reuses = await one(env.tx, `SELECT id FROM payments WHERE company_id = ? AND status = 'pending' AND plan_id = ? AND months = 1`, [company.id, a.p_plan_id]);
+    if (!reuses && today >= 3) throw new DbRuleError('Bir gündə ən çox 3 paket sorğusu göndərmək olar. Sabah yenidən cəhd edin.', 'P0001');
     const stored = await updateRow(env, 'subscriptions', { id: sub.id }, { requested_plan_id: a.p_plan_id, requested_at: nowText(env) });
     const invoice = await ensureInvoice(env, company.id, a.p_plan_id, 1);
     return { ...stored, invoice };

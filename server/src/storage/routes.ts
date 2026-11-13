@@ -2,6 +2,8 @@
 // x-upsert; PUT update), download, public and signed URLs, remove, list.
 // Rows live in storage_objects (with RLS from ./policy.ts and the
 // storage.objects triggers); bytes live on disk (./files.ts).
+import { hkdfSync } from 'node:crypto';
+import { Transform } from 'node:stream';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { SignJWT, jwtVerify } from 'jose';
@@ -16,6 +18,31 @@ import { storageAllows } from './policy.ts';
 
 export interface StorageDeps { config: Config; pool: Pool; schema: Schema }
 const MAX_UPLOAD = 50 * 1024 * 1024;
+/** Room for the multipart boundary and headers around the file. */
+const MULTIPART_SLACK = 64 * 1024;
+// Bulk calls and listings are bounded (audit 2026-11-13, #47).
+const MAX_BULK = 100;
+const MAX_LIST = 1000;
+const MAX_LIST_SCAN = 5000;
+/** Signed URLs live at most a week (#21). */
+const MAX_SIGNED_SECONDS = 7 * 24 * 3600;
+
+/** The type the bytes really are, for the formats the buckets accept (#56). */
+export function sniff(bytes: Uint8Array): string | null {
+  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
+  if (bytes.length >= 8 && bytes[0] === 0x89 && ascii(1, 4) === 'PNG') return 'image/png';
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE') return 'audio/wav';
+  if (bytes.length >= 6 && ascii(0, 4) === 'GIF8') return 'image/gif';
+  if (bytes.length >= 5 && ascii(0, 5) === '%PDF-') return 'application/pdf';
+  return null;
+}
+const SNIFFED: Record<string, string> = { 'image/png': 'image/png', 'image/jpeg': 'image/jpeg', 'image/jpg': 'image/jpeg',
+  'image/webp': 'image/webp', 'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav', 'audio/wave': 'audio/wav',
+  'image/gif': 'image/gif', 'application/pdf': 'application/pdf' };
+/** Shown in the browser; everything else is downloaded as a file (#56). */
+const INLINE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'audio/wav', 'audio/x-wav', 'audio/wave', 'application/pdf']);
 
 /** Storage error body: { statusCode, error, message }. */
 export class StorageError extends Error {
@@ -76,7 +103,9 @@ function mimeAllowed(allowed: unknown, mime: string): boolean {
 export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   const { config, pool, schema } = deps;
   const files = new FileStore(config.storageDir);
-  const key = new TextEncoder().encode(config.jwtSecret);
+  // Signed URLs have their own key, so a URL signature is never a valid session token (#21).
+  const key = new Uint8Array(hkdfSync('sha256', process.env.STORAGE_SIGNING_KEY || config.jwtSecret, 'asoiu-career', 'storage-signed-url-v1', 32));
+  const uploadContext = new WeakMap<FastifyRequest, Context>();
 
   app.removeAllContentTypeParsers();
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
@@ -96,10 +125,29 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   });
 
   async function context(req: FastifyRequest): Promise<Context> {
-    const ctx = await contextFromHeaders(config, req.headers.apikey as string | undefined, req.headers.authorization);
+    const ctx = await contextFromHeaders(config, req.headers.apikey as string | undefined, req.headers.authorization, pool);
     if (!ctx) throw new StorageError(400, 'Invalid JWT', 'invalid signature');
+    if (ctx.restricted) throw new StorageError(403, 'Unauthorized', 'Yeni şifrə təyin edin');
     return ctx;
   }
+
+  // #46: an upload is checked (key, session, bucket, declared size) before its
+  // body is read, and the body stops at the bucket's size limit.
+  const tooLarge = () => new StorageError(413, 'Payload too large', 'The object exceeded the maximum allowed size');
+  app.addHook('preParsing', async (req, _reply, payload) => {
+    if ((req.method !== 'POST' && req.method !== 'PUT') || !req.routeOptions.url?.endsWith('/object/:bucket/*')) return payload;
+    const ctx = await context(req);
+    if (ctx.role === 'anon') throw denied();
+    const { bucket } = target(req);
+    const settings = await bucketRow(pool, bucket);
+    const limit = Math.min(MAX_UPLOAD, settings.file_size_limit ?? MAX_UPLOAD) + MULTIPART_SLACK;
+    if (Number(req.headers['content-length'] ?? 0) > limit) throw tooLarge();
+    uploadContext.set(req, ctx);
+    let seen = 0;
+    return payload.pipe(new Transform({
+      transform(chunk: Buffer, _encoding, done) { seen += chunk.length; if (seen > limit) done(tooLarge()); else done(null, chunk); }
+    }));
+  });
 
   function target(req: FastifyRequest): { bucket: string; name: string } {
     const params = req.params as { bucket: string; '*'?: string };
@@ -124,13 +172,18 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
 
   async function serve(reply: FastifyReply, req: FastifyRequest, row: Row) {
     if (!await files.exists(row.bucket_id as string, row.name as string)) throw notFound();
-    reply.header('content-type', (row.mimetype as string) || 'application/octet-stream');
+    const mime = String(row.mimetype || 'application/octet-stream');
+    reply.header('content-type', mime);
+    // A stored file never runs as a page of the API's origin (#56).
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header('content-security-policy', "default-src 'none'; sandbox");
+    reply.header('cross-origin-resource-policy', 'cross-origin');
     reply.header('cache-control', (row.cache_control as string) || 'no-cache');
     reply.header('content-length', String(row.size));
     reply.header('etag', metadata(row).eTag);
     reply.header('last-modified', new Date(row.updated_at as string).toUTCString());
     const download = (req.query as Record<string, string | undefined>).download;
-    if (download !== undefined) {
+    if (download !== undefined || !INLINE.has(mime.split(';')[0].trim().toLowerCase())) {
       const file = download || String(row.name).split('/').pop()!;
       reply.header('content-disposition', `attachment; filename="${file.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(file)}`);
     }
@@ -139,13 +192,16 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
 
   async function upload(req: FastifyRequest, reply: FastifyReply, mode: 'create' | 'update') {
     const { bucket, name } = target(req);
-    const ctx = await context(req);
+    const ctx = uploadContext.get(req) ?? await context(req);
     const settings = await bucketRow(pool, bucket);
     const file = await readUpload(req);
     if (settings.file_size_limit != null && file.bytes.length > settings.file_size_limit) {
       throw new StorageError(413, 'Payload too large', 'The object exceeded the maximum allowed size');
     }
     if (!mimeAllowed(settings.allowed_mime_types, file.mime)) throw new StorageError(415, 'invalid_mime_type', `mime type ${file.mime} is not supported`);
+    // The bytes must be what the type says (#56): a page renamed to .png is refused.
+    const declared = SNIFFED[file.mime.split(';')[0].trim().toLowerCase()];
+    if (declared && sniff(file.bytes) !== declared) throw new StorageError(415, 'invalid_mime_type', `The file content is not ${file.mime}`);
     const upsert = mode === 'update' || String(req.headers['x-upsert'] ?? '').toLowerCase() === 'true';
     const temp = await files.stage(bucket, name, file.bytes);
     let placed = false;
@@ -208,28 +264,30 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     return serve(reply, req, row);
   });
 
-  async function sign(bucket: string, name: string, expiresIn: number) {
+  /** The signature names the object's version: a replaced file needs a new URL (#21). */
+  const version = (row: Row) => `${row.id}:${row.updated_at}`;
+  async function sign(bucket: string, name: string, expiresIn: number, row: Row) {
     const now = Math.floor(Date.now() / 1000);
-    const token = await new SignJWT({ url: `${bucket}/${name}` }).setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    const token = await new SignJWT({ url: `${bucket}/${name}`, v: version(row) }).setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setIssuedAt(now).setExpirationTime(now + expiresIn).sign(key);
     return `/object/sign/${bucket}/${name}?token=${token}`;
   }
   const expiry = (value: unknown) => {
     const n = Number(value);
     if (!Number.isFinite(n) || n < 1) throw new StorageError(400, 'Bad Request', 'expiresIn must be a positive number');
-    return Math.floor(n);
+    return Math.min(Math.floor(n), MAX_SIGNED_SECONDS);
   };
 
   app.get('/object/sign/:bucket/*', async (req, reply) => {
     const { bucket, name } = target(req);
     const token = (req.query as Record<string, string | undefined>).token;
     if (!token) throw new StorageError(400, 'InvalidSignature', 'Missing token');
-    let url: unknown;
-    try { url = (await jwtVerify(token, key, { algorithms: ['HS256'] })).payload.url; }
+    let url: unknown, signedVersion: unknown;
+    try { ({ url, v: signedVersion } = (await jwtVerify(token, key, { algorithms: ['HS256'] })).payload); }
     catch (error) { throw new StorageError(400, 'InvalidJWT', (error as Error).message); }
     if (url !== `${bucket}/${name}`) throw new StorageError(400, 'InvalidSignature', 'The url do not match the signature');
     const row = await objectRow(pool, bucket, name);
-    if (!row) throw notFound();
+    if (!row || signedVersion !== version(row)) throw notFound();
     return serve(reply, req, row);
   });
 
@@ -239,10 +297,10 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const expiresIn = expiry((req.body as Record<string, unknown> | undefined)?.expiresIn);
     const visible = await transaction(pool, async tx => {
       const row = await objectRow(tx, bucket, name);
-      return !!row && await storageAllows(tx, ctx, 'SELECT', row);
+      return row && await storageAllows(tx, ctx, 'SELECT', row) ? row : null;
     });
     if (!visible) throw notFound();
-    return { signedURL: await sign(bucket, name, expiresIn) };
+    return { signedURL: await sign(bucket, name, expiresIn, visible) };
   });
 
   app.post('/object/sign/:bucket', async (req) => {
@@ -251,17 +309,18 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const body = (req.body ?? {}) as { expiresIn?: unknown; paths?: unknown };
     const expiresIn = expiry(body.expiresIn);
     if (!Array.isArray(body.paths)) throw new StorageError(400, 'Bad Request', 'paths must be an array');
+    if (body.paths.length > MAX_BULK) throw new StorageError(400, 'Bad Request', `At most ${MAX_BULK} paths per request`);
     const paths = body.paths.map(String);
     const visible = await transaction(pool, async tx => {
-      const out = new Set<string>();
+      const out = new Map<string, Row>();
       for (const name of paths) {
         const row = validKey(name) ? await objectRow(tx, bucket, name) : null;
-        if (row && await storageAllows(tx, ctx, 'SELECT', row)) out.add(name);
+        if (row && await storageAllows(tx, ctx, 'SELECT', row)) out.set(name, row);
       }
       return out;
     });
     return Promise.all(paths.map(async path => visible.has(path)
-      ? { error: null, path, signedURL: await sign(bucket, path, expiresIn) }
+      ? { error: null, path, signedURL: await sign(bucket, path, expiresIn, visible.get(path)!) }
       : { error: 'Either the object does not exist or you do not have access to it', path, signedURL: null }));
   });
 
@@ -270,6 +329,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const ctx = await context(req);
     const prefixes = (req.body as { prefixes?: unknown } | undefined)?.prefixes;
     if (!Array.isArray(prefixes) || !prefixes.length) throw new StorageError(400, 'Bad Request', 'prefixes must be a non-empty array');
+    if (prefixes.length > MAX_BULK) throw new StorageError(400, 'Bad Request', `At most ${MAX_BULK} objects per request`);
     await bucketRow(pool, bucket);
     const deleted = await transaction(pool, async tx => {
       const out: Row[] = [];
@@ -293,12 +353,12 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const body = (req.body ?? {}) as { prefix?: string; limit?: number; offset?: number; search?: string; sortBy?: { column?: string; order?: string } };
     let prefix = String(body.prefix ?? '').replace(/^\/+/, '');
     if (prefix && !prefix.endsWith('/')) prefix += '/';
-    const limit = Math.max(0, Number(body.limit ?? 100));
-    const offset = Math.max(0, Number(body.offset ?? 0));
+    const limit = Math.min(MAX_LIST, Math.max(0, Number(body.limit ?? 100) || 0));
+    const offset = Math.min(MAX_LIST_SCAN, Math.max(0, Number(body.offset ?? 0) || 0));
     const search = String(body.search ?? '').toLowerCase();
     const column = ['name', 'created_at', 'updated_at', 'last_accessed_at'].includes(String(body.sortBy?.column)) ? String(body.sortBy!.column) : 'name';
     const descending = String(body.sortBy?.order ?? 'asc').toLowerCase() === 'desc';
-    const candidates = await rows<Row & { bucket_id: string; name: string }>(pool, `SELECT * FROM storage_objects WHERE bucket_id = ? AND LEFT(name, ?) = ? ORDER BY name`,
+    const candidates = await rows<Row & { bucket_id: string; name: string }>(pool, `SELECT * FROM storage_objects WHERE bucket_id = ? AND LEFT(name, ?) = ? ORDER BY name LIMIT ${MAX_LIST_SCAN}`,
       [bucket, [...prefix].length, prefix]);
     const visible = await transaction(pool, async tx => {
       const out: Row[] = [];

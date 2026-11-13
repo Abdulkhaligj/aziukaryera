@@ -4,11 +4,14 @@ import { createMailer } from './auth/mailer.ts';
 import { loadConfig } from './config.ts';
 import { createPool } from './db.ts';
 import { loadSchema } from './schema.ts';
+import { encryptLegacyClaimCodes } from './maintenance.ts';
 
 const config = loadConfig();
 const pool = createPool(config.mysqlUrl);
 const schema = await loadSchema(pool);
 const app = await buildApp({ config, pool, schema, mailer: createMailer(config), logger: true });
+const encrypted = await encryptLegacyClaimCodes(pool);
+if (encrypted) app.log.info(`encrypted ${encrypted} legacy claim code(s)`);
 if (!config.smtp) app.log.warn('SMTP_HOST is not set: auth emails are kept in memory and not delivered');
 if (!config.smtp && !config.mailerAutoconfirm) app.log.error('Email confirmation is on but SMTP_HOST is not set: new sign-ups cannot be confirmed');
 

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -24,6 +25,9 @@ export const viewport: Viewport = {
   ]
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+// Every page is rendered per request, so its scripts carry the nonce of the
+// response's Content-Security-Policy (proxy.ts, audit 2026-11-13, #58).
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  await headers();
   return <html lang="az"><body>{children}</body></html>;
 }

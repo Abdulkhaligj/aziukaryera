@@ -65,26 +65,27 @@ export function fromDatabase(error: unknown, table: string, ctx: Context | null 
   switch (e.errno) {
     case 1062: { // ER_DUP_ENTRY
       const key = msg.match(/for key '(?:[^.']+\.)?([^']+)'/)?.[1] ?? 'unknown';
-      return new PgError(409, '23505', `duplicate key value violates unique constraint "${key === 'PRIMARY' ? `${table}_pkey` : key}"`, msg);
+      // No MySQL text in the answer: it would repeat the other row's value (#61).
+      return new PgError(409, '23505', `duplicate key value violates unique constraint "${key === 'PRIMARY' ? `${table}_pkey` : key}"`);
     }
     case 1451: case 1452: { // ER_ROW_IS_REFERENCED_2 / ER_NO_REFERENCED_ROW_2
       const fk = msg.match(/CONSTRAINT `([^`]+)`/)?.[1] ?? 'unknown';
       return new PgError(409, '23503', e.errno === 1452
         ? `insert or update on table "${table}" violates foreign key constraint "${fk}"`
-        : `update or delete on table "${table}" violates foreign key constraint "${fk}"`, msg);
+        : `update or delete on table "${table}" violates foreign key constraint "${fk}"`);
     }
     case 3819: { // ER_CHECK_CONSTRAINT_VIOLATED
       const check = msg.match(/Check constraint '([^']+)'/)?.[1] ?? 'unknown';
-      return new PgError(400, '23514', `new row for relation "${table}" violates check constraint "${check}"`, msg);
+      return new PgError(400, '23514', `new row for relation "${table}" violates check constraint "${check}"`);
     }
     case 1048: case 1364: { // ER_BAD_NULL_ERROR / ER_NO_DEFAULT_FOR_FIELD
       const column = msg.match(/(?:Column|Field) '([^']+)'/)?.[1] ?? 'unknown';
-      return new PgError(400, '23502', `null value in column "${column}" of relation "${table}" violates not-null constraint`, msg);
+      return new PgError(400, '23502', `null value in column "${column}" of relation "${table}" violates not-null constraint`);
     }
     case 1265: case 1366: case 1292: case 1406: case 3140: // truncated / incorrect value / data too long / invalid JSON
-      return new PgError(400, '22P02', `invalid input value: ${msg}`);
-    case 1054: return new PgError(400, '42703', msg);
-    case 1644: return new PgError(400, e.sqlState || 'P0001', msg); // SIGNAL from a procedure
+      return new PgError(400, '22P02', `invalid input value for column "${msg.match(/column '([^']+)'/i)?.[1] ?? 'unknown'}"`);
+    case 1054: return new PgError(400, '42703', `column "${msg.match(/column '([^']+)'/i)?.[1] ?? 'unknown'}" does not exist`);
+    case 1644: return new PgError(400, e.sqlState || 'P0001', msg); // our own SIGNAL text
     default: return null;
   }
 }

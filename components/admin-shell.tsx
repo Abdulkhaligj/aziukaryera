@@ -10,7 +10,7 @@ import {
   AlertTriangle, Copy, Check, Eye, LoaderCircle, Pencil, Megaphone, RefreshCw
 } from 'lucide-react';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
-import { can, roleDescriptions, roleLabels } from '@/lib/permissions';
+import { can, canApproveJobs, roleDescriptions, roleLabels } from '@/lib/permissions';
 import { logout } from '@/app/login/actions';
 import ImageField from '@/components/image-field';
 import Assistant from '@/components/assistant';
@@ -104,7 +104,7 @@ function FacultyMajorPicker({ lookups, faculties, majors }: { lookups: Lookups; 
   </fieldset>;
 }
 
-function EditorFields({ resource, row, data, lookups, mode, self = false }: { resource: ResourceKey; row?: AdminRow; data: Store; lookups: Lookups; mode: 'create' | 'edit'; self?: boolean }) {
+function EditorFields({ resource, row, data, lookups, mode, self = false, role = '' }: { resource: ResourceKey; row?: AdminRow; data: Store; lookups: Lookups; mode: 'create' | 'edit'; self?: boolean; role?: string }) {
   const f = row?.fields || {};
   const companies = data.companies;
   if (resource === 'pending_jobs') return <>
@@ -114,8 +114,8 @@ function EditorFields({ resource, row, data, lookups, mode, self = false }: { re
       <select name="status" defaultValue={String(f.status || 'pending_approval')}>
         <option value="pending_approval">Təsdiq gözləyir</option>
         <option value="changes_requested">Düzəliş tələb olunur</option>
-        <option value="approved">Təsdiqlənib</option>
-        <option value="published">Dərc olunub</option>
+        <option value="approved" disabled={!canApproveJobs(role)}>Təsdiqlənib</option>
+        <option value="published" disabled={!canApproveJobs(role)}>Dərc olunub</option>
         <option value="rejected">Rədd edilib</option>
         <option value="archived">Arxivə keçir</option>
       </select>
@@ -295,6 +295,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
   const [copied, setCopied] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetPhrase, setResetPhrase] = useState('');
+  const [platformPassword, setPlatformPassword] = useState('');
   const [approvalNotes, setApprovalNotes] = useState<ApprovalNote[]>([]);
   const [approvalNoteOpen, setApprovalNoteOpen] = useState(false);
   const [approvalNoteText, setApprovalNoteText] = useState('');
@@ -484,13 +485,13 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
   }
 
   async function resetPlatform() {
-    if (resetPhrase !== 'SIFIRLA') return;
+    if (resetPhrase !== 'SIFIRLA' || !platformPassword) return;
     setBusy(true); setFormError('');
     try {
-      const response = await fetch('/api/admin/system/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: resetPhrase }) });
+      const response = await fetch('/api/admin/system/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: resetPhrase, password: platformPassword }) });
       const result = await readJson(response);
       if (!response.ok) throw new Error(result.error || 'Sıfırlama alınmadı');
-      setResetOpen(false); setResetPhrase('');
+      setResetOpen(false); setResetPhrase(''); setPlatformPassword('');
       window.location.reload();
     } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Sıfırlama alınmadı'); }
     finally { setBusy(false); }
@@ -620,7 +621,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
         <div className="modalHead"><div className="modalWho">{modal.mode === 'edit' && modal.row?.avatar && <RowAvatar row={modal.row} className="modalPhoto"/>}<div><h2>{modal.mode === 'create' ? `Yeni ${singular[resource] || 'qeyd'}` : canEdit ? 'Redaktə' : 'Ətraflı'}</h2><p>{modal.mode === 'edit' && modal.row ? `${titles[resource]} · ${modal.row.title}` : titles[resource]}</p></div></div><button type="button" className="iconButton" aria-label="Pəncərəni bağla" onClick={() => setModal(null)} disabled={busy}><X size={20}/></button></div>
         <div className="modalBody">
           {(modal.mode === 'create' ? canCreate : canEdit)
-            ? <EditorFields resource={resource} row={modal.row} data={data} lookups={lookups} mode={modal.mode} self={editingSelf}/>
+            ? <EditorFields resource={resource} row={modal.row} data={data} lookups={lookups} mode={modal.mode} self={editingSelf} role={currentRole}/>
             : modal.row && <ReadOnlyDetails row={modal.row}/>}
           {resource === 'admins' && modal.mode === 'edit' && modal.row && !editingSelf && <div className="noticeBox subtle"><KeyRound size={16}/> Əməkdaş şifrəni unudubsa, “Şifrəni sıfırla” ilə yeni müvəqqəti şifrə verin.</div>}
           {resource === 'pending_jobs' && modal.mode === 'edit' && modal.row && <section className="approvalNotes" aria-label="Təsdiq üzrə daxili qeydlər">
@@ -672,11 +673,12 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       <div className="modalHead"><div><h2>Platformanı sıfırla</h2><p>Bu əməliyyat geri qaytarılmır.</p></div><button type="button" className="iconButton" aria-label="Pəncərəni bağla" onClick={() => setResetOpen(false)} disabled={busy}><X size={20}/></button></div>
       <div className="modalBody">
         <div className="resetWarning"><Trash2 size={22}/><div><b>Silinəcək məlumatlar</b><p>Adi istifadəçilər və şirkət hesabları, elanlar, müraciətlər, tədbirlər, paylaşımlar, CV və müsahibə tarixçəsi, güzəştlər və sayt məzmunu.</p></div></div>
-        <div className="noticeBox">Admin hesabları, fakültə və ixtisas siyahıları, həmçinin paketlər saxlanılır.</div>
+        <div className="noticeBox">Admin hesabları, audit tarixçəsi, fakültə və ixtisas siyahıları, həmçinin paketlər saxlanılır.</div>
         <label className="field">Təsdiq üçün <b>SIFIRLA</b> yazın<input value={resetPhrase} onChange={event => setResetPhrase(event.target.value)} autoComplete="off"/></label>
+        <label className="field">Şifrəniz (təsdiq üçün)<input type="password" value={platformPassword} onChange={event => setPlatformPassword(event.target.value)} autoComplete="current-password"/></label>
         {formError && <div className="errorBox">{formError}</div>}
       </div>
-      <div className="modalActions"><span className="spacer"/><button type="button" className="secondaryButton" onClick={() => setResetOpen(false)} disabled={busy}>Ləğv et</button><button type="button" className="dangerButton solid" onClick={resetPlatform} disabled={busy || resetPhrase !== 'SIFIRLA'}><RotateCcw size={17}/>{busy ? 'Sıfırlanır…' : 'Hər şeyi sıfırla'}</button></div>
+      <div className="modalActions"><span className="spacer"/><button type="button" className="secondaryButton" onClick={() => setResetOpen(false)} disabled={busy}>Ləğv et</button><button type="button" className="dangerButton solid" onClick={resetPlatform} disabled={busy || resetPhrase !== 'SIFIRLA' || !platformPassword}><RotateCcw size={17}/>{busy ? 'Sıfırlanır…' : 'Hər şeyi sıfırla'}</button></div>
     </div></div>}
 
     <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} role={currentRole} userId={currentUserId}

@@ -165,6 +165,10 @@ test('interview requests: create, duplicate, accept, cancel, reopen', async () =
   assert.equal((await student.rpc('cancel_interview_request', { p_request_id: requestId })).data, requestId);
   assert.equal((await notes(companyUser, 'interview_request')).at(-1)!.title, 'Müsahibə sorğusu ləğv olundu');
   assert.equal((await student.rpc('cancel_interview_request', { p_request_id: requestId })).error?.message, 'Yalnız aktiv sorğunuzu ləğv edə bilərsiniz');
+  // Audit 2026-11-13, #40: a cancelled request is sent again only after a day.
+  assert.equal((await student.rpc('create_interview_request', { p_application_id: applicationId, p_message: 'Tez' })).error?.message,
+    'Ləğv etdiyiniz sorğunu 24 saatdan sonra yenidən göndərə bilərsiniz');
+  await exec(h.pool, 'UPDATE interview_requests SET updated_at = updated_at - INTERVAL 25 HOUR WHERE id = ?', [requestId]);
   assert.equal((await student.rpc('create_interview_request', { p_application_id: applicationId, p_message: 'Yenidən' })).data, requestId, 'reopened');
   assert.equal((await one<{ status: string }>(h.pool, 'SELECT status FROM interview_requests WHERE id = ?', [requestId]))!.status, 'pending');
 });
@@ -249,7 +253,11 @@ test('admin_reset_platform_data empties the platform but keeps the admins', asyn
   assert.equal((await admin.rpc('admin_reset_platform_data', { p_confirmation: 'yox' })).error?.message, 'Sıfırlama təsdiqi yanlışdır');
   assert.equal((await editor.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA' })).error?.message,
     'Bu əməliyyatı yalnız aktiv Super Admin icra edə bilər');
-  const reset = await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA' });
+  // H-09: a missing word or a wrong password refuses; the audit log is kept.
+  assert.equal((await admin.rpc('admin_reset_platform_data', { p_password: 'Sifre2026!' })).error?.message, 'Sıfırlama təsdiqi yanlışdır');
+  assert.equal((await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA', p_password: 'wrong' })).error?.message, 'Şifrə yanlışdır');
+  const auditBefore = Number((await one<{ n: number }>(h.pool, 'SELECT COUNT(*) AS n FROM admin_audit_logs'))!.n);
+  const reset = await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA', p_password: 'Sifre2026!' });
   assert.equal(reset.error, null);
   assert.deepEqual(reset.data, { ok: true, removed_users: 2, kept_admins: 2 });
   for (const table of ['jobs', 'applications', 'companies', 'posts', 'interview_requests', 'benefits', 'ads']) {
@@ -260,4 +268,5 @@ test('admin_reset_platform_data empties the platform but keeps the admins', asyn
   const audit = await rows<{ title: string }>(h.pool, 'SELECT title FROM admin_audit_logs ORDER BY created_at, title');
   assert.ok(audit.some(r => r.title === 'Database delete: profiles'), 'cascaded profile deletes are audited, as in Postgres');
   assert.equal(audit.at(-1)!.title, 'Platforma məlumatları sıfırlandı');
+  assert.ok(audit.length > auditBefore, 'earlier audit rows are kept');
 });

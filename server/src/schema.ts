@@ -24,7 +24,10 @@ export interface Column {
   autoIncrement: boolean;
   /** null: no default, or one only MySQL can compute (left to the INSERT). */
   defaultSpec: DefaultSpec | null;
+  /** ENUM members, or the values of a CHECK (col IN (…)) list. */
   enumValues: string[] | null;
+  /** CHAR(36) ascii: a Postgres uuid column. */
+  uuid: boolean;
 }
 
 export interface ForeignKey {
@@ -41,6 +44,8 @@ export interface Table {
   name: string;
   columns: Map<string, Column>;
   primaryKey: string[];
+  /** Columns of each UNIQUE index (the primary key included). */
+  uniqueKeys: string[][];
   /** Foreign keys declared on this table (many-to-one). */
   foreignKeys: ForeignKey[];
   /** Foreign keys on other tables that point here (one-to-many). */
@@ -50,20 +55,21 @@ export interface Table {
 export type Schema = Map<string, Table>;
 
 export async function loadSchema(pool: Pool): Promise<Schema> {
-  const result = await rows<{ t: string; c: string; dt: string; ct: string; n: string; k: string; d: string | null; x: string; p: number }>(pool,
+  const result = await rows<{ t: string; c: string; dt: string; ct: string; n: string; k: string; d: string | null; x: string; p: number; cs: string | null }>(pool,
     `SELECT table_name AS t, column_name AS c, data_type AS dt, column_type AS ct, is_nullable AS n,
-            column_key AS k, column_default AS d, extra AS x, ordinal_position AS p
+            column_key AS k, column_default AS d, extra AS x, ordinal_position AS p, character_set_name AS cs
        FROM information_schema.columns WHERE table_schema = DATABASE() ORDER BY table_name, ordinal_position`);
   const schema: Schema = new Map();
   const expressions = new Map<string, Column[]>();
   for (const r of result) {
-    if (!schema.has(r.t)) schema.set(r.t, { name: r.t, columns: new Map(), primaryKey: [], foreignKeys: [], referencedBy: [] });
+    if (!schema.has(r.t)) schema.set(r.t, { name: r.t, columns: new Map(), primaryKey: [], uniqueKeys: [], foreignKeys: [], referencedBy: [] });
     const table = schema.get(r.t)!;
     const enumValues = r.dt === 'enum' ? [...r.ct.matchAll(/'((?:[^']|'')*)'/g)].map(m => m[1].replace(/''/g, "'")) : null;
     const column: Column = {
       name: r.c, dataType: r.dt, columnType: r.ct, nullable: r.n === 'YES', primary: r.k === 'PRI',
       hasDefault: r.d !== null || /auto_increment|DEFAULT_GENERATED/i.test(r.x),
-      autoIncrement: /auto_increment/i.test(r.x), defaultSpec: null, enumValues
+      autoIncrement: /auto_increment/i.test(r.x), defaultSpec: null, enumValues,
+      uuid: r.dt === 'char' && r.ct === 'char(36)' && r.cs === 'ascii'
     };
     table.columns.set(r.c, column);
     if (r.d === null) continue;
@@ -85,10 +91,34 @@ export async function loadSchema(pool: Pool): Promise<Schema> {
       for (const column of columns) column.defaultSpec = { kind: 'value', value: canonical(column, value) };
     } catch { /* left to MySQL */ }
   }
+  // CHECK (col IN ('a', 'b')): the allowed values. MySQL compares them without
+  // regard to case, so the write pipeline maps 'APPROVED' to 'approved' before
+  // any rule compares it (audit 2026-11-13, H-01 and #37).
+  const checks = await rows<{ t: string; c: string }>(pool,
+    `SELECT tc.table_name AS t, cc.check_clause AS c FROM information_schema.check_constraints cc
+       JOIN information_schema.table_constraints tc ON tc.constraint_schema = cc.constraint_schema AND tc.constraint_name = cc.constraint_name
+      WHERE cc.constraint_schema = DATABASE()`);
+  for (const check of checks) {
+    const m = check.c.match(/^\(*`(\w+)` in \((.*)\)\)*$/s);
+    if (!m) continue;
+    const values = [...m[2].matchAll(/_[a-z0-9]+\\'((?:[^\\]|\\[^'])*?)\\'/g)].map(x => x[1].replace(/\\(.)/g, '$1'));
+    const column = schema.get(check.t)?.columns.get(m[1]);
+    if (column && values.length && !column.enumValues) column.enumValues = values;
+  }
   const keys = await rows<{ t: string; c: string }>(pool,
     `SELECT table_name AS t, column_name AS c FROM information_schema.key_column_usage
       WHERE table_schema = DATABASE() AND constraint_name = 'PRIMARY' ORDER BY table_name, ordinal_position`);
   for (const k of keys) schema.get(k.t)?.primaryKey.push(k.c);
+  const uniques = await rows<{ t: string; i: string; c: string }>(pool,
+    `SELECT table_name AS t, index_name AS i, column_name AS c FROM information_schema.statistics
+      WHERE table_schema = DATABASE() AND non_unique = 0 ORDER BY table_name, index_name, seq_in_index`);
+  const byIndex = new Map<string, { t: string; cols: string[] }>();
+  for (const u of uniques) {
+    const key = `${u.t}.${u.i}`;
+    if (!byIndex.has(key)) byIndex.set(key, { t: u.t, cols: [] });
+    byIndex.get(key)!.cols.push(u.c);
+  }
+  for (const { t, cols } of byIndex.values()) schema.get(t)?.uniqueKeys.push(cols);
   const fks = await rows<{ n: string; t: string; c: string; rt: string; rc: string }>(pool,
     `SELECT constraint_name AS n, table_name AS t, column_name AS c, referenced_table_name AS rt, referenced_column_name AS rc
        FROM information_schema.key_column_usage

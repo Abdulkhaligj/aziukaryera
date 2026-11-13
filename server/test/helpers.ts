@@ -85,3 +85,18 @@ async function seed(pool: ReturnType<typeof createPool>) {
     ('free', 'monthly_network_posts', 'Aylıq paylaşımlar', 1, 5), ('pro', 'monthly_network_posts', 'Aylıq paylaşımlar', 1, 30),
     ('free', 'post_media', 'Şəkil və sənəd', 0, NULL), ('pro', 'post_media', 'Şəkil və sənəd', 1, NULL)`);
 }
+
+/** Bytes that start like a real file of the type: uploads are checked by
+ *  their content, not only their declared type (audit 2026-11-13, #56). */
+export function fileBytes(size: number, type: string): Uint8Array<ArrayBuffer> {
+  const ascii = (s: string) => [...s].map(c => c.charCodeAt(0));
+  const head: number[] = {
+    'image/png': [0x89, ...ascii('PNG'), 0x0d, 0x0a, 0x1a, 0x0a],
+    'image/jpeg': [0xff, 0xd8, 0xff, 0xe0],
+    'image/webp': [...ascii('RIFF'), 0, 0, 0, 0, ...ascii('WEBP')],
+    'audio/wav': [...ascii('RIFF'), 0, 0, 0, 0, ...ascii('WAVE')]
+  }[type] ?? [];
+  const bytes = new Uint8Array(size).map((_, i) => i % 251);
+  bytes.set(head.slice(0, size));
+  return bytes;
+}

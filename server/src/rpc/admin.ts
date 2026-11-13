@@ -1,5 +1,8 @@
 // public.admin_reset_platform_data → private.reset_career_platform: a super
 // admin empties the platform but keeps every administrator account.
+// H-09 (audit 2026-11-13): the confirmation word is required, the super admin
+// re-enters their password, and the audit log is never emptied.
+import bcrypt from 'bcryptjs';
 import { exec, one, rows } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
 import { deleteWhere, insertRow } from '../write/pipeline.ts';
@@ -11,17 +14,20 @@ const TABLES = ['broadcast_notification_reads', 'moderation_logs', 'notification
   'post_comments', 'post_likes', 'messages', 'connections', 'follows', 'reports', 'benefit_claims', 'event_registrations',
   'invites', 'saved_jobs', 'application_status_history', 'applications', 'payments', 'subscription_usage',
   'interview_sessions', 'cv_documents', 'education', 'company_members', 'subscriptions', 'jobs', 'events', 'benefits',
-  'benefit_partners', 'posts', 'broadcast_notifications', 'companies', 'site_content', 'content', 'audit_logs', 'admin_audit_logs'];
+  'benefit_partners', 'posts', 'broadcast_notifications', 'companies', 'site_content', 'content'];
 
 rpc({
-  name: 'admin_reset_platform_data', args: { p_confirmation: 'text' }, roles: ['authenticated'], security: 'invoker', returns: 'value',
+  name: 'admin_reset_platform_data', args: { p_confirmation: 'text', p_password: 'text' }, roles: ['authenticated'], security: 'invoker', returns: 'value',
   async run(invoker, a) {
     // The private function is SECURITY DEFINER.
     const env = { ...invoker, definer: true };
-    // `p_confirmation <> 'SIFIRLA'` is NULL (not true) for a NULL argument.
-    if (a.p_confirmation != null && a.p_confirmation !== 'SIFIRLA') throw new DbRuleError('Sıfırlama təsdiqi yanlışdır', 'P0001');
+    if (a.p_confirmation !== 'SIFIRLA') throw new DbRuleError('Sıfırlama təsdiqi yanlışdır', 'P0001');
     if (await currentAdminRole(env.tx, env.ctx) !== 'super_admin') {
       throw new DbRuleError('Bu əməliyyatı yalnız aktiv Super Admin icra edə bilər', 'P0001');
+    }
+    const account = await one<{ encrypted_password: string | null }>(env.tx, 'SELECT encrypted_password FROM auth_users WHERE id = ?', [env.ctx.uid]);
+    if (typeof a.p_password !== 'string' || !account?.encrypted_password || !await bcrypt.compare(a.p_password, account.encrypted_password)) {
+      throw new DbRuleError('Şifrə yanlışdır', '28P01');
     }
     // set_config('lock_timeout', '5s', true) and set_config('statement_timeout', '30s', true).
     const [[previous]] = await env.tx.query('SELECT @@SESSION.innodb_lock_wait_timeout AS t') as unknown as [[{ t: number }]];

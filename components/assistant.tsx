@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImagePlus, LoaderCircle, Mic, Pencil, Rocket, Send, Sparkles, Square, X } from 'lucide-react';
-import { createClient } from '@/lib/backend/client';
-import { uploadPublicImage } from '@/components/image-field';
+import { uploadFile, uploadPublicImage } from '@/components/image-field';
 import { can } from '@/lib/permissions';
 import type { AdminRole, AdminRow, ResourceKey } from '@/lib/types';
 import { readJson } from '@/lib/read-json';
@@ -199,11 +198,8 @@ export default function Assistant({ open, onClose, role, userId, companies, comp
       let audio_path = '';
       let image_url = '';
       if (audio) {
-        const db = createClient();
-        if (!db) throw new Error('Bağlantı qurulmayıb');
-        audio_path = `${userId}/${crypto.randomUUID()}.wav`;
-        const { error } = await db.storage.from('assistant-audio').upload(audio_path, audio, { contentType: 'audio/wav', upsert: false });
-        if (error) throw new Error('Səs yüklənmədi: ' + error.message);
+        try { audio_path = (await uploadFile('audio', new Blob([audio], { type: 'audio/wav' }))).path; }
+        catch (caught) { throw new Error('Səs yüklənmədi: ' + (caught instanceof Error ? caught.message : '')); }
       }
       if (attached) image_url = await uploadPublicImage(attached.file, 'assistant');
       const response = await fetch('/api/admin/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: prompt, audio_path, image_url, history }) });

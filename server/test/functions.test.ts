@@ -6,7 +6,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
-import { startHarness, type Harness } from './helpers.ts';
+import { fileBytes, startHarness, type Harness } from './helpers.ts';
 
 const SECRET = 'm'.repeat(40);
 let h: Harness;
@@ -75,7 +75,7 @@ test('content-moderation: secret, verdicts applied through the RPCs, usage recor
 
 test('avatar moderation downloads the photo from storage and publishes it', async () => {
   const path = `${studentId}/${'b'.repeat(32)}.webp`;
-  assert.equal((await student.storage.from('avatars').upload(path, new Blob([new Uint8Array(40)], { type: 'image/webp' }))).error, null);
+  assert.equal((await student.storage.from('avatars').upload(path, new Blob([fileBytes(40, 'image/webp')], { type: 'image/webp' }))).error, null);
   assert.equal((await student.rpc('avatar_submit', { p_path: path })).error, null);
   verdict = { verdict: 'allow', categories: [], reason: '' };
   const res = await call('content-moderation', { table: 'profiles', id: studentId }, { 'x-moderation-secret': SECRET });
