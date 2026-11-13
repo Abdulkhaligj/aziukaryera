@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { changePassword } from './actions';
 import { PasswordChangeButton, PasswordField } from '@/components/login-form';
 import { getAdminContext } from '@/lib/admin-data';
+import { messageFor } from '@/lib/messages';
 
 export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const context = await getAdminContext({ allowPasswordChange: true });
@@ -15,7 +16,8 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
       ? 'Siz müvəqqəti şifrə ilə daxil oldunuz. Davam etmək üçün yalnız sizin bildiyiniz yeni şifrə qurun.'
       : `${context.email} hesabı üçün yeni şifrə.`}</p>
     <form action={changePassword} className="stackForm">
-      {query.error && <div className="errorBox" role="alert">{query.error}</div>}
+      {messageFor(query.error) && <div className="errorBox" role="alert">{messageFor(query.error)}</div>}
+      <PasswordField name="current_password" label={context.mustChangePassword ? 'Müvəqqəti şifrə' : 'Cari şifrə'} autoComplete="current-password" minLength={1}/>
       <PasswordField name="password" label="Yeni şifrə" autoComplete="new-password" minLength={10}/>
       <PasswordField name="password2" label="Yeni şifrənin təkrarı" autoComplete="new-password" minLength={10}/>
       <p className="formHint">Ən azı 10 simvol, hərf və rəqəm olmalıdır.</p>

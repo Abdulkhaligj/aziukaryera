@@ -9,12 +9,13 @@ import { transaction, type Row } from '../db.ts';
 import { table as tableOf, type Schema } from '../schema.ts';
 import { fromDatabase, PgError, pgErrors } from './errors.ts';
 import { deleteRows, insertRows, keysWhere, updateRows } from './mutate.ts';
-import { embedOptions, nodesAt, parseFilters, parseOrder, parseSelect, splitOrder, type ScopedFilter } from './parse.ts';
+import { embedOptions, nodesAt, parseFilters, parseOrder, parseSelect, splitOrder, type ScopedFilter, type SelectItem } from './parse.ts';
 import { exposed, VIEW_BASE } from './policy.ts';
 import { filterSql, readRows } from './select.ts';
 import { applySession } from './session.ts';
 import { coerceArgs, findRpc } from '../rpc/registry.ts';
 import { rowMatches, selectColumns, sortRows } from './memory.ts';
+import { RateLimiter } from '../auth/rate-limit.ts';
 import '../rpc/index.ts';
 
 export interface RestDeps { config: Config; pool: Pool; schema: Schema }
@@ -25,6 +26,35 @@ function rootOnly(filters: ScopedFilter[]) {
   return nodesAt(filters);
 }
 type Query = Record<string, unknown>;
+
+// One request reads at most MAX_ROWS rows, skips at most MAX_OFFSET and embeds
+// at most MAX_DEPTH levels (audit 2026-11-13, #45); PostgREST's max-rows is 1000 too.
+const MAX_ROWS = 1000;
+const MAX_OFFSET = 100_000;
+const MAX_DEPTH = 3;
+const MAX_EMBEDS = 12;
+function checkShape(items: SelectItem[], depth = 0, count = { n: 0 }): SelectItem[] {
+  for (const item of items) {
+    if (item.type !== 'embed') continue;
+    if (depth + 1 > MAX_DEPTH) throw pgErrors.parse(`Embedding is limited to ${MAX_DEPTH} levels`);
+    if (++count.n > MAX_EMBEDS) throw pgErrors.parse(`At most ${MAX_EMBEDS} embedded resources per request`);
+    checkShape(item.items, depth + 1, count);
+  }
+  return items;
+}
+const selectOf = (raw: unknown) => checkShape(parseSelect(raw as string));
+function paging(query: Query): { limit: number; offset: number } {
+  const limit = query.limit == null ? MAX_ROWS : Number(query.limit);
+  const offset = Number(query.offset || 0);
+  if (!Number.isInteger(limit) || limit < 0 || !Number.isInteger(offset) || offset < 0) throw pgErrors.parse('limit and offset must be non-negative integers');
+  if (offset > MAX_OFFSET) throw pgErrors.parse(`offset is limited to ${MAX_OFFSET}`);
+  return { limit: Math.min(limit, MAX_ROWS), offset };
+}
+/** #33: an update or delete without a filter would touch every row it may. */
+function requireFilter(filters: ScopedFilter[], verb: 'UPDATE' | 'DELETE') {
+  if (!filters.length) throw new PgError(400, '21000', `${verb} requires a WHERE clause`);
+  return filters;
+}
 const OBJECT = 'application/vnd.pgrst.object+json';
 
 function prefer(req: FastifyRequest): Record<string, string> {
@@ -45,12 +75,14 @@ function contentRange(offset: number, count: number, total: number | null) {
 
 export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
   const { config, pool, schema } = deps;
+  const rpcLimiters = new Map<string, RateLimiter>();
 
   async function context(req: FastifyRequest): Promise<Context> {
     const apikey = (req.headers.apikey as string | undefined) ?? (req.query as Query)?.apikey as string | undefined;
     if (!apikey) throw pgErrors.missingKey();
-    const ctx = await contextFromHeaders(config, apikey, req.headers.authorization);
+    const ctx = await contextFromHeaders(config, apikey, req.headers.authorization, pool);
     if (!ctx) throw pgErrors.badJwt();
+    if (ctx.restricted) throw new PgError(403, '42501', 'Yeni şifrə təyin edin');
     return ctx;
   }
 
@@ -87,13 +119,13 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     const { table: name } = req.params;
     const query = req.query;
     const count = prefer(req).count === 'exact';
-    const offset = Number(query.offset || 0);
+    const { limit, offset } = paging(query);
     const filters = parseFilters(query);
     const embedShape = embedOptions(query);
     const order = splitOrder(query.order, embedShape);
-    const result = await run(req, name, (tx, ctx) => readRows(tx, schema, ctx, name, parseSelect(query.select as string), {
+    const result = await run(req, name, (tx, ctx) => readRows(tx, schema, ctx, name, selectOf(query.select), {
       where: filterSql(tableOf(schema, name), nodesAt(filters)), embedded: filters.filter(f => f.path.length), embedShape,
-      order, limit: query.limit != null ? Number(query.limit) : null, offset, count
+      order, limit, offset, count
     }));
     const range = contentRange(offset, result.rows.length, result.total);
     if (req.method === 'HEAD') return reply.code(200).header('content-range', range).send();
@@ -124,13 +156,21 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
       throw new PgError(405, '25006', `cannot execute ${name}() in a read-only transaction`);
     }
     const shaping = def.returns === 'rows' ? {
-      filters: parseFilters(query), order: parseOrder(query.order), items: parseSelect(query.select as string),
-      limit: query.limit === undefined ? null : Number(query.limit), offset: Number(query.offset ?? 0)
+      filters: parseFilters(query), order: parseOrder(query.order), items: parseSelect(query.select as string), ...paging(query)
     } : null;
     if (shaping?.filters.some(f => f.path.length)) throw pgErrors.parse('Embedding is not available on function results');
     let result: unknown;
     try {
       const args = coerceArgs(def, body);
+      if (ctx.role !== 'service_role') {
+        for (const limit of def.limits ?? []) {
+          const id = `${name}:${limit.name}`;
+          if (!rpcLimiters.has(id)) rpcLimiters.set(id, new RateLimiter(limit.count, limit.windowMs));
+          if (rpcLimiters.get(id)!.take(`${req.ip}|${ctx.uid ?? ''}|${limit.key?.(args) ?? ''}`)) continue;
+          if (limit.silent && def.returns === 'void') return reply.code(204).send();
+          throw new PgError(429, '54000', 'Too many requests; try again later');
+        }
+      }
       result = await transaction(pool, async tx => {
         await applySession(tx, ctx);
         return def.run({ tx, ctx, schema, now: new Date(), definer: def.security === 'definer' }, args);
@@ -143,7 +183,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     if (def.returns === 'void') return reply.code(204).send();
     if (!shaping) return reply.code(200).type('application/json; charset=utf-8').send(JSON.stringify(result ?? null));
     const matched = sortRows((result as Row[]).filter(row => nodesAt(shaping.filters).every(node => rowMatches(row, node))), shaping.order);
-    const page = matched.slice(shaping.offset, shaping.limit == null ? undefined : shaping.offset + shaping.limit);
+    const page = matched.slice(shaping.offset, shaping.offset + shaping.limit);
     const range = prefer(req).count === 'exact' ? contentRange(shaping.offset, page.length, matched.length) : undefined;
     if (req.method === 'HEAD') { if (range) reply.header('content-range', range); return reply.code(200).send(); }
     return send(reply, req, 200, selectColumns(page, shaping.items), { range });
@@ -184,7 +224,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     const result = await run(req, name, async (tx, ctx) => {
       if (VIEW_BASE[name]) throw pgErrors.permission(ctx, name);
       const t = tableOf(schema, name);
-      const keys = await updateRows(tx, schema, ctx, name, req.body as Row, filterSql(t, rootOnly(parseFilters(req.query))));
+      const keys = await updateRows(tx, schema, ctx, name, req.body as Row, filterSql(t, rootOnly(requireFilter(parseFilters(req.query), 'UPDATE'))));
       return representation ? (await readRows(tx, schema, ctx, name, parseSelect(req.query.select as string), { where: keysWhere(t, keys) })).rows : null;
     });
     if (!result) return reply.code(204).send();
@@ -197,7 +237,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     const result = await run(req, name, async (tx, ctx) => {
       if (VIEW_BASE[name]) throw pgErrors.permission(ctx, name);
       const t = tableOf(schema, name);
-      const where = filterSql(t, rootOnly(parseFilters(req.query)));
+      const where = filterSql(t, rootOnly(requireFilter(parseFilters(req.query), 'DELETE')));
       // Deleted rows are returned as they were, so read them first.
       const before = representation ? await readRows(tx, schema, ctx, name, parseSelect(req.query.select as string), { where }) : null;
       const keys = await deleteRows(tx, schema, ctx, name, where);

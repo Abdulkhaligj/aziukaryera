@@ -10,6 +10,18 @@ let h: Harness;
 before(async () => { h = await startHarness(); });
 after(async () => { await h?.close(); });
 
+// An email link opens a page with one button; pressing it posts the form (audit 2026-11-13, #75).
+async function openLink(link: string) {
+  const page = await fetch(link);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-type') || '', /text\/html/);
+  const html = await page.text();
+  const unescape = (v: string) => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  const fields = Object.fromEntries([...html.matchAll(/name="(\w+)" value="([^"]*)"/g)].map(m => [m[1], unescape(m[2])]));
+  return fetch(`${h.url}/auth/v1/verify`, { method: 'POST', redirect: 'manual',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields) });
+}
+
 const studentMeta = { role: 'student', account_status: 'student', full_name: 'Aysel Məmmədova', phone: '+994500000000',
   faculty_name: 'İnformasiya texnologiyaları', major_name: 'Kompüter elmləri', group_name: '650.22', bachelor_start_year: '2022', bachelor_end_year: '2026' };
 
@@ -99,13 +111,25 @@ test('passwords migrated from the old database (bcrypt $2a$) keep working', asyn
   assert.equal(data.user?.id, '11111111-1111-4111-8111-111111111111');
 });
 
-test('changing the password rejects the current one and accepts a new one', async () => {
+test('changing the password needs the current one, rejects the same one, and ends the other sessions', async () => {
   const client = h.anon();
   await client.auth.signInWithPassword({ email: 'aysel.m@asoiu.edu.az', password: 'Sifre2026!' });
-  const same = await client.auth.updateUser({ password: 'Sifre2026!' });
+  const other = h.anon();
+  await other.auth.signInWithPassword({ email: 'aysel.m@asoiu.edu.az', password: 'Sifre2026!' });
+  const update = (attributes: Record<string, unknown>) => client.auth.updateUser(attributes as { password: string });
+  const missing = await update({ password: 'YeniSifre2026!' });
+  assert.equal(missing.error?.message, 'Current password is incorrect', 'a stolen session cannot set a new password (#14)');
+  const wrong = await update({ password: 'YeniSifre2026!', current_password: 'Sehv2026!' });
+  assert.equal(wrong.error?.message, 'Current password is incorrect');
+  const same = await update({ password: 'Sifre2026!', current_password: 'Sifre2026!' });
   assert.match(same.error?.message || '', /different from the old password/);
-  const changed = await client.auth.updateUser({ password: 'YeniSifre2026!' });
+  const changed = await update({ password: 'YeniSifre2026!', current_password: 'Sifre2026!' });
   assert.equal(changed.error, null);
+  const stillHere = await client.auth.getUser();
+  assert.equal(stillHere.error, null, 'the session that changed the password stays');
+  const otherToken = (await other.auth.getSession()).data.session!.access_token;
+  const ended = await fetch(`${h.url}/rest/v1/profiles?select=id`, { headers: { apikey: h.config.anonKey, authorization: `Bearer ${otherToken}` } });
+  assert.equal(ended.status, 401, 'every other session ends at once (H-10)');
   const relogin = await h.anon().auth.signInWithPassword({ email: 'aysel.m@asoiu.edu.az', password: 'YeniSifre2026!' });
   assert.equal(relogin.error, null);
 });
@@ -146,15 +170,24 @@ test('password recovery emails a link that signs the user in through the portal 
   const mail = h.mailer.outbox![before];
   assert.equal(mail.kind, 'recovery');
   assert.equal(mail.to, 'aysel.m@asoiu.edu.az');
-  const res = await fetch(mail.link, { redirect: 'manual' });
+  const res = await openLink(mail.link);
   assert.equal(res.status, 303);
   const location = new URL(res.headers.get('location')!);
   assert.equal(location.origin + location.pathname, 'https://asoiu-career.vercel.app/');
   const hash = new URLSearchParams(location.hash.slice(1));
   assert.equal(hash.get('type'), 'recovery');
-  const user = await fetch(`${h.url}/auth/v1/user`, { headers: { apikey: h.config.anonKey, authorization: `Bearer ${hash.get('access_token')}` } });
+  const recoveryAuth = { apikey: h.config.anonKey, authorization: `Bearer ${hash.get('access_token')}` };
+  const user = await fetch(`${h.url}/auth/v1/user`, { headers: recoveryAuth });
   assert.equal(user.status, 200);
-  const again = await fetch(mail.link, { redirect: 'manual' });
+  // The recovery session only sets a new password (#15).
+  const data = await fetch(`${h.url}/rest/v1/profiles?select=id`, { headers: recoveryAuth });
+  assert.equal(data.status, 403);
+  const email = await fetch(`${h.url}/auth/v1/user`, { method: 'PUT', headers: { ...recoveryAuth, 'content-type': 'application/json' }, body: JSON.stringify({ email: 'x@asoiu.edu.az' }) });
+  assert.equal(email.status, 403);
+  const set = await fetch(`${h.url}/auth/v1/user`, { method: 'PUT', headers: { ...recoveryAuth, 'content-type': 'application/json' }, body: JSON.stringify({ password: 'Berpa2026!' }) });
+  assert.equal(set.status, 200, 'no current password is needed after a recovery link');
+  assert.equal((await fetch(`${h.url}/rest/v1/profiles?select=id`, { headers: recoveryAuth })).status, 200, 'then the session is a normal one');
+  const again = await openLink(mail.link);
   assert.match(again.headers.get('location')!, /error_code=otp_expired/, 'links are single use');
   const tooSoon = await h.anon().auth.resetPasswordForEmail('aysel.m@asoiu.edu.az');
   assert.match(tooSoon.error?.message || '', /only request this after/);
@@ -167,8 +200,10 @@ test('redirects outside the allow list fall back to the site', async () => {
 });
 
 test('magic links are only sent to existing accounts when shouldCreateUser is false', async () => {
+  const before = h.mailer.outbox!.length;
   const unknown = await h.anon().auth.signInWithOtp({ email: 'nobody@asoiu.edu.az', options: { shouldCreateUser: false } });
-  assert.equal(unknown.error?.message, 'Signups not allowed for otp');
+  assert.equal(unknown.error, null, 'the answer does not tell whether the address is registered');
+  assert.equal(h.mailer.outbox!.length, before, 'but no mail goes out');
   const known = await h.anon().auth.signInWithOtp({ email: 'migrated@asoiu.edu.az', options: { shouldCreateUser: false } });
   assert.equal(known.error, null);
   assert.equal(h.mailer.outbox!.at(-1)!.kind, 'magic_link');
@@ -219,16 +254,21 @@ test('email change: links to the current and the new address, both must confirm'
   const mails = h.mailer.outbox!.slice(before);
   assert.deepEqual(mails.map(m => [m.to, m.kind]).sort(), [['kohne@asoiu.edu.az', 'email_change_current'], ['yeni@asoiu.edu.az', 'email_change']]);
 
-  const first = await fetch(mails[0].link, { redirect: 'manual' });
+  const first = await openLink(mails[0].link);
   assert.match(first.headers.get('location')!, /#message=Confirmation\+link\+accepted/);
-  const second = await fetch(mails[1].link, { redirect: 'manual' });
+  const second = await openLink(mails[1].link);
   assert.match(second.headers.get('location')!, /#access_token=/);
   const user = await h.service().auth.admin.getUserById(data.user!.id);
   assert.equal(user.data.user!.email, 'yeni@asoiu.edu.az');
   assert.equal(user.data.user!.new_email, undefined);
 
-  const taken = await client.auth.updateUser({ email: 'aysel.m@asoiu.edu.az' });
-  assert.equal(taken.error?.message, 'A user with this email address has already been registered');
+  const existing = await h.service().auth.admin.createUser({ email: 'tutulub@asoiu.edu.az', password: 'Sifre2026!', email_confirm: true,
+    user_metadata: { role: 'student', full_name: 'Tutulmuş Ünvan' } });
+  assert.equal(existing.error, null);
+  const sent = h.mailer.outbox!.length;
+  const taken = await client.auth.updateUser({ email: 'tutulub@asoiu.edu.az' });
+  assert.equal(taken.error, null, 'an address in use is not revealed (#18)');
+  assert.equal(h.mailer.outbox!.length, sent, 'and gets no link');
 });
 
 test('resend for an email change follows the 60-second cooldown and ignores unknown addresses', async () => {

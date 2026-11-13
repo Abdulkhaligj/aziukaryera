@@ -5,8 +5,8 @@ import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import type { Config } from '../config.ts';
-import { contextFromHeaders, systemContext, verifyJwt, type Claims } from '../context.ts';
-import { exec, one, toMysqlDatetime, transaction, type Tx } from '../db.ts';
+import { contextFromHeaders, forgetSessions, systemContext, verifyJwt, type Claims } from '../context.ts';
+import { exec, one, rows, toMysqlDatetime, transaction, type Tx } from '../db.ts';
 import { AuthError, authErrors, DbRuleError } from '../errors.ts';
 import type { Schema } from '../schema.ts';
 import { composeMail, type Mailer, type MailKind } from './mailer.ts';
@@ -34,8 +34,17 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const signIns = new RateLimiter(30, 5 * 60_000);
   const refreshes = new RateLimiter(150, 5 * 60_000);
   const emailsPerIp = new RateLimiter(30, 60 * 60_000);
+  // Per address and client (#16): someone else asking for links to your address
+  // cannot use up your cooldown; the address itself has a larger hourly cap.
   const emailCooldown = new RateLimiter(1, 60_000);
+  const emailPerClient = new RateLimiter(3, 60 * 60_000);
+  const emailPerAddress = new RateLimiter(20, 60 * 60_000);
   const signups = new RateLimiter(30, 60 * 60_000);
+  // Failed passwords per account (#64), new-address requests per user (#18).
+  const failedSignIns = new RateLimiter(10, 15 * 60_000);
+  const emailChanges = new RateLimiter(5, 60 * 60_000);
+  const LINK_MINUTES = 60;
+  const INVITE_MINUTES = 24 * 60;
 
   const meta = (req: FastifyRequest) => ({ userAgent: req.headers['user-agent'], ip: req.ip });
   const limit = (limiter: RateLimiter, key: string) => { if (!limiter.take(key)) throw new AuthError(429, 'over_request_rate_limit', 'Request rate limit reached'); };
@@ -50,12 +59,20 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const verifyLink = (token: string, type: string, redirect: string) =>
     `${config.publicUrl}/auth/v1/verify?token=${encodeURIComponent(token)}&type=${type}&redirect_to=${encodeURIComponent(redirect)}`;
 
-  async function sendMail(kind: MailKind, user: AuthUser, token: string, type: string, redirect: string, ip: string) {
+  async function sendMail(kind: MailKind, user: AuthUser, token: string, type: string, redirect: string, ip: string, ttl = LINK_MINUTES) {
     if (!emailsPerIp.take(ip)) throw authErrors.rateLimited();
-    await mailer.send(composeMail(kind, user.email!, verifyLink(token, type, redirect)));
+    await mailer.send(composeMail(kind, user.email!, verifyLink(token, type, redirect), ttl));
   }
-  function cooldown(email: string) {
-    if (!emailCooldown.take(email)) throw authErrors.tooFrequent(emailCooldown.retryAfter(email) || 60);
+  function cooldown(email: string, ip: string) {
+    const key = `${email}|${ip}`;
+    if (!emailCooldown.take(key)) throw authErrors.tooFrequent(emailCooldown.retryAfter(key) || 60);
+    if (!emailPerClient.take(key) || !emailPerAddress.take(email)) throw authErrors.rateLimited();
+  }
+  /** Ends every session of a user (password set by an admin, ban, deletion: H-10). */
+  async function endSessions(db: Tx, userId: string) {
+    const ids = await rows<{ id: string }>(db, 'SELECT id FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL', [userId]);
+    await exec(db, 'UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND revoked_at IS NULL', [userId]);
+    forgetSessions(...ids.map(r => r.id));
   }
 
   /** Inserts auth_users and runs handle_new_user in the same transaction. */
@@ -84,7 +101,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     return email;
   }
 
-  async function bearerUser(req: FastifyRequest): Promise<{ user: AuthUser; claims: Claims }> {
+  async function bearerUser(req: FastifyRequest): Promise<{ user: AuthUser; claims: Claims; restricted: boolean }> {
     const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) throw authErrors.noAuthorization();
     const claims = await verifyJwt(config, token);
@@ -92,16 +109,23 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     if (!await sessionIsActive(pool, claims.session_id)) throw authErrors.sessionNotFound();
     const user = await findUserById(pool, claims.sub);
     if (!user) throw new AuthError(403, 'user_not_found', 'User from sub claim in JWT does not exist');
-    return { user, claims };
+    if (isBanned(user)) throw authErrors.banned();
+    const session = await one<{ restricted: boolean }>(pool, 'SELECT restricted FROM auth_sessions WHERE id = ?', [claims.session_id]);
+    return { user, claims, restricted: !!session?.restricted };
   }
   async function requireService(req: FastifyRequest) {
     const ctx = await contextFromHeaders(config, undefined, req.headers.authorization);
     if (ctx?.role !== 'service_role') throw authErrors.notAdmin();
   }
 
+  // The confirmation page posts an HTML form.
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 8192 }, (_req, body, done) => {
+    done(null, Object.fromEntries(new URLSearchParams(String(body))));
+  });
+
   // Every route except the email-link target needs the anon or service key.
   app.addHook('preHandler', async (req: FastifyRequest) => {
-    if (req.routeOptions.url?.endsWith('/verify') && req.method === 'GET') return;
+    if (req.routeOptions.url?.endsWith('/verify') && (req.method === 'GET' || /urlencoded/i.test(String(req.headers['content-type'] ?? '')))) return;
     if (req.routeOptions.url?.endsWith('/health')) return;
     const apikey = (req.headers.apikey as string | undefined) ?? (req.query as Body)?.apikey;
     if (!apikey) throw authErrors.missingKey();
@@ -132,8 +156,14 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     const outcome = await transaction(pool, async tx => {
       const existing = await findUserByEmail(tx, email, true);
       if (existing) {
-        if (config.mailerAutoconfirm || existing.email_confirmed_at) throw authErrors.userExists();
-        return { user: existing, resend: true as const };
+        if (config.mailerAutoconfirm) throw authErrors.userExists();
+        // An address that is already in use answers like a new sign-up and the
+        // owner gets a note instead: no data and no "exists" leaks (#13, #18).
+        if (existing.email_confirmed_at || existing.raw_app_meta_data?.invited) return { duplicate: existing };
+        // H-04: an unconfirmed sign-up belongs to whoever confirms the newest
+        // link. The earlier attempt (its password and profile) is replaced, so a
+        // pre-registered password can never be the one that works later.
+        await deleteRow({ tx, ctx: systemContext, schema, now: new Date() }, 'auth_users', { id: existing.id });
       }
       let user: AuthUser;
       try {
@@ -143,11 +173,17 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         throw error;
       }
       if (config.mailerAutoconfirm) return { session: await startSession(tx, config, user, 'password', meta(req)) };
-      return { user, token: await createOneTimeToken(tx, user.id, 'email_confirmation', 24 * 60) };
+      return { user, token: await createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES) };
     });
     if ('session' in outcome) return outcome.session;
-    if ('token' in outcome && outcome.token) await sendMail('confirmation', outcome.user, outcome.token, 'signup', redirect, req.ip);
-    return { ...toGoTrueUser(outcome.user), confirmation_sent_at: new Date().toISOString() };
+    const sentAt = new Date().toISOString();
+    if ('duplicate' in outcome) {
+      if (emailsPerIp.take(req.ip)) await mailer.send(composeMail('already_registered', email, config.siteUrl, null));
+      return { ...toGoTrueUser({ ...outcome.duplicate, id: randomUUID(), raw_user_meta_data: {}, raw_app_meta_data: {}, created_at: sentAt, updated_at: sentAt,
+        last_sign_in_at: null, email_confirmed_at: null } as AuthUser), identities: [], confirmation_sent_at: sentAt };
+    }
+    await sendMail('confirmation', outcome.user, outcome.token, 'signup', redirect, req.ip);
+    return { ...toGoTrueUser(outcome.user), confirmation_sent_at: sentAt };
   });
 
   app.post('/token', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
@@ -162,9 +198,14 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     if (req.query.grant_type !== 'password') throw new AuthError(400, 'validation_failed', 'unsupported_grant_type');
     limit(signIns, req.ip);
     const email = normalizeEmail(body.email);
+    // Ten wrong passwords for one account lock it for 15 minutes, from any IP (#64).
+    if (email && failedSignIns.retryAfter(email) > 0) throw authErrors.rateLimited();
     const user = email ? await findUserByEmail(pool, email) : null;
-    const matches = await bcrypt.compare(String(body.password ?? ''), user?.encrypted_password || DUMMY_HASH);
-    if (!user || !user.encrypted_password || !matches) throw authErrors.invalidCredentials();
+    const matches = await bcrypt.compare(String(body.password ?? '').slice(0, 72), user?.encrypted_password || DUMMY_HASH);
+    if (!user || !user.encrypted_password || !matches) {
+      if (email) failedSignIns.take(email);
+      throw authErrors.invalidCredentials();
+    }
     if (!user.email_confirmed_at) throw authErrors.emailNotConfirmed();
     if (isBanned(user)) throw authErrors.banned();
     return transaction(pool, tx => startSession(tx, config, user, 'password', meta(req)));
@@ -175,52 +216,82 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     const claims = token ? await verifyJwt(config, token) : null;
     if (!claims || claims.role !== 'authenticated' || typeof claims.sub !== 'string') throw authErrors.badJwt();
     const scope = ['global', 'local', 'others'].includes(req.query.scope) ? req.query.scope : 'global';
-    await transaction(pool, tx => revokeSessions(tx, claims.sub!, claims.session_id, scope));
+    const ended = await transaction(pool, async tx => {
+      const ids = await rows<{ id: string }>(tx, 'SELECT id FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL', [claims.sub]);
+      await revokeSessions(tx, claims.sub!, claims.session_id, scope);
+      return ids.map(r => r.id).filter(id => scope === 'global' || (scope === 'local' ? id === claims.session_id : id !== claims.session_id));
+    });
+    forgetSessions(...ended);
     return reply.code(204).send();
   });
 
   app.get('/user', async (req: FastifyRequest) => toGoTrueUser((await bearerUser(req)).user));
 
   app.put('/user', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
-    const { user } = await bearerUser(req);
+    const { user, claims, restricted } = await bearerUser(req);
     const body = req.body || {};
+    // A session from a recovery link only sets the new password (#15).
+    if (restricted && (body.email !== undefined || body.data !== undefined || body.password === undefined)) {
+      throw new AuthError(403, 'password_change_required', 'Set a new password first');
+    }
     const newEmail = body.email === undefined ? null : checkEmail(body.email);
     let changeTokens: { to: string; kind: MailKind; token: string }[] = [];
+    let ended: string[] = [];
     await transaction(pool, async tx => {
       if (newEmail && newEmail !== user.email) {
         // Secure email change: a link to the new address (and to the current one);
-        // the address changes once every link is confirmed.
+        // the address changes once every link is confirmed. An address in use by
+        // someone else gets no link and no error: nobody learns who is registered (#18).
+        if (!emailChanges.take(user.id)) throw authErrors.rateLimited();
+        cooldown(newEmail, req.ip);
         const taken = await findUserByEmail(tx, newEmail);
-        if (taken && taken.id !== user.id) throw authErrors.emailExists();
-        cooldown(newEmail);
-        changeTokens = await startEmailChange(tx, user, newEmail);
+        if (!taken || taken.id === user.id) changeTokens = await startEmailChange(tx, user, newEmail);
       }
       if (body.password !== undefined) {
         const password = checkPassword(body.password);
+        // The current password is checked here, not only in the browser (#14);
+        // a recovery-link session or an account without a password needs none.
+        if (!restricted && user.encrypted_password) {
+          if (typeof body.current_password !== 'string' || !await bcrypt.compare(body.current_password.slice(0, 72), user.encrypted_password)) {
+            throw new AuthError(400, 'invalid_credentials', 'Current password is incorrect');
+          }
+        }
         if (user.encrypted_password && await bcrypt.compare(password, user.encrypted_password)) {
           throw new AuthError(422, 'same_password', 'New password should be different from the old password.');
         }
-        await exec(tx, 'UPDATE auth_users SET encrypted_password = ? WHERE id = ?', [await bcrypt.hash(password, BCRYPT_COST), user.id]);
+        // A temporary password set by the Career Centre is replaced now (#32).
+        await exec(tx, `UPDATE auth_users SET encrypted_password = ?,
+            raw_app_meta_data = IF(JSON_EXTRACT(raw_app_meta_data, '$.must_change_password') = CAST('true' AS JSON),
+              JSON_SET(raw_app_meta_data, '$.must_change_password', FALSE), raw_app_meta_data)
+          WHERE id = ?`, [await bcrypt.hash(password, BCRYPT_COST), user.id]);
+        // Every other session ends; this one may now do everything again (H-10).
+        ended = (await rows<{ id: string }>(tx, 'SELECT id FROM auth_sessions WHERE user_id = ? AND id <> ? AND revoked_at IS NULL',
+          [user.id, claims.session_id ?? ''])).map(r => r.id);
+        await revokeSessions(tx, user.id, claims.session_id, 'others');
+        await exec(tx, 'UPDATE auth_sessions SET restricted = 0 WHERE id = ?', [claims.session_id ?? '']);
       }
       if (body.data !== undefined) {
         await exec(tx, 'UPDATE auth_users SET raw_user_meta_data = ? WHERE id = ?',
           [JSON.stringify(mergeMetadata(user.raw_user_meta_data || {}, body.data)), user.id]);
       }
     });
+    forgetSessions(...ended, claims.session_id);
     const redirect = redirectTarget((req.query as Body | undefined)?.redirect_to);
     for (const mail of changeTokens) {
       if (!emailsPerIp.take(req.ip)) throw authErrors.rateLimited();
       await mailer.send(composeMail(mail.kind, mail.to, verifyLink(mail.token, 'email_change', redirect)));
     }
-    return toGoTrueUser((await findUserById(pool, user.id))!);
+    const fresh = (await findUserById(pool, user.id))!;
+    // A request for an address that is taken looks like a pending change.
+    return toGoTrueUser(newEmail && newEmail !== user.email && !changeTokens.length ? { ...fresh, email_change: newEmail } : fresh);
   });
 
   app.post('/recover', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const email = checkEmail(req.body?.email);
-    cooldown(email);
+    cooldown(email, req.ip);
     const user = await findUserByEmail(pool, email);
     if (user) {
-      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'recovery'));
+      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'recovery', LINK_MINUTES));
       await sendMail('recovery', user, token, 'recovery', redirectTarget(req.query.redirect_to ?? req.body?.redirect_to), req.ip);
     }
     return {};
@@ -229,18 +300,21 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   app.post('/otp', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const body = req.body || {};
     const email = checkEmail(body.email);
-    cooldown(email);
+    cooldown(email, req.ip);
     const redirect = redirectTarget(req.query.redirect_to ?? body.redirect_to);
     const outcome = await transaction(pool, async tx => {
       let user = await findUserByEmail(tx, email, true);
       if (!user) {
-        if (body.create_user === false || config.disableSignup) throw authErrors.otpSignupDisabled();
+        // No account: the same empty answer as when one exists (#18).
+        if (body.create_user === false || config.disableSignup) return null;
+        // Creating accounts counts against the sign-up limit (#17).
+        limit(signups, req.ip);
         try { user = await createAuthUser(tx, { email, password: null, confirmed: false, userMeta: body.data }); }
         catch (error) { if (isRuleFailure(error)) throw authErrors.databaseSignup(); throw error; }
       }
-      return { user, token: await createOneTimeToken(tx, user.id, 'magic_link') };
+      return { user, token: await createOneTimeToken(tx, user.id, 'magic_link', LINK_MINUTES) };
     });
-    await sendMail('magic_link', outcome.user, outcome.token, 'magiclink', redirect, req.ip);
+    if (outcome) await sendMail('magic_link', outcome.user, outcome.token, 'magiclink', redirect, req.ip);
     return {};
   });
 
@@ -251,9 +325,9 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     await exec(tx, `UPDATE auth_users SET email_change = ?, email_change_confirm_status = 0, email_change_sent_at = CURRENT_TIMESTAMP(6) WHERE id = ?`,
       [newEmail, user.id]);
     const tokens: { to: string; kind: MailKind; token: string }[] =
-      [{ to: newEmail, kind: 'email_change', token: await createOneTimeToken(tx, user.id, 'email_change', 24 * 60, newEmail) }];
+      [{ to: newEmail, kind: 'email_change', token: await createOneTimeToken(tx, user.id, 'email_change', LINK_MINUTES, newEmail) }];
     if (config.secureEmailChange && user.email) {
-      tokens.push({ to: user.email, kind: 'email_change_current', token: await createOneTimeToken(tx, user.id, 'email_change', 24 * 60, user.email) });
+      tokens.push({ to: user.email, kind: 'email_change_current', token: await createOneTimeToken(tx, user.id, 'email_change', LINK_MINUTES, user.email) });
     }
     return tokens;
   }
@@ -263,7 +337,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     if (body.type === 'email_change') {
       // GoTrue: the email is the pending new address.
       const pendingEmail = checkEmail(body.email);
-      cooldown(pendingEmail);
+      cooldown(pendingEmail, req.ip);
       const user = await one<AuthUser>(pool, 'SELECT * FROM auth_users WHERE email_change = ? AND deleted_at IS NULL', [pendingEmail]);
       if (user) {
         const tokens = await transaction(pool, tx => startEmailChange(tx, user, pendingEmail));
@@ -277,10 +351,10 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     }
     if (body.type !== 'signup') throw authErrors.validation('Only signup and email_change links can be resent');
     const email = checkEmail(body.email);
-    cooldown(email);
+    cooldown(email, req.ip);
     const user = await findUserByEmail(pool, email);
     if (user && !user.email_confirmed_at) {
-      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'email_confirmation', 24 * 60));
+      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES));
       await sendMail('confirmation', user, token, 'signup', redirectTarget(req.query.redirect_to ?? body.options?.emailRedirectTo), req.ip);
     }
     return {};
@@ -289,7 +363,8 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   /** Consumes an email token, confirms the address and opens a session. For an
    *  email change confirmed on one of two addresses, returns the GoTrue message. */
   async function verify(token: string, type: string, req: FastifyRequest): Promise<Awaited<ReturnType<typeof startSession>> | { msg: string }> {
-    const purposes = PURPOSE[type];
+    // Own keys only: type=constructor is not a purpose (#75).
+    const purposes = Object.hasOwn(PURPOSE, type) ? PURPOSE[type] : null;
     if (!purposes || !token) throw authErrors.otpExpired();
     return transaction(pool, async tx => {
       const used = await consumeOneTimeToken(tx, token, purposes);
@@ -309,18 +384,13 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       const user = await findUserById(tx, used.user_id);
       if (!user) throw authErrors.otpExpired();
       if (isBanned(user)) throw authErrors.banned();
-      return startSession(tx, config, user, AMR[used.purpose] || 'otp', meta(req));
+      return startSession(tx, config, user, AMR[used.purpose] || 'otp', meta(req), used.purpose === 'recovery');
     });
   }
 
-  app.post('/verify', async (req: FastifyRequest<{ Body: Body }>) => {
-    const body = req.body || {};
-    return verify(String(body.token_hash ?? body.token ?? ''), String(body.type ?? ''), req);
-  });
-
-  app.get('/verify', async (req: FastifyRequest<{ Querystring: Body }>, reply: FastifyReply) => {
-    const { token, type } = req.query;
-    const redirect = redirectTarget(req.query.redirect_to);
+  /** Consumes a link and sends the browser back to the site with the session. */
+  async function verifyAndRedirect(req: FastifyRequest, reply: FastifyReply, token: unknown, type: unknown, redirectTo: unknown) {
+    const redirect = redirectTarget(redirectTo);
     try {
       const session = await verify(String(token ?? ''), String(type ?? ''), req);
       if ('msg' in session) return reply.redirect(`${redirect}#${new URLSearchParams({ message: session.msg })}`, 303);
@@ -334,6 +404,35 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       const hash = new URLSearchParams({ error: 'access_denied', error_code: error.errorCode, error_description: 'Email link is invalid or has expired' });
       return reply.redirect(`${redirect}#${hash}`, 303);
     }
+  }
+
+  app.post('/verify', async (req: FastifyRequest<{ Body: Body }>, reply: FastifyReply) => {
+    const body = req.body || {};
+    // The confirmation page's form: consume the link and go back to the site.
+    if (/urlencoded/i.test(String(req.headers['content-type'] ?? ''))) return verifyAndRedirect(req, reply, body.token, body.type, body.redirect_to);
+    return verify(String(body.token_hash ?? body.token ?? ''), String(body.type ?? ''), req);
+  });
+
+  // The link in an email opens a page with one button; only the button (a POST)
+  // uses the link, so mail scanners that open links do not burn it (#75).
+  const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  app.get('/verify', async (req: FastifyRequest<{ Querystring: Body }>, reply: FastifyReply) => {
+    const field = (name: string, value: unknown) => `<input type="hidden" name="${name}" value="${escapeHtml(String(value ?? '').slice(0, 2048))}">`;
+    const type = String(req.query.type ?? '');
+    const action = type === 'recovery' ? 'Davam et və yeni şifrə təyin et' : 'Təsdiqlə';
+    return reply.code(200)
+      .header('content-type', 'text/html; charset=utf-8')
+      .header('cache-control', 'no-store')
+      .header('referrer-policy', 'no-referrer')
+      .header('x-frame-options', 'DENY')
+      .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+      .send(`<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADNSU Karyera</title><style>body{font-family:system-ui,sans-serif;background:#f3f5fb;display:grid;place-items:center;min-height:100vh;margin:0}
+main{background:#fff;padding:32px 28px;border-radius:16px;max-width:420px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+button{background:#0b1f6b;color:#fff;border:0;border-radius:10px;padding:12px 22px;font-size:16px;cursor:pointer}</style></head>
+<body><main><h1 style="font-size:20px">ADNSU Karyera Mərkəzi</h1><p>Davam etmək üçün düyməni basın.</p>
+<form method="post" action="${escapeHtml(config.publicUrl)}/auth/v1/verify">${field('token', req.query.token)}${field('type', type)}${field('redirect_to', req.query.redirect_to)}
+<button type="submit">${action}</button></form></main></body></html>`);
   });
 
   // ---- admin API (service role only) ----
@@ -403,6 +502,8 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       const ban = banUntil(body.ban_duration);
       if (ban !== undefined) { sets.push('banned_until = ?'); params.push(ban); }
       if (sets.length) await exec(tx, `UPDATE auth_users SET ${sets.join(', ')} WHERE id = ?`, [...params, current.id]);
+      // A password set by an administrator, or a ban, ends every open session (H-10).
+      if (body.password !== undefined || (ban !== undefined && ban !== null)) await endSessions(tx, current.id);
       return (await findUserById(tx, current.id))!;
     });
     return toGoTrueUser(user);
@@ -414,7 +515,10 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     if (!user) throw authErrors.userNotFound();
     // Through the write pipeline: the profile and its rows go with their
     // triggers (audit, quota counters), as the Postgres FK cascade did.
-    await transaction(pool, tx => deleteRow({ tx, ctx: systemContext, schema, now: new Date() }, 'auth_users', { id: user.id }));
+    await transaction(pool, async tx => {
+      await endSessions(tx, user.id);
+      await deleteRow({ tx, ctx: systemContext, schema, now: new Date() }, 'auth_users', { id: user.id });
+    });
     return toGoTrueUser(user);
   });
 
@@ -426,11 +530,11 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     const outcome = await transaction(pool, async tx => {
       if (await findUserByEmail(tx, email, true)) throw authErrors.emailExists();
       let user: AuthUser;
-      try { user = await createAuthUser(tx, { email, password: null, confirmed: false, userMeta: body.data }); }
+      try { user = await createAuthUser(tx, { email, password: null, confirmed: false, appMeta: { invited: true }, userMeta: body.data }); }
       catch (error) { if (isRuleFailure(error)) throw new AuthError(500, 'unexpected_failure', 'Database error saving new user'); throw error; }
-      return { user, token: await createOneTimeToken(tx, user.id, 'invite', 24 * 60) };
+      return { user, token: await createOneTimeToken(tx, user.id, 'invite', INVITE_MINUTES) };
     });
-    await mailer.send(composeMail('invite', email, verifyLink(outcome.token, 'invite', redirect)));
+    await mailer.send(composeMail('invite', email, verifyLink(outcome.token, 'invite', redirect), INVITE_MINUTES));
     return toGoTrueUser(outcome.user);
   });
 }

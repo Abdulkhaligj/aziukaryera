@@ -191,8 +191,18 @@ const Backend = {
       const code = hash.get('error') || query.get('error');
       if (!code) return null;
       const desc = hash.get('error_description') || query.get('error_description') || code;
+      const errorCode = hash.get('error_code') || query.get('error_code') || code;
       history.replaceState(null, '', window.location.pathname);
-      return this.translate(decodeURIComponent(desc.replace(/\+/g, ' ')));
+      // Text from the address bar is shown only when it is a message we know
+      // (audit 2026-11-13, #79): a crafted link cannot put its own words here.
+      const text = decodeURIComponent(desc.replace(/\+/g, ' '));
+      const known = this.translate(text);
+      if (known !== text) return known;
+      return ({
+        otp_expired: 'Linkin vaxtı keçib və ya o artıq istifadə olunub. Yenidən sorğu göndərin.',
+        access_denied: 'Giriş ləğv edildi.',
+        unauthorized_client: 'Bu giriş üsulu aktiv deyil.'
+      })[errorCode] || 'Giriş tamamlanmadı. Yenidən cəhd edin.';
     } catch (e) { return null; }
   },
 
@@ -215,9 +225,32 @@ const Backend = {
     return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
   },
 
-  async changePassword(newPassword) {
+  /** The server checks the current password (audit 2026-11-13, #14); after a
+   *  recovery link none is needed and none is sent. */
+  async changePassword(newPassword, currentPassword) {
     if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
-    const { error } = await this.sb.auth.updateUser({ password: newPassword });
+    const attributes = currentPassword == null ? { password: newPassword } : { password: newPassword, current_password: currentPassword };
+    const { error } = await this.sb.auth.updateUser(attributes);
+    return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
+  },
+
+  /** The device forgets the session even when the server cannot be reached (#80). */
+  async forgetLocalSession() {
+    try { await this.sb?.auth?._removeSession?.(); } catch { /* storage below */ }
+    try {
+      for (const key of Object.keys(window.localStorage)) {
+        if (/^sb-.*-auth-token(-code-verifier)?$/.test(key)) window.localStorage.removeItem(key);
+      }
+    } catch { /* storage unavailable */ }
+  },
+
+  /** #52: the student agrees that their CV texts may be sent to the AI provider. */
+  async giveAiConsent() {
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
+    const { data } = await this.sb.auth.getSession();
+    const id = data?.session?.user?.id;
+    if (!id) return { ok: false, error: 'Sessiya tapılmadı.' };
+    const { error } = await this.sb.from('profiles').update({ ai_consent_at: new Date().toISOString() }).eq('id', id);
     return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
   },
 
@@ -232,6 +265,9 @@ const Backend = {
   translate(msg) {
     const m = String(msg || '');
     if (/Invalid login credentials/i.test(m)) return 'E-poçt və ya şifrə yanlışdır.';
+    if (/Current password is incorrect/i.test(m)) return 'Cari şifrə yanlışdır.';
+    if (/different from the old password|same_password/i.test(m)) return 'Yeni şifrə köhnəsindən fərqli olmalıdır.';
+    if (/Set a new password first|Yeni şifrə təyin edin/i.test(m)) return 'Davam etmək üçün əvvəlcə yeni şifrə təyin edin.';
     if (/_(application_url|link_url|website|logo_url|cover_url|image_url)_web/i.test(m)) {
       return 'Link http:// və ya https:// ilə başlamalıdır (şəkillər üçün https://).';
     }

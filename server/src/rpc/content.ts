@@ -1,6 +1,7 @@
 // Ads and student benefits: active_ads, ad_track, claim_benefit, redeem_benefit_code.
 import { randomUUID } from 'node:crypto';
-import { one, rows, toMysqlDatetime, type Row } from '../db.ts';
+import { codeHash, decryptField, encryptField } from '../crypto.ts';
+import { exec, one, rows, toMysqlDatetime, type Row } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
 import { insertRow, nowText, updateRow } from '../write/pipeline.ts';
 import { isAdmin, pgTrim } from '../write/rules/core.ts';
@@ -16,14 +17,17 @@ rpc({
 
 rpc({
   name: 'ad_track', args: { p_id: 'uuid', p_kind: 'text' }, roles: ['anon', 'authenticated'], security: 'definer', returns: 'void',
+  // H-11: a visitor counts once per ad and kind every 30 minutes, and at most
+  // 300 times an hour; more calls are accepted and not counted.
+  limits: [
+    { name: 'per-ad', count: 1, windowMs: 30 * 60_000, key: a => `${a.p_id}|${a.p_kind}`, silent: true },
+    { name: 'per-client', count: 300, windowMs: 3_600_000, silent: true }
+  ],
   async run(env, a) {
     if (a.p_kind !== 'view' && a.p_kind !== 'click') return;
-    const ad = await one<{ id: string; impressions: number; clicks: number }>(env.tx, `SELECT id, impressions, clicks FROM ads
-       WHERE id = ? AND status = 'active' AND ? BETWEEN starts_on AND ends_on FOR UPDATE`, [a.p_id, bakuDate(env.now)]);
-    if (!ad) return;
-    await updateRow(env, 'ads', { id: ad.id }, {
-      impressions: ad.impressions + (a.p_kind === 'view' ? 1 : 0), clicks: ad.clicks + (a.p_kind === 'click' ? 1 : 0)
-    });
+    // A counter, not content: one UPDATE without an audit row per view.
+    await exec(env.tx, `UPDATE ads SET ${a.p_kind === 'view' ? 'impressions = impressions + 1' : 'clicks = clicks + 1'}
+       WHERE id = ? AND status = 'active' AND ? BETWEEN starts_on AND ends_on`, [a.p_id, bakuDate(env.now)]);
   }
 });
 
@@ -34,13 +38,20 @@ rpc({
   name: 'claim_benefit', args: { p_benefit: 'uuid' }, roles: ['authenticated'], security: 'definer', returns: 'row',
   async run(env, a) {
     const me = requireUid(env, 'Giriş tələb olunur');
-    const benefit = await one<{ valid_to: string | null }>(env.tx, 'SELECT valid_to FROM benefits WHERE id = ? AND active = 1', [a.p_benefit]);
+    // Benefits are for active students and graduates (#65).
+    const who = await one<{ role: string; status: string }>(env.tx, 'SELECT role, status FROM profiles WHERE id = ?', [me]);
+    if (!who || who.status !== 'active' || !['student', 'graduate'].includes(who.role)) throw new DbRuleError('Güzəştlər yalnız aktiv tələbə və məzunlar üçündür', '42501');
+    // The benefit row is locked, so two claims at once cannot both create a code (#65).
+    const benefit = await one<{ valid_to: string | null }>(env.tx, 'SELECT valid_to FROM benefits WHERE id = ? AND active = 1 FOR UPDATE', [a.p_benefit]);
     if (!benefit) throw new DbRuleError('Güzəşt tapılmadı və ya aktiv deyil', 'P0002');
     if (benefit.valid_to != null && benefit.valid_to < utcDate(env.now)) throw new DbRuleError('Güzəştin müddəti bitib', '23514');
     const existing = await one(env.tx, `SELECT * FROM benefit_claims WHERE benefit_id = ? AND profile_id = ?
        AND redeemed_at IS NULL AND expires_at > ? LIMIT 1`, [a.p_benefit, me, toMysqlDatetime(env.now)]);
-    if (existing) return existing;
-    return insertRow(env, 'benefit_claims', { benefit_id: a.p_benefit, profile_id: me, code: newClaimCode() });
+    if (existing) return { ...existing, code: decryptField(existing.code) };
+    // The code is stored encrypted and found by its hash (#73).
+    const code = newClaimCode();
+    const stored = await insertRow(env, 'benefit_claims', { benefit_id: a.p_benefit, profile_id: me, code: encryptField(code), code_hash: codeHash(code) });
+    return { ...stored, code };
   }
 });
 
@@ -49,7 +60,8 @@ rpc({
   async run(env, a) {
     const me = requireUid(env, 'Giriş tələb olunur');
     const code = a.p_code == null ? null : (pgTrim(a.p_code) as string).toUpperCase();
-    const claim = code == null ? null : await one<Row>(env.tx, 'SELECT * FROM benefit_claims WHERE code = ? COLLATE utf8mb4_bin', [code]);
+    // Locked: a code is redeemed once even when two partners try at the same time (#65).
+    const claim = code == null ? null : await one<Row>(env.tx, 'SELECT * FROM benefit_claims WHERE code_hash = ? FOR UPDATE', [codeHash(code)]);
     const result = (status: string, student: unknown = null, faculty: unknown = null, benefit: unknown = null, partner: unknown = null, at: unknown = null) =>
       [{ status, student_name: student, faculty, benefit, partner, redeemed_at: at }];
     if (!claim) return result('tapilmadi');

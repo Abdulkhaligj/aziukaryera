@@ -30,13 +30,17 @@ export async function isAdmin(env: WriteEnv): Promise<boolean> {
   return (await currentAdminRole(env.tx, env.ctx)) !== null;
 }
 
-/** `auth.uid() is null or public.is_admin()`: trusted callers and staff. */
-export async function privileged(env: WriteEnv): Promise<boolean> {
-  return !env.ctx.uid || await isAdmin(env);
-}
-
 /** current_user not in ('authenticated','anon'): SECURITY DEFINER code, the service role and server internals. */
 export const isTrusted = (env: WriteEnv) => !!env.definer || env.ctx.role === 'system' || env.ctx.role === 'service_role';
+
+/** `auth.uid() is null or public.is_admin()`: server code (no user) or staff.
+ *  Inside a SECURITY DEFINER trigger auth.uid() is still the caller, so the
+ *  definer flag does not count. Postgres also let anonymous requests through
+ *  here; an anonymous caller is not trusted (audit 2026-11-13, #69). */
+export async function privileged(env: WriteEnv): Promise<boolean> {
+  if (!env.ctx.uid) return env.ctx.role !== 'anon';
+  return isAdmin(env);
+}
 
 /** NEW.col IS DISTINCT FROM OLD.col (false for INSERT, where OLD is null). */
 export const changed = (row: Row, old: Row | null, ...columns: string[]) =>

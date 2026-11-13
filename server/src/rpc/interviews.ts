@@ -21,12 +21,19 @@ rpc({
       [a.p_application_id, me]);
     if (!target) throw new DbRuleError('Bu müraciət üzrə sorğu göndərməyə icazə yoxdur', '42501');
     const message = pgTrim(a.p_message ?? '');
-    const existing = await one<{ id: string; status: string }>(env.tx, 'SELECT id, status FROM interview_requests WHERE application_id = ? FOR UPDATE', [a.p_application_id]);
+    const existing = await one<{ id: string; status: string; updated_at: string }>(env.tx, 'SELECT id, status, updated_at FROM interview_requests WHERE application_id = ? FOR UPDATE', [a.p_application_id]);
     if (!existing) {
       return (await insertRow(env, 'interview_requests', { application_id: a.p_application_id, student_id: target.student_id, company_id: target.company_id, message })).id;
     }
     // ON CONFLICT DO UPDATE … WHERE status IN ('cancelled', 'declined')
     if (existing.status !== 'cancelled' && existing.status !== 'declined') throw new DbRuleError('Bu müraciət üçün artıq aktiv müsahibə sorğusu var', 'P0001');
+    // #40: a declined request may be sent again after 30 days, a cancelled one after a day.
+    const wait = existing.status === 'declined' ? 30 * 86_400_000 : 86_400_000;
+    if (env.now.getTime() - new Date(existing.updated_at).getTime() < wait) {
+      throw new DbRuleError(existing.status === 'declined'
+        ? 'Şirkət sorğunu rədd edib; yeni sorğunu 30 gündən sonra göndərə bilərsiniz'
+        : 'Ləğv etdiyiniz sorğunu 24 saatdan sonra yenidən göndərə bilərsiniz', 'P0001');
+    }
     await updateRow(env, 'interview_requests', { id: existing.id }, {
       status: 'pending', message, reply_note: '', scheduled_slot_id: null, updated_at: nowText(env), created_at: nowText(env)
     });

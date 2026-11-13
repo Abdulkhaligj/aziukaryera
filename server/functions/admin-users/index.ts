@@ -12,6 +12,7 @@ type AdminAccessRole = "super_admin" | "manager" | "editor" | "reviewer";
 type RequestBody = {
   action?: "invite" | "create" | "update" | "delete" | "reset_password" | "change_password";
   password?: string;
+  current_password?: string;
   resource?: ManagedResource;
   id?: string;
   full_name?: string;
@@ -108,9 +109,12 @@ Deno.serve(async (req: Request) => {
     try {
       const changed = await fetch(`${url}/auth/v1/user`, {
         method: "PUT", headers: { Authorization: authorization, apikey: anonKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ password }), signal: AbortSignal.timeout(12500), redirect: "error",
+        // The API checks the current password itself (audit 2026-11-13, #14).
+        body: JSON.stringify({ password, current_password: typeof body.current_password === "string" ? body.current_password : "" }),
+        signal: AbortSignal.timeout(12500), redirect: "error",
       });
       const changedUser = await readLimitedJson(changed, 131072);
+      if (changed.status === 400 && changedUser?.error_code === "invalid_credentials") return json({ ok: false, error: "Cari şifrə yanlışdır." }, 400);
       if (!changed.ok || changedUser?.id !== actor.id) return json({ ok: false, error: "Şifrə dəyişmədi; fərqli yeni şifrə seçin." }, 400);
     } catch {
       return json({ ok: false, error: "Şifrə dəyişikliyi təsdiqlənmədi; yenidən cəhd edin." }, 503);
@@ -249,11 +253,15 @@ Deno.serve(async (req: Request) => {
     const { data: targetAuth } = await service.auth.admin.getUserById(id);
     if (!targetAuth.user) return json({ ok: false, error: "Auth istifadəçisi tapılmadı" }, 404);
     const password = tempPassword();
+    // #32: every reset password is temporary: the next sign-in asks for a new
+    // one, the person's sessions end, and they are told the password was reset.
     const { error } = await service.auth.admin.updateUserById(id, {
       password,
-      app_metadata: { must_change_password: target.role === "admin" },
+      app_metadata: { must_change_password: true },
     });
     if (error) return json({ ok: false, error: error.message }, 400);
+    await service.from("notifications").insert({ profile_id: id, kind: "password_reset", title: "Şifrəniz sıfırlandı",
+      body: "Karyera Mərkəzi hesabınız üçün müvəqqəti şifrə təyin etdi. Növbəti girişdə yeni şifrə qurun. Bunu siz istəməmisinizsə, Karyera Mərkəzinə yazın.", link: "profile" });
     if ((await service.from("admin_audit_logs").insert({ title: `${target.full_name || target.email} üçün şifrə sıfırlandı`, resource, resource_id: id, action: "reset-password", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true, email: target.email, temporaryPassword: password });
   }

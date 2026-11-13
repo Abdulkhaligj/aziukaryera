@@ -5,7 +5,15 @@
  */
 
 const CareerAI = {
-  async request(task, payload) {
+  /* Audit 2026-11-13, #52: CV və cavablar AI xidmətinə yalnız tələbənin razılığı ilə göndərilir. */
+  async askConsent() {
+    const agreed = window.confirm('AI alətləri CV mətninizi və cavablarınızı təhlil üçün xarici AI xidmətinə (Google Gemini və ya Groq) göndərir. ' +
+      'E-poçt, telefon və profil linkləri göndərilmədən əvvəl gizlədilir. Razısınızmı? Razılığı istənilən vaxt Karyera Mərkəzinə yazaraq geri götürə bilərsiniz.');
+    if (!agreed) return false;
+    return (await Backend.giveAiConsent()).ok === true;
+  },
+
+  async request(task, payload, retried = false) {
     if (!Backend.init() || !Backend.sb) {
       return { ok: false, fallback: true, error: 'AI xidməti hazırda əlçatan deyil.' };
     }
@@ -14,6 +22,10 @@ const CareerAI = {
         body: { task, payload, locale: 'az' }
       });
       if (error) throw error;
+      if (data?.code === 'consent_required' && !retried) {
+        if (await this.askConsent()) return this.request(task, payload, true);
+        return { ok: false, fallback: true, error: 'AI təhlili üçün razılıq verilmədi; sadə yoxlama göstərilir.' };
+      }
       if (!data || data.ok === false) {
         return { ok: false, fallback: true, error: data?.error || 'AI cavabı alınmadı.' };
       }

@@ -77,9 +77,15 @@ const Auth = {
   },
 
   async logout() {
+    let warning = null;
     if (Store.mode === 'remote') {
       const result = await Backend.signOut();
-      if (!result?.ok) return result || { ok: false, error: 'Çıxış tamamlanmadı.' };
+      // Without a connection the server is not told, but this device still
+      // forgets the session (audit 2026-11-13, #80).
+      if (!result?.ok) {
+        await Backend.forgetLocalSession();
+        warning = 'Serverə çıxış bildirilmədi, amma bu cihazda sessiya bağlandı.';
+      }
     }
     window.CareerSession?.invalidate('logout');
     window.CVDrafts?.clear();
@@ -88,7 +94,7 @@ const Auth = {
     Store.state.view = 'dashboard';
     Store.bind();
     Store.save();
-    return { ok: true };
+    return warning ? { ok: true, warning } : { ok: true };
   },
 
   /* ---------------------------------------------------------------- *
@@ -356,12 +362,13 @@ const Auth = {
     if (newPw !== newPw2) return { ok: false, field: 'new2', error: 'Yeni şifrələr üst-üstə düşmür.' };
 
     if (Store.mode === 'remote') {
-      /* Server cari şifrəni yenidən yoxlamır — əvvəlcə onu təsdiqləyirik. */
+      /* Cari şifrəni server özü yoxlayır (audit 2026-11-13, #14). */
+      if (!currentPw) return { ok: false, field: 'current', error: 'Cari şifrəni daxil edin.' };
       const scope = window.CareerSession.capture();
-      const verify = await Backend.signIn(user.email, currentPw);
+      const result = await Backend.changePassword(newPw, currentPw);
       if (!window.CareerSession.matches(scope)) return window.CareerSession.stale();
-      if (!verify.ok) return { ok: false, field: 'current', error: 'Cari şifrə yanlışdır.' };
-      return await Backend.changePassword(newPw);
+      if (!result.ok && /Cari şifrə/.test(result.error || '')) return { ok: false, field: 'current', error: result.error };
+      return result;
     }
 
     const check = await this.hash(String(currentPw || ''), user.salt);

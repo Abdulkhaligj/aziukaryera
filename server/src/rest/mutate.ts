@@ -5,7 +5,7 @@ import type { Context } from '../context.ts';
 import { one, rows as queryRows, type Row, type Tx } from '../db.ts';
 import { table as tableOf, type Schema, type Table } from '../schema.ts';
 import { deleteRow, insertPrepared, prepareInsert, q, toParam, updateRow, type WriteEnv, type WriteOptions } from '../write/pipeline.ts';
-import { pgErrors } from './errors.ts';
+import { PgError, pgErrors } from './errors.ts';
 import { checkSql, granted, usingSql } from './policy.ts';
 import type { Where } from './select.ts';
 
@@ -68,8 +68,9 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
   const env: WriteEnv = { tx, ctx, schema, now: new Date() };
   const insertCheck = checkSql(tableName, ctx, 'INSERT');
   const updateCheck = checkSql(tableName, ctx, 'UPDATE');
-  // No permissive policy at all: Postgres refuses before any constraint runs.
-  if (insertCheck === 'FALSE' && !options.resolution) throw pgErrors.rls(ctx, tableName);
+  // No permissive policy at all: refused before any row is looked at, also for
+  // an upsert, so ON CONFLICT cannot probe rows the caller may not see (H-08).
+  if (insertCheck === 'FALSE') throw pgErrors.rls(ctx, tableName);
   const queue: (() => Promise<void>)[] = [];
   const keys: Row[] = [];
   for (const raw of input) {
@@ -83,12 +84,20 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
     if (options.resolution) {
       const conflict = options.onConflict ?? t.primaryKey;
       if (conflict.some(c => !t.columns.has(c))) throw pgErrors.column(tableName, conflict.find(c => !t.columns.has(c))!);
+      // As in Postgres, the conflict target must be a unique key: an arbitrary
+      // column (an email, say) cannot be used to look rows up (H-08).
+      if (!t.uniqueKeys.some(k => k.length === conflict.length && k.every(c => conflict.includes(c)))) {
+        throw new PgError(400, '42P10', 'there is no unique or exclusion constraint matching the ON CONFLICT specification');
+      }
       const proposed = prepared.row;
       const existing = conflict.every(c => proposed[c] !== undefined && proposed[c] !== null)
         ? await one(tx, `SELECT * FROM ${q(tableName)} WHERE ${conflict.map(c => `${q(c)} = ?`).join(' AND ')} FOR UPDATE`,
           conflict.map(c => toParam(t.columns.get(c)!, proposed[c])))
         : null;
       if (existing) {
+        // A conflicting row the caller may not see answers like a refused
+        // insert, not like "exists" (H-08).
+        if (!await rowPasses(tx, t, existing, usingSql(tableName, ctx, 'SELECT'))) throw pgErrors.rls(ctx, tableName);
         if (options.resolution === 'ignore') continue;
         if (!await rowPasses(tx, t, existing, usingSql(tableName, ctx, 'UPDATE'))) throw pgErrors.rlsUsing(ctx, tableName);
         // PostgREST sets every payload column to EXCLUDED.col (the row after BEFORE INSERT triggers).

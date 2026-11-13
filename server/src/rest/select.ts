@@ -2,12 +2,13 @@
 // (embedded ones included), filters, Postgres NULL ordering, exact counts and
 // resource embedding over foreign keys (batched, no N+1).
 import type { Context } from '../context.ts';
+import { decryptField, ENCRYPTED_COLUMNS } from '../crypto.ts';
 import { rows as queryRows, toMysqlDatetime, type Row, type Tx } from '../db.ts';
 import { table as tableOf, type Column, type ForeignKey, type Schema, type Table } from '../schema.ts';
 import { q } from '../write/pipeline.ts';
 import { pgErrors } from './errors.ts';
 import { isGroup, nodesAt, parseList, type EmbedOptions, type Filter, type FilterNode, type OrderTerm, type ScopedFilter, type SelectItem } from './parse.ts';
-import { exposed, granted, usingSql } from './policy.ts';
+import { exposed, granted, hiddenFor, usingSql } from './policy.ts';
 
 export interface Where { sql: string[]; params: unknown[] }
 export const noWhere = (): Where => ({ sql: [], params: [] });
@@ -141,9 +142,14 @@ export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: 
   const clause = [usingSql(tableName, ctx, 'SELECT'), ...where.sql].map(s => `(${s})`).join(' AND ');
   const paging = options.limit != null ? ` LIMIT ${Number(options.limit)} OFFSET ${Number(options.offset || 0)}`
     : options.offset ? ` LIMIT 18446744073709551615 OFFSET ${Number(options.offset)}` : '';
-  const raw = await queryRows(tx, `SELECT ${[...wanted].map(q).join(', ')} FROM ${q(tableName)} WHERE ${clause}${orderSql(t, options.order || [])}${paging}`, where.params);
+  // Columns hidden from this caller read as NULL everywhere, filters and order included (#62).
+  const hidden = hiddenFor(ctx, tableName);
+  const source = hidden.length
+    ? `(SELECT ${[...t.columns.keys()].map(c => (hidden.includes(c) ? `NULL AS ${q(c)}` : q(c))).join(', ')} FROM ${q(tableName)}) AS ${q(tableName)}`
+    : q(tableName);
+  const raw = await queryRows(tx, `SELECT ${[...wanted].map(q).join(', ')} FROM ${source} WHERE ${clause}${orderSql(t, options.order || [])}${paging}`, where.params);
   let total: number | null = null;
-  if (options.count) total = Number((await queryRows<{ n: number }>(tx, `SELECT COUNT(*) AS n FROM ${q(tableName)} WHERE ${clause}`, where.params))[0].n);
+  if (options.count) total = Number((await queryRows<{ n: number }>(tx, `SELECT COUNT(*) AS n FROM ${source} WHERE ${clause}`, where.params))[0].n);
 
   const attached = new Map<string, Map<string, Row | Row[] | null>>();
   for (const [i, embed] of embeds.entries()) {
@@ -196,12 +202,15 @@ export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: 
   return { rows, raw: keep, total };
 }
 
-/** Response object: requested columns in select order (embeds filled by the caller). */
+/** Response object: requested columns in select order (embeds filled by the caller).
+ *  Columns stored encrypted (#73) are returned as their plain text. */
 function shape(t: Table, items: SelectItem[], row: Row): Row {
   const out: Row = {};
+  const secret = ENCRYPTED_COLUMNS[t.name] ?? [];
+  const value = (name: string) => (secret.includes(name) ? decryptField(row[name]) : row[name]);
   for (const item of items) {
-    if (item.type === 'star') t.columns.forEach((_, name) => { out[name] = row[name]; });
-    else if (item.type === 'column') out[item.alias ?? item.name] = row[item.name];
+    if (item.type === 'star') t.columns.forEach((_, name) => { out[name] = value(name); });
+    else if (item.type === 'column') out[item.alias ?? item.name] = value(item.name);
     else out[item.alias ?? item.relation] = row[item.alias ?? item.relation] ?? null;
   }
   return out;

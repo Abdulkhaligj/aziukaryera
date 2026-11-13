@@ -36,6 +36,10 @@ export function can(role: AdminRole | string, action: Action, resource: Resource
   return false;
 }
 
+/** Approving or publishing a vacancy (audit 2026-11-13, #31): not for editors,
+ *  who write vacancies; the API refuses it for them as well. */
+export const canApproveJobs = (role: AdminRole | string) => role === 'super_admin' || role === 'manager';
+
 export const roleLabels: Record<AdminRole, string> = {
   super_admin: 'Super Admin',
   manager: 'Menecer',

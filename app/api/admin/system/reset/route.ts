@@ -16,7 +16,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Təsdiq sözü yanlışdır' }, { status: 400 });
   }
 
-  const { data, error } = await context.db.rpc('admin_reset_platform_data', { p_confirmation: body.confirmation });
+  if (typeof body.password !== 'string' || !body.password) {
+    return NextResponse.json({ error: 'Şifrənizi daxil edin' }, { status: 400 });
+  }
+  const { data, error } = await context.db.rpc('admin_reset_platform_data', { p_confirmation: body.confirmation, p_password: body.password });
   if (error) return NextResponse.json({ error: publicError(error, 'Sıfırlama alınmadı') }, { status: 400 });
   return NextResponse.json(data);
 }

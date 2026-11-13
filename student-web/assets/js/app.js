@@ -332,12 +332,12 @@ function jobCard(job, report, opts = {}) {
     ${report && report.blockers.length ? `<div class="note warn"><span class="m">!</span><span>${report.blockers.map(esc).join(' · ')}</span></div>` : ''}
 
     ${opts.footer !== undefined ? opts.footer : `<div class="job-foot">
-      <button class="btn sm" data-act="job-detail" data-id="${job.id}">Ətraflı</button>
+      <button class="btn sm" data-act="job-detail" data-id="${esc(job.id)}">Ətraflı</button>
       ${applied
         ? `<span class="chip good">✓ Müraciət edilib</span>`
-        : `<button class="btn sm primary" data-act="apply" data-id="${job.id}">Müraciət et</button>`}
+        : `<button class="btn sm primary" data-act="apply" data-id="${esc(job.id)}">Müraciət et</button>`}
       <div class="spacer"></div>
-      <button class="btn sm ghost" data-act="save" data-id="${job.id}">${savedOn ? '★ Seçilmişlərdə' : '☆ Yadda saxla'}</button>
+      <button class="btn sm ghost" data-act="save" data-id="${esc(job.id)}">${savedOn ? '★ Seçilmişlərdə' : '☆ Yadda saxla'}</button>
     </div>`}
   </article>`;
 }
@@ -572,7 +572,7 @@ function viewApplications() {
             <td class="num">${r.score}%</td>
             <td><span class="chip ${tone}">${esc(a.status)}</span>
               ${a.note ? `<div style="color:var(--muted);font-size:11.5px;margin-top:3px">${esc(a.note)}</div>` : ''}</td>
-            <td><button class="btn sm danger" data-act="withdraw" data-id="${job.id}">Geri götür</button></td>
+            <td><button class="btn sm danger" data-act="withdraw" data-id="${esc(job.id)}">Geri götür</button></td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -1060,7 +1060,7 @@ function cvCompare() {
         <div class="field">
           <label for="cmp-job">Vakansiya seçin</label>
           <select id="cmp-job" data-act="cmp-job">
-            ${jobs.map(j => `<option value="${j.id}" ${String(j.id) === String(jobId) ? 'selected' : ''}>
+            ${jobs.map(j => `<option value="${esc(j.id)}" ${String(j.id) === String(jobId) ? 'selected' : ''}>
               ${esc((companyOf(j.companyId)).name || '')} — ${esc(j.title)}</option>`).join('')}
           </select>
         </div>
@@ -1113,7 +1113,7 @@ function cvCompare() {
             : '<span style="color:var(--muted);font-size:12.5px">Yoxdur.</span>'}
         </div>
       </div>
-      ${!Store.isApplied(job.id) ? `<button class="btn primary block" data-act="apply" data-id="${job.id}">Bu vakansiyaya müraciət et</button>`
+      ${!Store.isApplied(job.id) ? `<button class="btn primary block" data-act="apply" data-id="${esc(job.id)}">Bu vakansiyaya müraciət et</button>`
         : '<div class="note good"><span class="m">✓</span><span>Bu vakansiyaya müraciət etmisiniz.</span></div>'}
     </div>
   </div>`;
@@ -1146,7 +1146,7 @@ function viewInterview() {
     <div class="card pad-lg">
       <div class="grid c2">
         <div class="field"><label for="iv-company">Şirkət</label>
-          <select id="iv-company">${companies.map(c => `<option value="${c.id}" ${c.id === 'socar' ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+          <select id="iv-company">${companies.map(c => `<option value="${esc(c.id)}" ${c.id === 'socar' ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
         <div class="field"><label for="iv-role">Vəzifə</label>
           <input id="iv-role" type="text" value="${esc(rankOpportunities(jobs, s)[0]?.job.title || 'Mechanical Engineer')}"></div>
         <div class="field"><label for="iv-type">Müsahibə tipi</label>
@@ -1410,7 +1410,7 @@ function viewEvents() {
         <div class="row" style="margin-top:14px">
           ${on ? '<span class="chip good">✓ Qeydiyyatdan keçmisiniz</span>'
             : full ? '<span class="chip bad">Yerlər dolub</span>'
-            : `<button class="btn sm primary" data-act="event-reg" data-id="${e.id}">Qeydiyyatdan keç</button>`}
+            : `<button class="btn sm primary" data-act="event-reg" data-id="${esc(e.id)}">Qeydiyyatdan keç</button>`}
         </div>
       </div>`;
     }).join('')}
@@ -1722,7 +1722,7 @@ function viewCompanyDashboard() {
             <h3 style="font-size:14.5px;margin:7px 0 2px">${esc(job.title)}</h3>
             <div style="color:var(--muted);font-size:12px">Son tarix ${fmtDate(job.deadline)}</div>
           </div>
-          <button class="btn sm" data-act="cand-job" data-id="${job.id}">Bütün namizədlər →</button>
+          <button class="btn sm" data-act="cand-job" data-id="${esc(job.id)}">Bütün namizədlər →</button>
         </div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
           <div class="row" style="justify-content:space-between;align-items:center;gap:14px">
@@ -1760,7 +1760,7 @@ function viewVacancies() {
         <td class="num">${strong}</td>
         <td class="num">${fmtDate(j.deadline)}</td>
         <td>${j.status === 'pending' ? '<span class="chip warn">Təsdiq gözləyir</span>' : '<span class="chip good">Dərc olunub</span>'}</td>
-        <td><button class="btn sm" data-act="cand-job" data-id="${j.id}">Namizədlər</button></td>
+        <td><button class="btn sm" data-act="cand-job" data-id="${esc(j.id)}">Namizədlər</button></td>
       </tr>`;
     }).join('')}</tbody></table></div>`
     : emptyState('Elan yoxdur', 'İlk vakansiyanı yaradın.')}`;
@@ -1857,7 +1857,7 @@ function viewCandidates() {
       <div class="field" style="flex:1;min-width:220px">
         <label for="cand-job" class="sr-only">Elan</label>
         <select id="cand-job" data-act="cand-select">
-          ${jobs.map(j => `<option value="${j.id}" ${String(j.id) === String(jobId) ? 'selected' : ''}>${esc(j.title)}</option>`).join('')}
+          ${jobs.map(j => `<option value="${esc(j.id)}" ${String(j.id) === String(jobId) ? 'selected' : ''}>${esc(j.title)}</option>`).join('')}
         </select>
       </div>
       <div class="field" style="width:170px">
@@ -1893,7 +1893,7 @@ function viewCandidates() {
             <td>${meterHTML(report)}</td>
             <td><div class="skillrow">${report.matched.map(s => `<span class="sk hit">${esc(s)}</span>`).join('') || '<span style="color:var(--muted);font-size:11.5px">—</span>'}</div></td>
             <td>${invited ? '<span class="chip good">Dəvət edilib</span>'
-              : `<button class="btn sm primary" data-act="invite" data-sid="${student.id}" data-id="${jobId}">Dəvət et</button>`}</td>
+              : `<button class="btn sm primary" data-act="invite" data-sid="${esc(student.id)}" data-id="${esc(jobId)}">Dəvət et</button>`}</td>
           </tr>`;
         }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:26px">Bu filtrə uyğun namizəd yoxdur.</td></tr>'}
       </tbody>
@@ -2038,7 +2038,7 @@ function viewSubscription() {
       <ul class="plan-list">${plan.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
       ${current === plan.id
         ? '<button class="btn block" disabled>Hazırkı paket</button>'
-        : `<button class="btn ${plan.featured ? 'primary' : ''} block" data-act="plan-select" data-plan="${plan.id}">${plan.id === 'free' ? 'Free plana keç' : 'Sorğu göndər'}</button>`}
+        : `<button class="btn ${plan.featured ? 'primary' : ''} block" data-act="plan-select" data-plan="${esc(plan.id)}">${plan.id === 'free' ? 'Free plana keç' : 'Sorğu göndər'}</button>`}
     </article>`).join('')}</div>
     <div class="note" style="margin-top:16px"><span class="m">ⓘ</span><span>Aktiv limitlər server tərəfində yoxlanılır və Karyera Mərkəzi tərəfindən idarə olunur.</span></div>`;
 }
@@ -2183,8 +2183,8 @@ function viewApprovals() {
   ${pending.length ? `<div class="joblist">
     ${pending.map(j => jobCard(j, null, {
       footer: `<div class="job-foot">
-        <button class="btn sm primary" data-act="approve" data-id="${j.id}">✓ Təsdiqlə və dərc et</button>
-        <button class="btn sm danger" data-act="reject" data-id="${j.id}">× İmtina</button>
+        <button class="btn sm primary" data-act="approve" data-id="${esc(j.id)}">✓ Təsdiqlə və dərc et</button>
+        <button class="btn sm danger" data-act="reject" data-id="${esc(j.id)}">× İmtina</button>
         <div class="spacer"></div>
         <span style="color:var(--muted);font-size:11.5px">
           ${esc((companyOf(j.companyId)).name || '')} göndərib · ${fmtDate(j.postedAt)}
@@ -2814,7 +2814,7 @@ function authRegisterForm(busy) {
         ${field('contactPhone', 'Telefon', input('contactPhone', 'type="tel" inputmode="tel" required'), { req: true })}
       </div>
       <div class="note warn"><span class="m">!</span><span>Şirkət hesabı və hər yeni vakansiya ayrıca admin təsdiqindən keçir.</span></div>`),
-    pane(3, `<div class="field"><label>Başlanğıc paket</label><div class="registration-plans">${COMPANY_PLANS.map(plan => `<button type="button" data-act="auth-plan" data-plan="${plan.id}" aria-pressed="${a.plan === plan.id}"><span>${plan.name}</span><b>${plan.price} AZN<small>/ ay</small></b><em>${plan.features.slice(0,3).join(' · ')}</em></button>`).join('')}</div><span class="help">Ödəniş provayderi qoşulana qədər Pro və Business seçimi admin təsdiqinə göndərilir.</span></div>
+    pane(3, `<div class="field"><label>Başlanğıc paket</label><div class="registration-plans">${COMPANY_PLANS.map(plan => `<button type="button" data-act="auth-plan" data-plan="${esc(plan.id)}" aria-pressed="${a.plan === plan.id}"><span>${plan.name}</span><b>${plan.price} AZN<small>/ ay</small></b><em>${plan.features.slice(0,3).join(' · ')}</em></button>`).join('')}</div><span class="help">Ödəniş provayderi qoşulana qədər Pro və Business seçimi admin təsdiqinə göndərilir.</span></div>
       ${passwordFields}
       ${terms}`)
   ];
@@ -3080,7 +3080,7 @@ function render() {
       <nav class="rail" aria-label="Bölmələr">
         ${NAV[role].map(item => item.group
           ? `<div class="rail-group">${esc(item.group)}</div>`
-          : `<a href="#${item.id}" data-act="go" data-view="${item.id}" ${view === item.id ? 'aria-current="page"' : ''}>
+          : `<a href="#${item.id}" data-act="go" data-view="${esc(item.id)}" ${view === item.id ? 'aria-current="page"' : ''}>
               <span class="ico" aria-hidden="true">${item.ico}</span>${esc(item.label)}
               ${navCounts(role, item.id) ? `<span class="count">${navCounts(role, item.id)}</span>` : ''}
             </a>`).join('')}
@@ -3165,7 +3165,7 @@ function jobDetailModal(id) {
           ? r.missing.map(x => `<span class="sk gap">${esc(x)}</span>`).join('')
           : '<span class="chip good">Əsas açar sözlər tamdır</span>'}</div>
       </div>
-      <button class="btn sm" style="margin-top:14px" data-act="job-ai-explain" data-id="${job.id}"
+      <button class="btn sm" style="margin-top:14px" data-act="job-ai-explain" data-id="${esc(job.id)}"
         ${UI.aiJobBusy === String(job.id) ? 'disabled' : ''}>${UI.aiJobBusy === String(job.id) ? 'AI təhlil edir…' : 'AI ilə dərin izah et'}</button>
       ${aiResult ? `<div class="ai-panel" style="margin-top:12px">${renderAIResult(aiResult)}</div>` : ''}
     </div>
@@ -3200,7 +3200,7 @@ function jobDetailModal(id) {
 
     <div class="row">
       ${Store.isApplied(job.id) ? '<span class="chip good">✓ Müraciət edilib</span>'
-        : `<button class="btn primary" data-act="apply" data-id="${job.id}">Müraciət et</button>`}
+        : `<button class="btn primary" data-act="apply" data-id="${esc(job.id)}">Müraciət et</button>`}
       <button class="btn" data-act="close-modal">Bağla</button>
     </div>`);
 }
@@ -3232,7 +3232,7 @@ function applyModal(id) {
       <textarea id="apply-note" placeholder="Niyə bu vəzifəyə uyğun olduğunuzu 2–3 cümlə ilə yazın."></textarea>
     </div>
     <div class="row">
-      <button class="btn primary" data-act="apply-confirm" data-id="${job.id}">Müraciəti göndər →</button>
+      <button class="btn primary" data-act="apply-confirm" data-id="${esc(job.id)}">Müraciəti göndər →</button>
       <button class="btn" data-act="close-modal">İmtina</button>
     </div>
     <p style="color:var(--muted);font-size:11px;margin:14px 0 0">
@@ -3400,7 +3400,7 @@ document.addEventListener('click', e => {
           resetAuthForm(); UI.publicView = 'landing';
           Landing.detail = null;
           Landing.load().then(rerender);
-          rerender(); toast('Sistemdən çıxdınız');
+          rerender(); toast(result.warning || 'Sistemdən çıxdınız');
         } finally { UI.loggingOut = false; }
       })();
       break;

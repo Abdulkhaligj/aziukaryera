@@ -67,9 +67,11 @@ test('failed logout never produces a successful logout notice', async () => {
 test('password action uses trusted combined change and checks failure/refresh outcomes', async () => {
   const calls = [];
   let ok = false;
-  const client = { auth: { getUser: async () => ({ data: { user: { id: 'actor' } } }), refreshSession: async () => { calls.push('refresh'); return { error: null }; } }, functions: { invoke: async (name, args) => { calls.push([name, args.body.action]); assert.equal(args.body.password, 'ChangedPass2026'); return { data: { ok }, error: null }; } } };
+  const client = { auth: { getUser: async () => ({ data: { user: { id: 'actor' } } }), refreshSession: async () => { calls.push('refresh'); return { error: null }; } }, functions: { invoke: async (name, args) => { calls.push([name, args.body.action]); assert.equal(args.body.password, 'ChangedPass2026'); assert.equal(args.body.current_password, 'Muveqqeti2026'); return { data: { ok }, error: null }; } } };
   const { changePassword } = load('app/account/password/actions.ts', ['changePassword'], { redirect, createClient: async () => client, getAdminContext: async () => ({ mustChangePassword: true }) });
-  const form = new Map([['password', 'ChangedPass2026'], ['password2', 'ChangedPass2026']]);
+  const missing = new Map([['password', 'ChangedPass2026'], ['password2', 'ChangedPass2026']]);
+  await assert.rejects(changePassword(missing), error => error.url === '/account/password?error=password.current_missing');
+  const form = new Map([['current_password', 'Muveqqeti2026'], ['password', 'ChangedPass2026'], ['password2', 'ChangedPass2026']]);
   await assert.rejects(changePassword(form), error => error.url.startsWith('/account/password?error='));
   assert.equal(calls.length, 1);
   ok = true;

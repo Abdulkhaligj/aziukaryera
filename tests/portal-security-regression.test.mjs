@@ -137,16 +137,22 @@ function makeBuilder(storage, owner = null) {
 }
 
 
-test('SDK error and exception are propagated without clearing active UI or claiming logout success', async () => {
+// Audit 2026-11-13, #80: a failed server call no longer leaves the device signed
+// in; the session is forgotten locally and the person is told the server was not reached.
+test('without a connection logout still forgets the session on this device and says so', async () => {
   for (const behavior of [async () => ({ error: { message: 'network error' } }), async () => { throw new Error('offline'); }]) {
     const main = makeMain(memoryStorage(), behavior);
+    let removed = 0;
+    main.context.Backend.sb.auth._removeSession = async () => { removed++; };
     const result = await main.context.Backend.signOut();
     assert.equal(result.ok, false);
     main.runLogout();
     await settle();
-    assert.equal(main.context.Store.state.session.userId, 'student-A');
+    assert.equal(main.context.Store.state.session, null);
+    assert.equal(removed, 1);
+    assert.equal(main.purges, 1);
+    assert.ok(main.notices.includes('Serverə çıxış bildirilmədi, amma bu cihazda sessiya bağlandı.'));
     assert.ok(!main.notices.includes('Sistemdən çıxdınız'));
-    assert.equal(main.purges, 0);
   }
 });
 
@@ -258,7 +264,7 @@ test('unconfigured default does not point at the sender project or enable implic
 test('external executable dependencies are exact versions with SHA384 integrity', () => {
   const index = read('index.html');
   // The data client library ships with the site (same origin), pinned to one version.
-  assert.match(index, /<script src="assets\/vendor\/api-client\.min\.js\?v=[0-9a-z]+"><\/script>/);
+  assert.match(index, /<script src="assets\/vendor\/api-client\.min\.js\?v=[0-9a-z]+" integrity="sha384-[A-Za-z0-9+\/=]+"><\/script>/);
   assert.match(read('assets/vendor/api-client.min.js'), /^\/\*! Data client library \(MIT\), v2\.58\.0/);
   assert.match(cvSource, /react@18\.3\.1/);
   assert.match(cvSource, /react-dom@18\.3\.1/);
@@ -293,4 +299,71 @@ test('shipped CSP hashes match every actual inline script and no inline handlers
       assert.ok(policy.includes(hash), 'CSP must be regenerated after script edits');
     }
   }
+});
+
+test('audit 2026-11-13: the data client carries the integrity of the shipped file (#85)', () => {
+  const expected = 'sha384-' + createHash('sha384').update(fs.readFileSync(path.join(portal, 'assets/vendor/api-client.min.js'))).digest('base64');
+  for (const html of [read('index.html'), cvSource]) {
+    assert.ok(html.includes(`integrity="${expected}"`), 'run scripts/update-security-policy.mjs after updating the client');
+  }
+});
+
+test('audit 2026-11-13: every inline script is in the reviewed list (#85)', () => {
+  const reviewed = JSON.parse(read('scripts/inline-scripts.json')).map(entry => entry.hash);
+  for (const html of [read('index.html'), cvSource]) {
+    for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+      if (/\bsrc\s*=/i.test(match[1]) || !match[2].trim()) continue;
+      assert.ok(reviewed.includes('sha256-' + createHash('sha256').update(match[2]).digest('base64')), 'an unreviewed inline script');
+    }
+  }
+  const generator = read('scripts/update-security-policy.mjs');
+  assert.match(generator, /inline-scripts\.json/);
+  assert.match(generator, /process\.exit\(1\)/, 'the generator refuses an unreviewed inline script');
+});
+
+test('audit 2026-11-13: images come from the site (and the API at the cutover), not any https: address (#81)', () => {
+  for (const html of [read('index.html'), cvSource]) {
+    const policy = /http-equiv="Content-Security-Policy" content="([^"]+)"/i.exec(html)[1];
+    assert.match(policy, /img-src 'self' data: blob:(;| https:\/\/[a-z0-9.-]+;)/);
+  }
+});
+
+test('audit 2026-11-13: the CV builder has no third-party parser and prints in a sandbox (#82)', () => {
+  assert.doesNotMatch(cvSource, /api\.anthropic\.com/);
+  assert.match(cvSource, /setAttribute\('sandbox', 'allow-same-origin allow-modals'\)/);
+});
+
+test('audit 2026-11-13: job ids in attributes are escaped (H-05)', () => {
+  assert.doesNotMatch(appSource, /="\$\{(?:[A-Za-z_][\w.]*\.id|jobId)\}"/);
+});
+
+test('audit 2026-11-13: an error text in the address bar is shown only when it is known (#79)', () => {
+  const source = read('assets/js/backend.js');
+  const context = vm.createContext({ window: { location: { hash: '#error=x&error_description=Hesab%C4%B1n%C4%B1z+bloklan%C4%B1b%2C+evil.example-a+yaz%C4%B1n', search: '', pathname: '/' } },
+    history: { replaceState() {} }, URLSearchParams, decodeURIComponent, UNI_DOMAIN: 'asoiu.edu.az', USE_BACKEND: false, API_URL: '', API_KEY: '' });
+  vm.runInContext(source + '\nglobalThis.B = Backend;', context);
+  const message = context.B.readOAuthError();
+  assert.doesNotMatch(message, /evil/);
+  assert.equal(message, 'Giriş tamamlanmadı. Yenidən cəhd edin.');
+});
+
+test('audit 2026-11-13: logout forgets the session on this device even offline (#80)', () => {
+  const auth = read('assets/js/auth.js');
+  assert.match(auth, /await Backend\.forgetLocalSession\(\)/);
+  assert.match(read('assets/js/backend.js'), /async forgetLocalSession\(\)/);
+});
+
+test('audit 2026-11-13: recovery links and temporary passwords lead to the new-password screen (#15, #32)', () => {
+  assert.match(read('index.html'), /<script src="assets\/js\/password-required\.js\?v=[0-9a-z]+"><\/script>/);
+  const screen = read('assets/js/password-required.js');
+  assert.match(screen, /PASSWORD_RECOVERY/);
+  assert.match(screen, /must_change_password/);
+  assert.match(screen, /restricted === true/);
+  assert.match(read('assets/js/backend.js'), /current_password: currentPassword/);
+});
+
+test('audit 2026-11-13: AI tools ask for consent before CV text leaves (#52)', () => {
+  const ai = read('assets/js/ai.js');
+  assert.match(ai, /consent_required/);
+  assert.match(ai, /Backend\.giveAiConsent\(\)/);
 });

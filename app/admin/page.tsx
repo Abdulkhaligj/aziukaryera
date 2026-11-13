@@ -1,6 +1,7 @@
 import AdminShell from '@/components/admin-shell';
 import { getAdminContext, loadAdminData } from '@/lib/admin-data';
 import { redirect } from 'next/navigation';
+import { messageFor } from '@/lib/messages';
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   if (!process.env.NEXT_PUBLIC_API_URL || !process.env.NEXT_PUBLIC_API_KEY) {
@@ -11,6 +12,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   /* Müvəqqəti şifrə ilə girən əməkdaş əvvəlcə öz şifrəsini qurmalıdır */
   if (context.mustChangePassword) redirect('/account/password');
   const [{ data, errors, lookups }, query] = await Promise.all([loadAdminData(context), searchParams]);
-  return <AdminShell initialData={data} initialErrors={errors} lookups={lookups} notice={query.notice}
+  return <AdminShell initialData={data} initialErrors={errors} lookups={lookups} notice={messageFor(query.notice)}
     currentUser={context.fullName} currentEmail={context.email} currentRole={context.role} currentUserId={context.userId}/>;
 }

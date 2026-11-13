@@ -106,7 +106,9 @@ async function signAvatars(context: AdminContext, paths: unknown[]): Promise<Rec
 }
 export const mentorCategory: Record<string, string> = { karyera: 'Karyera istiqaməti', cv: 'CV və portfolio', 'müsahibə': 'Müsahibə hazırlığı', texniki: 'Texniki bacarıqlar', startap: 'Startap və layihələr', magistr: 'Magistr və təhsil', 'şəbəkələşmə': 'Şəbəkələşmə' };
 export const mentorStatus: Record<string, string> = { pending: 'Yeni müraciət', in_review: 'Baxılır', matched: 'Mentor təyin edilib', completed: 'Tamamlanıb', cancelled: 'Bağlanıb' };
-const logoOf = (url: unknown) => typeof url === 'string' && /^https:\/\//i.test(url) ? url : undefined;
+// Only pictures from the platform's own storage are shown (audit 2026-11-13, #53).
+const mediaBase = () => `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')}/storage/v1/object/public/`;
+const logoOf = (url: unknown) => typeof url === 'string' && mediaBase().startsWith('https://') && url.startsWith(mediaBase()) && !/[\s"'<>]/.test(url) ? url : undefined;
 const photo = (pics: Record<string, string>, path: unknown) => (typeof path === 'string' && pics[path]) || undefined;
 
 export async function loadResource(context: AdminContext, resource: ResourceKey, lookups?: Lookups): Promise<AdminRow[]> {

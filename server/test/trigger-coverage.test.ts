@@ -27,7 +27,10 @@ test('every Postgres trigger is ported with the same name, events, UPDATE OF col
     .map(t => `${t.table}.${t.name} ${t.timing} ${t.op}${t.op === 'update' && t.of ? ' of ' + [...t.of].sort().join(',') : ''} ${t.security}`).sort();
   const want = expected();
   assert.deepEqual(want.filter(x => !ported.includes(x)), [], 'missing ports');
-  assert.deepEqual(ported.filter(x => !want.includes(x)), [], 'ports without a Postgres trigger');
+  // Guards added by the security audit of 2026-11-13 (src/write/rules/hardening.ts) have no Postgres original.
+  const added = (x: string) => /^\S+\.001_security_/.test(x)
+    || /^(moderation_terms|moderation_allow)\.security_audit_changes /.test(x) || /^(post_comments|messages)\.security_audit_deletes /.test(x);
+  assert.deepEqual(ported.filter(x => !want.includes(x) && !added(x)), [], 'ports without a Postgres trigger');
   // 77 on public tables, plus the 2 avatar triggers on storage.objects (the storage service's own triggers are not ours).
   assert.equal(new Set(source.map(s => `${s.table}.${s.name}`)).size, 79);
 });

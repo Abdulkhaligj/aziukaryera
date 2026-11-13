@@ -2,7 +2,7 @@ import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUDIT_WARNING, getAdminContext, writeAudit } from '@/lib/admin-data';
 import { crossSite, escapeLike, functionError, httpsUrl, publicError, sent, webUrl } from '@/lib/admin-input';
-import { can } from '@/lib/permissions';
+import { can, canApproveJobs } from '@/lib/permissions';
 import type { ResourceKey } from '@/lib/types';
 
 const moderationStates = new Set(['visible', 'pending', 'hidden']);
@@ -36,6 +36,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const allowed = new Set(['draft', 'pending', 'pending_approval', 'changes_requested',
       'approved', 'published', 'rejected', 'expired', 'archived']);
     if (!allowed.has(status)) return NextResponse.json({ error: 'Yanlış təsdiq statusu.' }, { status: 400 });
+    if ((status === 'approved' || status === 'published') && !canApproveJobs(context.role)) {
+      return NextResponse.json({ error: 'Vakansiyanı yalnız Super Admin və ya Menecer təsdiqləyə bilər' }, { status: 403 });
+    }
     const reason = text(body.changes_requested).slice(0, 2000);
     if ((status === 'rejected' || status === 'changes_requested') && !reason)
       return NextResponse.json({ error: 'Rədd və ya düzəliş üçün səbəbi yazın.' }, { status: 400 });

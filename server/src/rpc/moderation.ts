@@ -86,7 +86,9 @@ rpc({
       if (old.finished || new Date(old.claimed_until as string).getTime() > Date.now() || (old.attempts as number) >= 5) return { claimed: false };
       attempts = (old.attempts as number) + 1;
     }
-    const budget = await aiReserveRequest(env, null, a.p_table === 'profiles' ? 'avatar_moderation' : 'content_moderation', null, null);
+    const author = a.p_table === 'profiles' ? a.p_id
+      : (await one<{ author_id: string }>(env.tx, `SELECT author_id FROM ${a.p_table === 'posts' ? 'posts' : 'post_comments'} WHERE id = ?`, [a.p_id]))?.author_id ?? null;
+    const budget = await aiReserveRequest(env, null, a.p_table === 'profiles' ? 'avatar_moderation' : 'content_moderation', null, null, author);
     if (budget.allowed !== true) return { claimed: false, reason: 'quota_exceeded' };
     const claimId = crypto.randomUUID();
     await exec(env.tx, `INSERT INTO private_moderation_claims (target_table, target_id, snapshot, claim_id, reservation_id, claimed_until, attempts)

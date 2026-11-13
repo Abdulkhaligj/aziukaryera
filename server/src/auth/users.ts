@@ -20,8 +20,10 @@ export interface AuthUser extends Row {
   email_change_sent_at?: string | null;
 }
 
-export const normalizeEmail = (email: unknown) => String(email ?? '').trim().toLowerCase();
-export const validEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) && email.length <= 191;
+export const normalizeEmail = (email: unknown) => String(email ?? '').normalize('NFKC').trim().toLowerCase();
+/** Printable ASCII only: invisible or look-alike characters would compare
+ *  differently in JavaScript and in MySQL (#74). */
+export const validEmail = (email: string) => /^[\x21-\x7e]+$/.test(email) && /^[^@]+@[^@]+\.[^@]{2,}$/.test(email) && email.length <= 191;
 
 export function findUserByEmail(db: Pool | Tx, email: string, lock = false) {
   return one<AuthUser>(db, `SELECT * FROM auth_users WHERE email = ? AND deleted_at IS NULL${lock ? ' FOR UPDATE' : ''}`, [normalizeEmail(email)]);

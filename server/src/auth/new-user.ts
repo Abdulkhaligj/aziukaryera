@@ -34,7 +34,8 @@ export async function handleNewUser(env: WriteEnv, user: { id: string; email: st
   await insertRow(env, 'profiles', {
     id: user.id, role, status, email: user.email, full_name: display,
     phone: text(meta, 'phone') ?? '', university, group_name: text(meta, 'group_name') ?? '',
-    avatar_url: nonEmpty(meta, 'avatar_url'), account_status: requestedStatus,
+    // A photo URL from sign-up metadata could point anywhere (#53); photos go through the avatar flow.
+    avatar_url: null, account_status: requestedStatus,
     // H-01 (audit 2026-11-12): staff verify alumni; sign-up never does.
     alumni_verified: false
   });

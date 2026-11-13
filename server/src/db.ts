@@ -12,7 +12,10 @@ export function createPool(url: string): Pool {
     uri: url,
     charset: 'UTF8MB4_0900_AI_CI',
     timezone: 'Z',
-    connectionLimit: 10,
+    // A full pool queues at most queueLimit requests; the rest fail fast (#49).
+    connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 20),
+    queueLimit: Number(process.env.MYSQL_QUEUE_LIMIT || 200),
+    connectTimeout: 10_000,
     decimalNumbers: true,
     dateStrings: true,
     typeCast(field, next) {
@@ -30,7 +33,11 @@ export function createPool(url: string): Pool {
   // Same collation as the columns, so literals and session variables compare
   // without "Illegal mix of collations". (The handshake can only carry ids ≤ 255.)
   (pool as unknown as { pool: { on(event: 'connection', cb: (c: { query(sql: string): void }) => void): void } })
-    .pool.on('connection', connection => connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_ci'));
+    .pool.on('connection', connection => {
+      connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_ci');
+      // A request waits at most 10 s for a row lock and a read runs at most 15 s (#49).
+      connection.query(`SET SESSION innodb_lock_wait_timeout = ${Number(process.env.MYSQL_LOCK_WAIT_SECONDS || 10)}, max_execution_time = ${Number(process.env.MYSQL_MAX_EXECUTION_MS || 15000)}`);
+    });
   return pool;
 }
 
@@ -82,7 +89,19 @@ export function onCommit(tx: Tx, task: Task): void {
   afterCommit.get(tx)!.push(task);
 }
 
+/** A deadlock rolls the whole transaction back; it is tried again twice (#49). */
 export async function transaction<T>(pool: Pool, work: (tx: Tx) => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await transactionOnce(pool, work);
+    } catch (error) {
+      if ((error as { errno?: number }).errno !== 1213 || attempt >= 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 80 * (attempt + 1)));
+    }
+  }
+}
+
+async function transactionOnce<T>(pool: Pool, work: (tx: Tx) => Promise<T>): Promise<T> {
   const tx = await pool.getConnection();
   afterCommit.delete(tx);
   try {
