@@ -89,7 +89,7 @@ test('H4: promotions at the same time never pass five active admins', async () =
   assert.equal(promoted, 2, 'two seats were free');
 });
 
-test('M24: two claims of one benefit at the same time give one code', async () => {
+test('H3: two claims of one benefit at the same time give one code', async () => {
   const partner = await h.service().from('benefit_partners').insert({ name: 'Kitab Evi', status: 'active' }).select('id').single();
   const benefit = await h.service().from('benefits').insert({ partner_id: partner.data!.id, title: '10% endirim', active: true }).select('id').single();
   assert.equal(benefit.error, null);
