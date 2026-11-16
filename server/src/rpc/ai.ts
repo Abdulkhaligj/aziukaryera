@@ -77,7 +77,8 @@ rpc({
 /** A row lock per budget until the transaction ends (pg_advisory_xact_lock):
  *  reservations of different people no longer wait for each other (#48). */
 async function lockBudget(env: WriteEnv, budget: string) {
-  await exec(env.tx, 'INSERT IGNORE INTO private_ai_budget_locks (budget) VALUES (?)', [budget]);
+  // ON DUPLICATE KEY takes the exclusive lock at once (no shared→exclusive deadlock, M16).
+  await exec(env.tx, 'INSERT INTO private_ai_budget_locks (budget) VALUES (?) ON DUPLICATE KEY UPDATE budget = budget', [budget]);
   await one(env.tx, 'SELECT budget FROM private_ai_budget_locks WHERE budget = ? FOR UPDATE', [budget]);
 }
 

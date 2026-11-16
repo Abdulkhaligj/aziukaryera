@@ -18,21 +18,36 @@ export async function setupDatabase(mysqlUrl, { reset = false, log = console.log
     if (reset) await admin.query(`DROP DATABASE IF EXISTS \`${database}\``);
     await admin.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_ci`);
     await admin.query(`USE \`${database}\``);
-    const [[{ has }]] = await admin.query(
-      `SELECT COUNT(*) AS has FROM information_schema.tables WHERE table_schema = ? AND table_name = 'profiles'`, [database]);
-    if (!has) {
-      log('schema.sql …');
-      await admin.query(readFileSync(new URL('schema.sql', dir), 'utf8'));
+    // The ledger first, so schema.sql is marked done only after it ran to the end
+    // (a half-created schema is never taken for a complete one: audit 2026-11-16, M35).
+    await admin.query(`CREATE TABLE IF NOT EXISTS \`schema_migrations\` (
+      \`version\` VARCHAR(191) NOT NULL,
+      \`applied_at\` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+      PRIMARY KEY (\`version\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_as_ci`);
+    const [[{ done }]] = await admin.query("SELECT COUNT(*) AS done FROM schema_migrations WHERE version = '0000_schema'");
+    if (!done) {
+      const [[{ tables, recorded }]] = await admin.query(
+        `SELECT (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name <> 'schema_migrations') AS tables,
+                (SELECT COUNT(*) FROM schema_migrations) AS recorded`, [database]);
+      if (tables && recorded) {
+        // A database set up before the schema itself was recorded: complete, since migrations ran.
+        await admin.query("INSERT INTO schema_migrations (version) VALUES ('0000_schema')");
+      } else if (tables) {
+        throw new Error(`${database} has ${tables} tables but no record of a complete schema.sql; set it up again with --reset (ALLOW_RESET=1).`);
+      } else {
+        log('schema.sql …');
+        await admin.query(readFileSync(new URL('schema.sql', dir), 'utf8'));
+        await admin.query("INSERT INTO schema_migrations (version) VALUES ('0000_schema')");
+      }
     }
     const files = readdirSync(new URL('migrations/', dir)).filter(f => /^\d+_.+\.sql$/.test(f)).sort();
+    // MySQL cannot roll DDL back; every migration is written to run again, so one
+    // that stopped half-way is completed by the next run (it is recorded only at the end).
     for (const file of files) {
       const version = file.replace(/\.sql$/, '');
-      const [[ledger]] = await admin.query(
-        `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = ? AND table_name = 'schema_migrations'`, [database]);
-      if (ledger.n) {
-        const [[done]] = await admin.query('SELECT COUNT(*) AS n FROM schema_migrations WHERE version = ?', [version]);
-        if (done.n) continue;
-      }
+      const [[done]] = await admin.query('SELECT COUNT(*) AS n FROM schema_migrations WHERE version = ?', [version]);
+      if (done.n) continue;
       log(`${file} …`);
       await admin.query(readFileSync(new URL(`migrations/${file}`, dir), 'utf8'));
       await admin.query('INSERT INTO schema_migrations (version) VALUES (?)', [version]);

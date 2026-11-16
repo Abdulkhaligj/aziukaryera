@@ -138,6 +138,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     if ((req.method !== 'POST' && req.method !== 'PUT') || !req.routeOptions.url?.endsWith('/object/:bucket/*')) return payload;
     const ctx = await context(req);
     if (ctx.role === 'anon') throw denied();
+    if (ctx.mustChangePassword) throw new StorageError(403, 'Unauthorized', 'Əvvəlcə yeni şifrə təyin edin');
     const { bucket } = target(req);
     const settings = await bucketRow(pool, bucket);
     const limit = Math.min(MAX_UPLOAD, settings.file_size_limit ?? MAX_UPLOAD) + MULTIPART_SLACK;
@@ -327,6 +328,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   app.delete('/object/:bucket', async (req) => {
     const bucket = (req.params as { bucket: string }).bucket;
     const ctx = await context(req);
+    if (ctx.mustChangePassword) throw new StorageError(403, 'Unauthorized', 'Əvvəlcə yeni şifrə təyin edin');
     const prefixes = (req.body as { prefixes?: unknown } | undefined)?.prefixes;
     if (!Array.isArray(prefixes) || !prefixes.length) throw new StorageError(400, 'Bad Request', 'prefixes must be a non-empty array');
     if (prefixes.length > MAX_BULK) throw new StorageError(400, 'Bad Request', `At most ${MAX_BULK} objects per request`);

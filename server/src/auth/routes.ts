@@ -12,7 +12,7 @@ import type { Schema } from '../schema.ts';
 import { composeMail, type Mailer, type MailKind } from './mailer.ts';
 import { handleNewUser } from './new-user.ts';
 import { deleteRow } from '../write/pipeline.ts';
-import { RateLimiter } from './rate-limit.ts';
+import { clientKey, RateLimiter } from './rate-limit.ts';
 import { consumeOneTimeToken, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession } from './tokens.ts';
 import { findUserByEmail, findUserById, isBanned, mergeMetadata, normalizeEmail, toGoTrueUser, validEmail, type AuthUser } from './users.ts';
 
@@ -40,13 +40,32 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const emailPerClient = new RateLimiter(3, 60 * 60_000);
   const emailPerAddress = new RateLimiter(20, 60 * 60_000);
   const signups = new RateLimiter(30, 60 * 60_000);
-  // Failed passwords per account (#64), new-address requests per user (#18).
+  // Failed passwords per account and client (audit 2026-11-16, M7): a stranger's
+  // wrong passwords lock only the stranger out. Per account, from any client, many
+  // failures slow every attempt down instead of locking the owner out.
   const failedSignIns = new RateLimiter(10, 15 * 60_000);
+  const failedPerAccount = new RateLimiter(1000, 15 * 60_000);
   const emailChanges = new RateLimiter(5, 60 * 60_000);
   const LINK_MINUTES = 60;
   const INVITE_MINUTES = 24 * 60;
 
   const meta = (req: FastifyRequest) => ({ userAgent: req.headers['user-agent'], ip: req.ip });
+  /** The key a client is limited by: its address, an IPv6 one per /64 (L12). */
+  const ipKey = (req: FastifyRequest) => clientKey(req.ip);
+  /** At most so many emails per client; taken before anything is looked up, and
+   *  whether or not the address exists, so the answer is the same either way (M8). */
+  const mailQuota = (req: FastifyRequest) => { if (!emailsPerIp.take(ipKey(req))) throw authErrors.rateLimited(); };
+  /** Sent after the answer: the response time does not tell whether the address exists (M8). */
+  const deliver = (mail: ReturnType<typeof composeMail>) => {
+    void mailer.send(mail).catch(error => app.log.error({ err: error, kind: mail.kind }, 'email delivery failed'));
+  };
+  /** user_metadata is copied into every token: it stays small (L14). */
+  function checkMetadata(data: unknown) {
+    if (data === undefined) return;
+    if (data === null || typeof data !== 'object' || Array.isArray(data) || JSON.stringify(data).length > 8192) {
+      throw authErrors.validation('User metadata must be an object of at most 8 KB');
+    }
+  }
   const limit = (limiter: RateLimiter, key: string) => { if (!limiter.take(key)) throw new AuthError(429, 'over_request_rate_limit', 'Request rate limit reached'); };
 
   function redirectTarget(requested: unknown): string {
@@ -59,12 +78,10 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const verifyLink = (token: string, type: string, redirect: string) =>
     `${config.publicUrl}/auth/v1/verify?token=${encodeURIComponent(token)}&type=${type}&redirect_to=${encodeURIComponent(redirect)}`;
 
-  async function sendMail(kind: MailKind, user: AuthUser, token: string, type: string, redirect: string, ip: string, ttl = LINK_MINUTES) {
-    if (!emailsPerIp.take(ip)) throw authErrors.rateLimited();
-    await mailer.send(composeMail(kind, user.email!, verifyLink(token, type, redirect), ttl));
-  }
+  /** Per address and client; the client's own limits are checked first, so one
+   *  client cannot fill these maps with addresses (M10). */
   function cooldown(email: string, ip: string) {
-    const key = `${email}|${ip}`;
+    const key = `${email}|${clientKey(ip)}`;
     if (!emailCooldown.take(key)) throw authErrors.tooFrequent(emailCooldown.retryAfter(key) || 60);
     if (!emailPerClient.take(key) || !emailPerAddress.take(email)) throw authErrors.rateLimited();
   }
@@ -76,12 +93,12 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   }
 
   /** Inserts auth_users and runs handle_new_user in the same transaction. */
-  async function createAuthUser(tx: Tx, input: { email: string; password: string | null; confirmed: boolean; appMeta?: Body; userMeta?: Body }) {
+  async function createAuthUser(tx: Tx, input: { email: string; password: string | null; passwordHash?: string; confirmed: boolean; appMeta?: Body; userMeta?: Body }) {
     const id = randomUUID();
     const appMeta = { provider: 'email', providers: ['email'], ...(input.appMeta || {}) };
     const userMeta = input.userMeta || {};
     await exec(tx, `INSERT INTO auth_users (id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
-      VALUES (?, ?, ?, ?, ?, ?)`, [id, input.email, input.password ? await bcrypt.hash(input.password, BCRYPT_COST) : null,
+      VALUES (?, ?, ?, ?, ?, ?)`, [id, input.email, input.passwordHash ?? (input.password ? await bcrypt.hash(input.password, BCRYPT_COST) : null),
       input.confirmed ? toMysqlDatetime(new Date()) : null, JSON.stringify(appMeta), JSON.stringify(userMeta)]);
     await handleNewUser({ tx, ctx: systemContext, schema, now: new Date() },
       { id, email: input.email, raw_app_meta_data: appMeta, raw_user_meta_data: userMeta }, config.universityDomain);
@@ -91,7 +108,8 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   function checkPassword(password: unknown): string {
     if (typeof password !== 'string' || password.length < config.passwordMinLength) throw authErrors.weakPassword(config.passwordMinLength);
-    if (password.length > 72) throw authErrors.validation('Password cannot be longer than 72 characters');
+    // bcrypt reads 72 bytes; a longer password would be cut without notice (L15).
+    if (Buffer.byteLength(password, 'utf8') > 72) throw authErrors.validation('Password cannot be longer than 72 bytes');
     return password;
   }
   function checkEmail(value: unknown): string {
@@ -101,7 +119,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     return email;
   }
 
-  async function bearerUser(req: FastifyRequest): Promise<{ user: AuthUser; claims: Claims; restricted: boolean }> {
+  async function bearerUser(req: FastifyRequest): Promise<{ user: AuthUser; claims: Claims; restricted: boolean; mustChange: boolean }> {
     const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) throw authErrors.noAuthorization();
     const claims = await verifyJwt(config, token);
@@ -111,7 +129,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     if (!user) throw new AuthError(403, 'user_not_found', 'User from sub claim in JWT does not exist');
     if (isBanned(user)) throw authErrors.banned();
     const session = await one<{ restricted: boolean }>(pool, 'SELECT restricted FROM auth_sessions WHERE id = ?', [claims.session_id]);
-    return { user, claims, restricted: !!session?.restricted };
+    return { user, claims, restricted: !!session?.restricted, mustChange: user.raw_app_meta_data?.must_change_password === true };
   }
   async function requireService(req: FastifyRequest) {
     const ctx = await contextFromHeaders(config, undefined, req.headers.authorization);
@@ -151,8 +169,11 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     const body = req.body || {};
     const email = checkEmail(body.email);
     const password = checkPassword(body.password);
-    limit(signups, req.ip);
+    checkMetadata(body.data);
+    limit(signups, ipKey(req));
     const redirect = redirectTarget(req.query.redirect_to ?? body.redirect_to);
+    // Hashed for every request, also when the address exists: same time either way (L9).
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
     const outcome = await transaction(pool, async tx => {
       const existing = await findUserByEmail(tx, email, true);
       if (existing) {
@@ -167,7 +188,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       }
       let user: AuthUser;
       try {
-        user = await createAuthUser(tx, { email, password, confirmed: config.mailerAutoconfirm, userMeta: body.data });
+        user = await createAuthUser(tx, { email, password, passwordHash, confirmed: config.mailerAutoconfirm, userMeta: body.data });
       } catch (error) {
         if (isRuleFailure(error)) { req.log.warn({ err: error }, 'signup rejected by handle_new_user'); throw authErrors.databaseSignup(); }
         throw error;
@@ -178,32 +199,39 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     if ('session' in outcome) return outcome.session;
     const sentAt = new Date().toISOString();
     if ('duplicate' in outcome) {
-      if (emailsPerIp.take(req.ip)) await mailer.send(composeMail('already_registered', email, config.siteUrl, null));
+      if (emailsPerIp.take(ipKey(req))) deliver(composeMail('already_registered', email, config.siteUrl, null));
       return { ...toGoTrueUser({ ...outcome.duplicate, id: randomUUID(), raw_user_meta_data: {}, raw_app_meta_data: {}, created_at: sentAt, updated_at: sentAt,
         last_sign_in_at: null, email_confirmed_at: null } as AuthUser), identities: [], confirmation_sent_at: sentAt };
     }
-    await sendMail('confirmation', outcome.user, outcome.token, 'signup', redirect, req.ip);
+    if (emailsPerIp.take(ipKey(req))) deliver(composeMail('confirmation', outcome.user.email!, verifyLink(outcome.token, 'signup', redirect), LINK_MINUTES));
     return { ...toGoTrueUser(outcome.user), confirmation_sent_at: sentAt };
   });
 
   app.post('/token', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const body = req.body || {};
     if (req.query.grant_type === 'refresh_token') {
-      limit(refreshes, req.ip);
+      limit(refreshes, ipKey(req));
       if (typeof body.refresh_token !== 'string' || !body.refresh_token) throw authErrors.refreshNotFound();
       const result = await transaction(pool, tx => refreshSession(tx, config, body.refresh_token));
       if ('replayed' in result) throw authErrors.refreshUsed();
       return result;
     }
     if (req.query.grant_type !== 'password') throw new AuthError(400, 'validation_failed', 'unsupported_grant_type');
-    limit(signIns, req.ip);
+    limit(signIns, ipKey(req));
     const email = normalizeEmail(body.email);
-    // Ten wrong passwords for one account lock it for 15 minutes, from any IP (#64).
-    if (email && failedSignIns.retryAfter(email) > 0) throw authErrors.rateLimited();
+    const lockKey = `${email}|${ipKey(req)}`;
+    // Ten wrong passwords from one client lock that client out of the account for
+    // 15 minutes (#64); others, the owner included, can still sign in (M7).
+    if (email && failedSignIns.retryAfter(lockKey) > 0) throw authErrors.rateLimited();
+    // Many failures from many clients: every attempt on the account waits longer.
+    const failures = email ? failedPerAccount.count(email) : 0;
+    if (failures > 20) await new Promise(resolve => setTimeout(resolve, Math.min(3000, (failures - 20) * 100)));
     const user = email ? await findUserByEmail(pool, email) : null;
-    const matches = await bcrypt.compare(String(body.password ?? '').slice(0, 72), user?.encrypted_password || DUMMY_HASH);
+    const password = String(body.password ?? '');
+    // No password over 72 bytes was ever set (L15); it is still compared, for equal timing.
+    const matches = await bcrypt.compare(password, user?.encrypted_password || DUMMY_HASH) && Buffer.byteLength(password, 'utf8') <= 72;
     if (!user || !user.encrypted_password || !matches) {
-      if (email) failedSignIns.take(email);
+      if (email) { failedSignIns.take(lockKey); failedPerAccount.take(email); }
       throw authErrors.invalidCredentials();
     }
     if (!user.email_confirmed_at) throw authErrors.emailNotConfirmed();
@@ -228,11 +256,20 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   app.get('/user', async (req: FastifyRequest) => toGoTrueUser((await bearerUser(req)).user));
 
   app.put('/user', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
-    const { user, claims, restricted } = await bearerUser(req);
+    const { user, claims, restricted, mustChange } = await bearerUser(req);
     const body = req.body || {};
-    // A session from a recovery link only sets the new password (#15).
-    if (restricted && (body.email !== undefined || body.data !== undefined || body.password === undefined)) {
+    // A session from a recovery link, or an account with a temporary password,
+    // only sets the new password (#15, audit 2026-11-16 M44).
+    if ((restricted || mustChange) && (body.email !== undefined || body.data !== undefined || body.password === undefined)) {
       throw new AuthError(403, 'password_change_required', 'Set a new password first');
+    }
+    checkMetadata(body.data);
+    // Without the second link to the current address, an email change asks for the
+    // password instead, so a stolen session alone cannot move the account (L10).
+    if (body.email !== undefined && !config.secureEmailChange && user.encrypted_password && !restricted) {
+      if (typeof body.current_password !== 'string' || !await bcrypt.compare(body.current_password, user.encrypted_password)) {
+        throw new AuthError(400, 'invalid_credentials', 'Current password is incorrect');
+      }
     }
     const newEmail = body.email === undefined ? null : checkEmail(body.email);
     let changeTokens: { to: string; kind: MailKind; token: string }[] = [];
@@ -252,7 +289,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         // The current password is checked here, not only in the browser (#14);
         // a recovery-link session or an account without a password needs none.
         if (!restricted && user.encrypted_password) {
-          if (typeof body.current_password !== 'string' || !await bcrypt.compare(body.current_password.slice(0, 72), user.encrypted_password)) {
+          if (typeof body.current_password !== 'string' || !await bcrypt.compare(body.current_password, user.encrypted_password)) {
             throw new AuthError(400, 'invalid_credentials', 'Current password is incorrect');
           }
         }
@@ -278,7 +315,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     forgetSessions(...ended, claims.session_id);
     const redirect = redirectTarget((req.query as Body | undefined)?.redirect_to);
     for (const mail of changeTokens) {
-      if (!emailsPerIp.take(req.ip)) throw authErrors.rateLimited();
+      if (!emailsPerIp.take(ipKey(req))) throw authErrors.rateLimited();
       await mailer.send(composeMail(mail.kind, mail.to, verifyLink(mail.token, 'email_change', redirect)));
     }
     const fresh = (await findUserById(pool, user.id))!;
@@ -288,11 +325,12 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   app.post('/recover', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const email = checkEmail(req.body?.email);
+    mailQuota(req);
     cooldown(email, req.ip);
     const user = await findUserByEmail(pool, email);
     if (user) {
-      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'recovery', LINK_MINUTES));
-      await sendMail('recovery', user, token, 'recovery', redirectTarget(req.query.redirect_to ?? req.body?.redirect_to), req.ip);
+      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'recovery', LINK_MINUTES, null, true));
+      deliver(composeMail('recovery', user.email!, verifyLink(token, 'recovery', redirectTarget(req.query.redirect_to ?? req.body?.redirect_to)), LINK_MINUTES));
     }
     return {};
   });
@@ -300,6 +338,8 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   app.post('/otp', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const body = req.body || {};
     const email = checkEmail(body.email);
+    checkMetadata(body.data);
+    mailQuota(req);
     cooldown(email, req.ip);
     const redirect = redirectTarget(req.query.redirect_to ?? body.redirect_to);
     const outcome = await transaction(pool, async tx => {
@@ -308,13 +348,13 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         // No account: the same empty answer as when one exists (#18).
         if (body.create_user === false || config.disableSignup) return null;
         // Creating accounts counts against the sign-up limit (#17).
-        limit(signups, req.ip);
+        limit(signups, ipKey(req));
         try { user = await createAuthUser(tx, { email, password: null, confirmed: false, userMeta: body.data }); }
         catch (error) { if (isRuleFailure(error)) throw authErrors.databaseSignup(); throw error; }
       }
-      return { user, token: await createOneTimeToken(tx, user.id, 'magic_link', LINK_MINUTES) };
+      return { user, token: await createOneTimeToken(tx, user.id, 'magic_link', LINK_MINUTES, null, true) };
     });
-    if (outcome) await sendMail('magic_link', outcome.user, outcome.token, 'magiclink', redirect, req.ip);
+    if (outcome) deliver(composeMail('magic_link', outcome.user.email!, verifyLink(outcome.token, 'magiclink', redirect), LINK_MINUTES));
     return {};
   });
 
@@ -335,27 +375,28 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   app.post('/resend', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const body = req.body || {};
     if (body.type === 'email_change') {
-      // GoTrue: the email is the pending new address.
+      // GoTrue: the email is the pending new address. Only the account itself may
+      // send its links again; that also voids the earlier ones (audit 2026-11-16, L11).
+      const { user: me } = await bearerUser(req);
       const pendingEmail = checkEmail(body.email);
+      mailQuota(req);
       cooldown(pendingEmail, req.ip);
-      const user = await one<AuthUser>(pool, 'SELECT * FROM auth_users WHERE email_change = ? AND deleted_at IS NULL', [pendingEmail]);
+      const user = me.email_change === pendingEmail ? me : null;
       if (user) {
         const tokens = await transaction(pool, tx => startEmailChange(tx, user, pendingEmail));
         const redirect = redirectTarget(req.query.redirect_to ?? body.options?.emailRedirectTo);
-        for (const mail of tokens) {
-          if (!emailsPerIp.take(req.ip)) throw authErrors.rateLimited();
-          await mailer.send(composeMail(mail.kind, mail.to, verifyLink(mail.token, 'email_change', redirect)));
-        }
+        for (const mail of tokens) deliver(composeMail(mail.kind, mail.to, verifyLink(mail.token, 'email_change', redirect)));
       }
       return {};
     }
     if (body.type !== 'signup') throw authErrors.validation('Only signup and email_change links can be resent');
     const email = checkEmail(body.email);
+    mailQuota(req);
     cooldown(email, req.ip);
     const user = await findUserByEmail(pool, email);
     if (user && !user.email_confirmed_at) {
       const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES));
-      await sendMail('confirmation', user, token, 'signup', redirectTarget(req.query.redirect_to ?? body.options?.emailRedirectTo), req.ip);
+      deliver(composeMail('confirmation', user.email!, verifyLink(token, 'signup', redirectTarget(req.query.redirect_to ?? body.options?.emailRedirectTo)), LINK_MINUTES));
     }
     return {};
   });
@@ -379,6 +420,12 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         if (taken && taken.id !== pending.id) throw authErrors.emailExists();
         await exec(tx, `UPDATE auth_users SET email = email_change, email_change = NULL, email_change_confirm_status = 0,
             email_confirmed_at = COALESCE(email_confirmed_at, CURRENT_TIMESTAMP(6)) WHERE id = ?`, [pending.id]);
+      }
+      // An account confirmed for the first time by a magic link (or an invite) did
+      // not choose its password through this mailbox: a password set at a
+      // stranger's sign-up stops working (audit 2026-11-16, M9).
+      if (used.purpose === 'magic_link' || used.purpose === 'invite') {
+        await exec(tx, 'UPDATE auth_users SET encrypted_password = NULL WHERE id = ? AND email_confirmed_at IS NULL', [used.user_id]);
       }
       await exec(tx, 'UPDATE auth_users SET email_confirmed_at = COALESCE(email_confirmed_at, CURRENT_TIMESTAMP(6)) WHERE id = ?', [used.user_id]);
       const user = await findUserById(tx, used.user_id);
@@ -531,14 +578,27 @@ button{background:#0b1f6b;color:#fff;border:0;border-radius:10px;padding:12px 22
     const body = req.body || {};
     const email = checkEmail(body.email);
     const redirect = redirectTarget(req.query.redirect_to ?? body.redirect_to);
+    checkMetadata(body.data);
     const outcome = await transaction(pool, async tx => {
-      if (await findUserByEmail(tx, email, true)) throw authErrors.emailExists();
+      const existing = await findUserByEmail(tx, email, true);
+      // An invite that was never accepted is sent again with a new link (M31).
+      if (existing && existing.raw_app_meta_data?.invited && !existing.email_confirmed_at) {
+        return { user: existing, created: false, token: await createOneTimeToken(tx, existing.id, 'invite', INVITE_MINUTES) };
+      }
+      if (existing) throw authErrors.emailExists();
       let user: AuthUser;
       try { user = await createAuthUser(tx, { email, password: null, confirmed: false, appMeta: { invited: true }, userMeta: body.data }); }
       catch (error) { if (isRuleFailure(error)) throw new AuthError(500, 'unexpected_failure', 'Database error saving new user'); throw error; }
-      return { user, token: await createOneTimeToken(tx, user.id, 'invite', INVITE_MINUTES) };
+      return { user, created: true, token: await createOneTimeToken(tx, user.id, 'invite', INVITE_MINUTES) };
     });
-    await mailer.send(composeMail('invite', email, verifyLink(outcome.token, 'invite', redirect), INVITE_MINUTES));
+    try {
+      await mailer.send(composeMail('invite', email, verifyLink(outcome.token, 'invite', redirect), INVITE_MINUTES));
+    } catch (error) {
+      // No email, no account: the invite can simply be tried again (M31).
+      req.log.error({ err: error }, 'invite email failed');
+      if (outcome.created) await transaction(pool, tx => deleteRow({ tx, ctx: systemContext, schema, now: new Date() }, 'auth_users', { id: outcome.user.id }));
+      throw new AuthError(502, 'email_send_failed', 'The invite email could not be sent; try again');
+    }
     return toGoTrueUser(outcome.user);
   });
 }

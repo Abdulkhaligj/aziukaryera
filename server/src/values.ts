@@ -23,12 +23,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function canonical(column: Column, value: unknown): unknown {
   if (value === null || value === undefined) return value;
-  // An allowed value written in another case is that value: MySQL would store
-  // or accept 'APPROVED' as 'approved', and every rule must see what MySQL sees.
-  if (column.enumValues && typeof value === 'string' && !column.enumValues.includes(value)) {
-    const lower = value.toLowerCase();
-    const match = column.enumValues.find(v => v.toLowerCase() === lower);
-    if (match !== undefined) return match;
+  // ENUM and CHECK (col IN (…)) columns take exactly one of their values, as in
+  // Postgres. MySQL would also take an index number, another case, trailing
+  // spaces or full-width letters and store them as a member that the rules
+  // never saw (audit 2026-11-16, C1/H1/M18/L1).
+  if (column.enumValues) {
+    if (typeof value !== 'string' || !column.enumValues.includes(value)) {
+      throw new DbRuleError(`invalid input value for ${column.name}: "${typeof value === 'string' ? value : JSON.stringify(value)}"`, '22P02');
+    }
+    return value;
   }
   if (column.uuid && typeof value === 'string' && UUID.test(value.trim())) return value.trim().toLowerCase();
   switch (column.dataType) {

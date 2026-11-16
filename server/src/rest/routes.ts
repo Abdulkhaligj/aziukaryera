@@ -15,7 +15,7 @@ import { filterSql, readRows } from './select.ts';
 import { applySession } from './session.ts';
 import { coerceArgs, findRpc } from '../rpc/registry.ts';
 import { rowMatches, selectColumns, sortRows } from './memory.ts';
-import { RateLimiter } from '../auth/rate-limit.ts';
+import { clientKey, RateLimiter } from '../auth/rate-limit.ts';
 import '../rpc/index.ts';
 
 export interface RestDeps { config: Config; pool: Pool; schema: Schema }
@@ -95,9 +95,13 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     return reply.code(status).type('application/json; charset=utf-8').send(rows);
   }
 
+  /** A temporary password is replaced before the account changes anything (M44). */
+  const readOnlyAccount = () => new PgError(403, '42501', 'Əvvəlcə yeni şifrə təyin edin');
+
   async function run<T>(req: FastifyRequest, tableName: string, work: (tx: import('../db.ts').Tx, ctx: Context) => Promise<T>): Promise<T> {
     if (!exposed(tableName) || !schema.has(tableName)) throw pgErrors.tableNotFound(tableName);
     const ctx = await context(req);
+    if (ctx.mustChangePassword && req.method !== 'GET' && req.method !== 'HEAD') throw readOnlyAccount();
     try {
       return await transaction(pool, async tx => { await applySession(tx, ctx); return work(tx, ctx); });
     } catch (error) {
@@ -152,6 +156,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     if (!def || keys.some(k => !(k in def.args))) throw pgErrors.functionNotFound(name, keys);
     const ctx = await context(req);
     if (ctx.role !== 'service_role' && !def.roles.includes(ctx.role as 'anon' | 'authenticated')) throw pgErrors.functionPermission(ctx, name);
+    if (ctx.mustChangePassword && !def.readOnly) throw readOnlyAccount();
     if ((req.method === 'GET' || req.method === 'HEAD') && !def.readOnly) {
       throw new PgError(405, '25006', `cannot execute ${name}() in a read-only transaction`);
     }
@@ -166,7 +171,7 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
         for (const limit of def.limits ?? []) {
           const id = `${name}:${limit.name}`;
           if (!rpcLimiters.has(id)) rpcLimiters.set(id, new RateLimiter(limit.count, limit.windowMs));
-          if (rpcLimiters.get(id)!.take(`${req.ip}|${ctx.uid ?? ''}|${limit.key?.(args) ?? ''}`)) continue;
+          if (rpcLimiters.get(id)!.take(`${clientKey(req.ip)}|${ctx.uid ?? ''}|${limit.key?.(args) ?? ''}`)) continue;
           if (limit.silent && def.returns === 'void') return reply.code(204).send();
           throw new PgError(429, '54000', 'Too many requests; try again later');
         }

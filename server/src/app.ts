@@ -25,7 +25,8 @@ export async function buildApp(deps: AppDeps) {
   setEncryptionKey(deps.config.dataEncryptionKey, deps.config.jwtSecret);
   // One trusted hop, and only from the internal network (Caddy): a client that
   // reaches the API port directly cannot pick its address with X-Forwarded-For (#23).
-  const internal = (address: string) => /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|::ffff:(127|10)\.|f[cd][0-9a-f]{2}:)/i.test(address);
+  // IPv4, the same written as ::ffff:a.b.c.d (audit 2026-11-16, L18), loopback and unique-local IPv6.
+  const internal = (address: string) => /^(::ffff:)?(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|^::1$|^f[cd][0-9a-f]{2}:/i.test(address);
   // Logs keep the path, never the query (tokens, keys, signed URLs) or credentials (#19).
   const logger = deps.logger ? {
     redact: ['req.headers.authorization', 'req.headers.apikey', 'req.headers.cookie', 'req.headers["x-moderation-secret"]'],

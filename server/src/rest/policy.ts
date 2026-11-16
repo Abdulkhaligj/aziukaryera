@@ -16,13 +16,51 @@ const { tables } = JSON.parse(readFileSync(new URL('./policies.generated.json', 
     tables[table]?.policies.push({ name, cmd, permissive: false, roles: ['anon', 'authenticated'], using, check: null });
   // H-06: a suspended or pending company, or one whose owner is suspended,
   // changes nothing through its policies (reading its own data still works).
+  const active = (e: string | null) => e?.split('owns_company(').join('owns_active_company(') ?? null;
   for (const rules of Object.values(tables)) {
+    const split: Policy[] = [];
     for (const p of rules.policies) {
-      if (p.cmd === 'SELECT' || p.cmd === 'ALL') continue;
-      p.using = p.using?.split('owns_company(').join('owns_active_company(') ?? null;
-      p.check = p.check?.split('owns_company(').join('owns_active_company(') ?? null;
+      if (p.cmd === 'SELECT') continue;
+      if (p.cmd === 'ALL') {
+        // An ALL policy covers writes too (invites_write): its write part gets the
+        // same rule, its read part stays (audit 2026-11-16, M1).
+        if (!/owns_company\(/.test(`${p.using} ${p.check}`)) continue;
+        split.push({ ...p, cmd: 'SELECT' });
+        for (const cmd of ['INSERT', 'UPDATE', 'DELETE'] as const) split.push({ ...p, cmd, using: active(p.using), check: active(p.check) });
+        p.cmd = 'SELECT'; p.name = `${p.name}__replaced`; p.roles = [];
+        continue;
+      }
+      p.using = active(p.using);
+      p.check = active(p.check);
+    }
+    rules.policies.push(...split);
+  }
+  // M2: a rejected company, or one whose owner is blocked, does not edit its row;
+  // a pending one may (it completes its profile before the review).
+  const ownerMayEdit = "((owner_id = @auth_uid) AND (status IN ('pending', 'active')) AND EXISTS (SELECT 1 FROM profiles op WHERE op.id = @auth_uid AND op.status IN ('pending', 'active')))";
+  for (const p of tables.companies?.policies ?? []) {
+    if (p.name !== 'companies_update') continue;
+    p.using = p.using?.split('(owner_id = @auth_uid)').join(ownerMayEdit) ?? null;
+    p.check = p.check?.split('(owner_id = @auth_uid)').join(ownerMayEdit) ?? null;
+  }
+  // L2: a company that is not active no longer reads its applications, their
+  // history or slots, as it no longer reads the applicants' profiles.
+  for (const t of ['applications', 'application_status_history', 'company_interview_slots']) {
+    for (const p of tables[t]?.policies ?? []) {
+      if (p.cmd === 'SELECT' && p.permissive) p.using = active(p.using);
     }
   }
+  // M3: an account that is not active sends no message, request or follow.
+  for (const t of ['messages', 'connections', 'follows']) {
+    tables[t]?.policies.push({ name: 'audit_sender_active', cmd: 'INSERT', permissive: false, roles: ['anon', 'authenticated'], using: null, check: 'app_account_active()' });
+  }
+  // M5: in Postgres the posts subquery of post_media_read ran under the posts
+  // policies; here the same condition is written out.
+  restrict('post_media', 'SELECT', 'audit_post_media_visible',
+    "EXISTS (SELECT 1 FROM posts p WHERE p.id = post_media.post_id AND ((p.moderation_status = 'visible') OR ((p.author_id = @auth_uid) AND (p.moderation_status = 'pending')) OR (@is_admin = 1)))");
+  // The same for applying: the vacancy's company must be active (it is hidden otherwise).
+  tables.applications?.policies.push({ name: 'audit_apply_company_active', cmd: 'INSERT', permissive: false, roles: ['anon', 'authenticated'], using: null,
+    check: "EXISTS (SELECT 1 FROM jobs j JOIN companies c ON c.id = j.company_id WHERE j.id = applications.job_id AND c.status = 'active')" });
   // H-06: the vacancies of a company that is not active are not public.
   restrict('jobs', 'SELECT', 'audit_jobs_active_company',
     "(@is_admin = 1) OR owns_company(company_id) OR EXISTS (SELECT 1 FROM companies c WHERE c.id = jobs.company_id AND c.status = 'active')");

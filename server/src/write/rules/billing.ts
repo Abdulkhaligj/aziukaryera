@@ -120,7 +120,10 @@ audited('notifications', ['delete']);
 /** private.reserve_company_quota: atomic counter with an optional cap. */
 export async function reserveCompanyQuota(env: WriteEnv, subject: string, feature: string, period: string, delta: number, limit: number | null, enforce: boolean) {
   if (limit !== null && limit < 0) throw new DbRuleError('Invalid negative quota limit');
-  await exec(env.tx, `INSERT IGNORE INTO private_company_quota_counters (subject_id, feature_key, period_start, used_count) VALUES (?, ?, ?, 0)`,
+  // ON DUPLICATE KEY takes the row's exclusive lock at once; INSERT IGNORE took a
+  // shared one and the UPDATE below then deadlocked with a second caller (M16).
+  await exec(env.tx, `INSERT INTO private_company_quota_counters (subject_id, feature_key, period_start, used_count) VALUES (?, ?, ?, 0)
+      ON DUPLICATE KEY UPDATE used_count = used_count`,
     [subject, feature, period]);
   const result = await exec(env.tx, `UPDATE private_company_quota_counters SET used_count = used_count + ?
       WHERE subject_id = ? AND feature_key = ? AND period_start = ? AND used_count + ? >= 0

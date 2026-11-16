@@ -47,6 +47,8 @@ export interface Config {
   corsOrigins: string[];
 }
 
+import { intEnv } from './db.ts';
+
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
   if (!value) throw new Error(`${name} is required`);
@@ -58,9 +60,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
   const publicUrl = required(env, 'API_EXTERNAL_URL').replace(/\/$/, '');
   const siteUrl = (env.SITE_URL || 'https://asoiu-career.vercel.app').replace(/\/$/, '');
+  // In production the API does not start without what keeps it honest (M30, M32):
+  // its own field-encryption key (not derived from JWT_SECRET, which rotate-keys.sh
+  // replaces), real email delivery, and the moderation secret.
+  if (env.NODE_ENV === 'production') {
+    const missing = ['DATA_ENCRYPTION_KEY', 'SMTP_HOST', 'MODERATION_WEBHOOK_SECRET'].filter(name => !env[name]);
+    if (missing.length) throw new Error(`production needs ${missing.join(', ')}`);
+    if ((env.MODERATION_WEBHOOK_SECRET ?? '').length < 32) throw new Error('MODERATION_WEBHOOK_SECRET must be at least 32 characters');
+  }
   return {
     host: env.HOST || '127.0.0.1',
-    port: Number(env.PORT || 8000),
+    port: intEnv(env, 'PORT', 8000, 1, 65535),
     mysqlUrl: required(env, 'MYSQL_URL'),
     publicUrl,
     siteUrl,
@@ -68,18 +78,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwtSecret,
     anonKey: required(env, 'ANON_KEY'),
     serviceRoleKey: required(env, 'SERVICE_ROLE_KEY'),
-    accessTokenTtl: Number(env.JWT_EXPIRY || 3600),
-    refreshTokenTtlDays: Number(env.REFRESH_TOKEN_TTL_DAYS || 30),
+    accessTokenTtl: intEnv(env, 'JWT_EXPIRY', 3600, 60, 86400),
+    refreshTokenTtlDays: intEnv(env, 'REFRESH_TOKEN_TTL_DAYS', 30, 1, 365),
     // H-01 (audit 2026-11-12): sign-ups confirm their email unless explicitly disabled.
     mailerAutoconfirm: (env.ENABLE_EMAIL_AUTOCONFIRM ?? 'false') === 'true',
     secureEmailChange: (env.SECURE_EMAIL_CHANGE ?? 'true') === 'true',
     disableSignup: env.DISABLE_SIGNUP === 'true',
     // At least 8 characters (#64).
-    passwordMinLength: Math.max(8, Number(env.PASSWORD_MIN_LENGTH || 8)),
+    // A value that is not a whole number stops the start, instead of becoming NaN
+    // and letting any password through (audit 2026-11-16, M6).
+    passwordMinLength: intEnv(env, 'PASSWORD_MIN_LENGTH', 8, 8, 72),
     universityDomain: env.UNIVERSITY_EMAIL_DOMAIN || 'asoiu.edu.az',
     smtp: env.SMTP_HOST ? {
       host: env.SMTP_HOST,
-      port: Number(env.SMTP_PORT || 587),
+      port: intEnv(env, 'SMTP_PORT', 587, 1, 65535),
       user: env.SMTP_USER || '',
       pass: env.SMTP_PASS || '',
       from: `${env.SMTP_SENDER_NAME || 'ADNSU Karyera Mərkəzi'} <${env.SMTP_ADMIN_EMAIL || 'career@asoiu.edu.az'}>`

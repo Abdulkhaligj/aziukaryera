@@ -278,11 +278,17 @@ test('resend for an email change follows the 60-second cooldown and ignores unkn
   const client = h.anon();
   await client.auth.signUp({ email: 'ikinci@asoiu.edu.az', password: 'Sifre2026!', options: { data: { role: 'student', full_name: 'İkinci Ünvan' } } });
   assert.equal((await client.auth.updateUser({ email: 'ucuncu@asoiu.edu.az' })).error, null);
-  const soon = await client.auth.resend({ type: 'email_change', email: 'ucuncu@asoiu.edu.az' });
-  assert.equal(soon.error?.message, 'For security purposes, you can only request this after 60 seconds.');
+  // Audit 2026-11-16, L11: only the account itself may resend its email-change links.
+  const anonymous = await client.auth.resend({ type: 'email_change', email: 'ucuncu@asoiu.edu.az' });
+  assert.ok(anonymous.error, 'without the account\'s session the links are not resent');
+  const token = (await client.auth.getSession()).data.session!.access_token;
+  const resend = (email: string) => fetch(`${h.url}/auth/v1/resend`, { method: 'POST',
+    headers: { apikey: h.config.anonKey, authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ type: 'email_change', email }) });
+  const soon = await resend('ucuncu@asoiu.edu.az');
+  assert.equal((await soon.json()).msg, 'For security purposes, you can only request this after 60 seconds.');
   const before = h.mailer.outbox!.length;
-  const unknown = await client.auth.resend({ type: 'email_change', email: 'hec-kim@asoiu.edu.az' });
-  assert.equal(unknown.error, null, 'no hint whether an address is pending');
+  const other = await resend('hec-kim@asoiu.edu.az');
+  assert.equal(other.status, 200, 'another address gets the same empty answer');
   assert.equal(h.mailer.outbox!.length, before);
 });
 
