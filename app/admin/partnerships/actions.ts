@@ -1,6 +1,6 @@
 'use server';
 
-import { getAdminContext } from '@/lib/admin-data';
+import { getAdminContext, writeAudit } from '@/lib/admin-data';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -31,6 +31,8 @@ export async function reviewPartnership(formData: FormData): Promise<void> {
   if (error || !data) {
     redirect('/admin/partnerships?result=error');
   }
+  // The decision is recorded in the panel's audit log (M43).
+  await writeAudit(ctx, 'company_partnership_requests', id, 'update', `Əməkdaşlıq müraciəti: ${status}`);
   revalidatePath('/admin/partnerships');
   redirect('/admin/partnerships?result=saved');
 }

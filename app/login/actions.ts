@@ -1,5 +1,7 @@
 'use server';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { SESSION_MAX_MS, SESSION_STARTED, sessionCookieOptions } from '@/lib/backend/cookies';
 import { createClient } from '@/lib/backend/server';
 import { getAdminContext } from '@/lib/admin-data';
 import type { MessageCode } from '@/lib/messages';
@@ -26,6 +28,8 @@ export async function login(formData: FormData) {
     await db.auth.signOut();
     to('/login', 'error', 'login.forbidden');
   }
+  // The sign-in time: the session ends 12 hours later (M41).
+  (await cookies()).set(SESSION_STARTED, String(Date.now()), { ...sessionCookieOptions, maxAge: SESSION_MAX_MS / 1000 });
   redirect(context.mustChangePassword ? '/account/password' : '/admin');
 }
 

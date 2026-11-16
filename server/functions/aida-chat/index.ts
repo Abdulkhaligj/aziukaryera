@@ -30,8 +30,16 @@ const db = createClient(Deno.env.get("API_URL") ?? "", SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-/** Gives a reservation back after a provider failure (M27); a failure here is logged only. */
+/** Reservations a provider already answered for (bounded). */
+const paid = new Set<string>();
+function markPaid(id: string) {
+  paid.add(id);
+  if (paid.size > 10_000) paid.delete(paid.values().next().value as string);
+}
+/** Gives a reservation back when no provider answered for it: a timeout, a 5xx,
+ *  no provider budget (M27). A paid answer that was unusable still counts. */
 async function releaseReservation(reservationId: string) {
+  if (paid.delete(reservationId)) return;
   const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
   if (error) console.error("reservation release failed:", error.message);
 }
@@ -80,7 +88,11 @@ async function clientHash(req: Request, day: string) {
 async function providerFetch(reservationId: string, input: string, init: RequestInit) {
   const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
   if (error || data !== true) throw new Error("provider_budget_unavailable");
-  return fetch(input, init);
+  const response = await fetch(input, init);
+  // A provider that answered was paid, whatever the answer is worth: that
+  // reservation is not given back (M27).
+  if (response.ok) markPaid(reservationId);
+  return response;
 }
 
 function safeJson(text: string) {

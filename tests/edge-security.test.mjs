@@ -28,6 +28,7 @@ async function handler(name, state = {}, env = {}) {
         return { data: { allowed: true, reservation_id: `reservation-${state.reserved}`, used: state.reserved, limit: state.limit || 20 }, error: null };
       }
       if (name === 'ai_consume_provider_attempt') return { data: !state.attemptError, error: null };
+      if (name === 'ai_release_reservation') { state.released = (state.released || 0) + 1; return { data: true, error: null }; }
       if (name === 'ai_candidate_pack') return { data: state.pack, error: null };
       if (name === 'moderation_claim') {
         if (state.claimed) return { data: { claimed: false }, error: null };
@@ -91,6 +92,8 @@ test('AIDA unusable paid output still consumes the reservation', async () => {
   const run = await handler('aida-chat', state);
   await run(request({ message: 'Career?' })); await run(request({ message: 'Career?' }));
   assert.equal(state.paid, 1); assert.equal(state.reserved, 20);
+  // A paid answer that was unusable is not given back (audit 2026-11-16, M27).
+  assert.equal(state.released || 0, 0);
 });
 test('AIDA reservation DB errors fail closed', async () => {
   const state = { rpcError: true }; const run = await handler('aida-chat', state);
@@ -230,4 +233,13 @@ test('Candidate ranking: the text of a candidate without AI consent never reache
   assert.doesNotMatch(state.requests.at(-1).contents[0].parts[0].text, /Private CV text/);
   const second = out.result.ranking.find(r => r.application_id === 'app-2');
   assert.equal(second.ai_score, null); assert.equal(second.flagged, 'no_ai_consent');
+});
+
+test('AIDA gives the reservation back when no provider answered (M27) and stops at the budget (L32)', async () => {
+  const state = { attemptError: true }; const run = await handler('aida-chat', state);
+  const response = await run(request({ message: 'Career?' }));
+  assert.equal(response.status, 502, 'a provider failure is not a success (M26)');
+  assert.equal(state.paid || 0, 0);
+  assert.equal(state.released, 1);
+  assert.equal(state.rpcs.filter(n => n === 'ai_consume_provider_attempt').length, 1, 'no further model is tried without budget');
 });

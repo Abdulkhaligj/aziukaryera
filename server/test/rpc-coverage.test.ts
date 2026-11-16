@@ -4,10 +4,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import '../src/rpc/index.ts';
 import { findRpc } from '../src/rpc/registry.ts';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIRS = ['student-web', 'app', 'lib', 'server/functions'];
 
 function* files(dir: string): Generator<string> {

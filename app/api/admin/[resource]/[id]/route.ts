@@ -1,8 +1,21 @@
 import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUDIT_WARNING, getAdminContext, writeAudit } from '@/lib/admin-data';
-import { crossSite, escapeLike, functionError, httpsUrl, publicError, sent, webUrl } from '@/lib/admin-input';
+import { amount, auditTitle, crossSite, escapeLike, functionError, httpsUrl, intInRange, peopleFields, publicError, sent, webUrl } from '@/lib/admin-input';
 import { can, canApproveJobs } from '@/lib/permissions';
+
+/** Status changes the approval page may make (audit 2026-11-16, L38). */
+const REVIEW_FROM: Record<string, string[]> = {
+  draft: ['pending_approval', 'approved', 'published', 'rejected', 'changes_requested', 'archived'],
+  pending: ['pending_approval', 'approved', 'published', 'rejected', 'changes_requested', 'archived'],
+  pending_approval: ['approved', 'published', 'rejected', 'changes_requested', 'archived'],
+  changes_requested: ['pending_approval', 'approved', 'published', 'rejected', 'archived'],
+  rejected: ['pending_approval', 'changes_requested', 'archived'],
+  approved: ['published', 'changes_requested', 'rejected', 'expired', 'archived'],
+  published: ['changes_requested', 'rejected', 'expired', 'archived'],
+  expired: ['pending_approval', 'archived'],
+  archived: ['pending_approval']
+};
 import type { ResourceKey } from '@/lib/types';
 
 const moderationStates = new Set(['visible', 'pending', 'hidden']);
@@ -42,20 +55,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const reason = text(body.changes_requested).slice(0, 2000);
     if ((status === 'rejected' || status === 'changes_requested') && !reason)
       return NextResponse.json({ error: 'Rədd və ya düzəliş üçün səbəbi yazın.' }, { status: 400 });
+    // The change starts from the status the reviewer saw; a decision made by
+    // someone else in the meantime is not overwritten (L38).
+    const { data: current } = await context.db.from('jobs').select('status').eq('id', id).maybeSingle();
+    if (!current) return NextResponse.json({ error: 'Vakansiya tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
+    if (!(REVIEW_FROM[current.status] ?? []).includes(status)) {
+      return NextResponse.json({ error: `“${current.status}” statusundan “${status}” statusuna keçmək olmaz.` }, { status: 409 });
+    }
+    const approving = status === 'approved' || status === 'published';
     const update: Record<string, unknown> = {
       status,
       changes_requested: status === 'rejected' || status === 'changes_requested' ? reason : null,
-      rejection_reason: status === 'rejected' ? reason : null
+      rejection_reason: status === 'rejected' ? reason : null,
+      // A vacancy that is not approved carries no approver (L38).
+      approved_by: approving ? context.userId : null,
+      approved_at: approving ? new Date().toISOString() : null
     };
-    if (status === 'approved' || status === 'published') {
-      update.approved_by = context.userId;
-      update.approved_at = new Date().toISOString();
-    }
     const { data, error } = await context.db.from('jobs')
-      .update(update).eq('id', id).select('id,status').maybeSingle();
+      .update(update).eq('id', id).eq('status', current.status).select('id,status').maybeSingle();
     if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
-    if (!data) return NextResponse.json({ error: 'Vakansiya tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
-    const audited = await writeAudit(context, 'pending_jobs', id, 'update', 'Vakansiyanın təsdiq statusu dəyişdirildi');
+    if (!data) return NextResponse.json({ error: 'Vakansiyanın statusu bu arada dəyişib; siyahını yeniləyin.' }, { status: 409 });
+    const audited = await writeAudit(context, 'pending_jobs', id, 'update', `Vakansiyanın təsdiq statusu: ${current.status} → ${status}`);
     return NextResponse.json({ ok: true, status: data.status, ...(audited ? {} : { warning: AUDIT_WARNING }) });
   }
 
@@ -63,8 +83,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     /* "Şifrəni sıfırla": yeni müvəqqəti şifrə qaytarılır (yalnız hesab yaratmaq hüququ olanlar) */
     const action = body.__action === 'reset_password' ? 'reset_password' : 'update';
     if (action === 'reset_password' && !can(context.role, 'create', key)) return NextResponse.json({ error: 'Şifrəni sıfırlamağa icazəniz yoxdur' }, { status: 403 });
+    // Only the fields of this section go to the function, never the raw body (M38).
     const { data, error } = await context.db.functions.invoke('admin-users', {
-      body: { ...body, action, resource: key, id }
+      body: { ...(action === 'update' ? peopleFields(key, body) : {}), action, resource: key, id }
     });
     if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'İstifadəçi yenilənmədi') }, { status: 400 });
     return NextResponse.json(data);
@@ -73,12 +94,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let table = resource;
   let payload: Record<string, unknown>;
   if (resource === 'companies') payload = { name: text(body.title), sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: webUrl(body.website) ?? '', company_size: text(body.company_size), address: text(body.address), logo_url: httpsUrl(body.logo_url), about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: body.verified === true || body.verified === 'true', status: text(body.status) };
-  else if (resource === 'jobs' || resource === 'pending_jobs') { table = 'jobs'; payload = { company_id: text(body.company_id), title: text(body.title), type: text(body.type), mode: text(body.mode), location: text(body.location), deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: nullableNumber(body.salary_min), salary_max: nullableNumber(body.salary_max), currency: text(body.currency) || 'AZN', salary_visible: body.salary_visible === true || body.salary_visible === 'true', positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: webUrl(body.application_url), changes_requested: text(body.changes_requested) || null, rejection_reason: text(body.status) === 'rejected' ? text(body.changes_requested) || null : null, status: text(body.status) }; }
-  else if (resource === 'events') payload = { title: text(body.title), kind: text(body.kind), starts_at: bakuTime(body.starts_at), place: text(body.place), seats: number(body.seats), description: text(body.description) || null, organizers: list(body.organizers), image_url: httpsUrl(body.image_url) };
+  else if (resource === 'jobs' || resource === 'pending_jobs') { table = 'jobs'; payload = { company_id: text(body.company_id), title: text(body.title), type: text(body.type), mode: text(body.mode), location: text(body.location), deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: nullableNumber(body.salary_min), salary_max: nullableNumber(body.salary_max), currency: text(body.currency) || 'AZN', salary_visible: body.salary_visible === true || body.salary_visible === 'true', positions: intInRange(body.positions, 1, 1000, 1), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: webUrl(body.application_url), changes_requested: text(body.changes_requested) || null, rejection_reason: text(body.status) === 'rejected' ? text(body.changes_requested) || null : null, status: text(body.status) }; }
+  else if (resource === 'events') payload = { title: text(body.title), kind: text(body.kind), starts_at: bakuTime(body.starts_at), place: text(body.place), seats: intInRange(body.seats, 0, 100000, 0), description: text(body.description) || null, organizers: list(body.organizers), image_url: httpsUrl(body.image_url) };
   else if (resource === 'ads') {
     const placement = text(body.placement);
     if (!placements.has(placement)) return NextResponse.json({ error: 'Reklam yerini seçin' }, { status: 400 });
-    payload = { title: text(body.title), advertiser: text(body.advertiser) || text(body.title), company_id: text(body.company_id) || null, description: text(body.description) || null, image_url: httpsUrl(body.image_url), link_url: httpsUrl(body.link_url), cta_label: text(body.cta_label) || 'Ətraflı', placement, starts_on: text(body.starts_on), ends_on: text(body.ends_on), status: adStatuses.has(text(body.status)) ? text(body.status) : 'draft', priority: number(body.priority), price_azn: text(body.price_azn) ? number(body.price_azn) : null, paid: bool(body.paid) };
+    payload = { title: text(body.title), advertiser: text(body.advertiser) || text(body.title), company_id: text(body.company_id) || null, description: text(body.description) || null, image_url: httpsUrl(body.image_url), link_url: httpsUrl(body.link_url), cta_label: text(body.cta_label) || 'Ətraflı', placement, starts_on: text(body.starts_on), ends_on: text(body.ends_on), status: adStatuses.has(text(body.status)) ? text(body.status) : 'draft', priority: intInRange(body.priority, 0, 1000, 0), price_azn: amount(body.price_azn), paid: bool(body.paid) };
   }
   else if (resource === 'benefits') {
     let partnerId = text(body.partner_id);
@@ -114,7 +135,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (company?.name) companyName = company.name;
     }
     if (!nomination || !companyName) return NextResponse.json({ error: 'Nominasiya və şirkət məcburidir' }, { status: 400 });
-    payload = { year: number(body.year, new Date().getFullYear()), nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: httpsUrl(body.logo_url), citation: text(body.citation) || null, published: body.published === true || body.published === 'true' || body.published === 'on' };
+    payload = { year: intInRange(body.year, 2000, 2100, new Date().getFullYear()), nomination, tier: text(body.tier) || 'gold', company_id: companyId || null, company_name: companyName, logo_url: httpsUrl(body.logo_url), citation: text(body.citation) || null, published: body.published === true || body.published === 'true' || body.published === 'on' };
   }
   else if (resource === 'mentor_requests') {
     table = 'mentor_requests';
@@ -129,7 +150,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   else if (resource === 'payments') { table = 'payments'; payload = { status: text(body.status) }; }
   else if (resource === 'plans') {
     table = 'plans';
-    payload = { monthly_price: number(body.monthly_price), currency: 'AZN', description: text(body.description), updated_at: new Date().toISOString() };
+    payload = { monthly_price: amount(body.monthly_price) ?? 0, currency: 'AZN', description: text(body.description), updated_at: new Date().toISOString() };
     const features = [
       { feature_key: 'active_vacancies', enabled: true, limit_value: nullableNumber(body.active_vacancies), label: 'Aktiv vakansiyalar' },
       { feature_key: 'featured_vacancies', enabled: nullableNumber(body.featured_vacancies) !== 0, limit_value: nullableNumber(body.featured_vacancies), label: 'Önə çıxarılan vakansiyalar' },
@@ -149,11 +170,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     payload = Object.fromEntries(Object.entries(payload).filter(([field]) =>
       derived.has(field) || sent(body, sourceField[field] ?? field) || (field === 'rejection_reason' && sent(body, 'status'))));
   }
-  if (Object.keys(payload).length) {
-    const { error } = await context.db.from(table).update(payload).eq('id', id);
-    if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
+  // An editor does not approve vacancies, nor set a company's status or badge (L35, L36).
+  const senior = canApproveJobs(context.role);
+  if (!senior && table === 'jobs' && (payload.status === 'approved' || payload.status === 'published')) {
+    const { data: current } = await context.db.from('jobs').select('status').eq('id', id).maybeSingle();
+    if (current?.status !== payload.status) return NextResponse.json({ error: 'Vakansiyanı yalnız Super Admin və ya Menecer təsdiqləyə bilər' }, { status: 403 });
   }
-  const audited = await writeAudit(context, resource, id, 'update', `${text(body.title) || resource} yeniləndi`);
+  if (!senior && table === 'companies') { delete payload.status; delete payload.verified; }
+  // Numbers are checked, not turned into 0 or accepted below zero (L39).
+  for (const [field, value] of Object.entries(payload)) {
+    if (value === 'invalid') return NextResponse.json({ error: `“${field}” sahəsinin dəyəri yanlışdır` }, { status: 400 });
+  }
+  if (Object.keys(payload).length) {
+    // The row must exist and be changed; zero rows is not a success (M42).
+    const { data: changed, error } = await context.db.from(table).update(payload).eq('id', id).select('id');
+    if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
+    if (!changed?.length) return NextResponse.json({ error: 'Qeyd tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
+  }
+  const audited = await writeAudit(context, resource, id, 'update', auditTitle(text(body.title) || resource, 'yeniləndi'));
   if (resource === 'network') {
     await context.db.from('moderation_logs').insert({ target_type: 'post', target_id: id, action: text(body.moderation_status) === 'hidden' ? 'hide' : 'approve', actor_id: context.userId, reason: 'Admin panelindən moderasiya' });
   }
@@ -181,8 +215,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     interview_analytics: 'interview_sessions', ai_usage: 'ai_usage'
   };
   const target = table[resource] || resource;
-  const { error } = await context.db.from(target).delete().eq('id', id);
+  const { data: removed, error } = await context.db.from(target).delete().eq('id', id).select('id');
   if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
+  if (!removed?.length) return NextResponse.json({ error: 'Qeyd tapılmadı və ya silməyə icazə yoxdur.' }, { status: 404 });
   const audited = await writeAudit(context, resource, id, 'delete', `${resource} qeydi silindi`);
   return NextResponse.json({ ok: true, ...(audited ? {} : { warning: AUDIT_WARNING }) });
 }

@@ -107,7 +107,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   const { config, pool, schema } = deps;
   const files = new FileStore(config.storageDir);
   // Signed URLs have their own key, so a URL signature is never a valid session token (#21).
-  const key = new Uint8Array(hkdfSync('sha256', process.env.STORAGE_SIGNING_KEY || config.jwtSecret, 'asoiu-career', 'storage-signed-url-v1', 32));
+  const key = new Uint8Array(hkdfSync('sha256', config.storageSigningKey || config.jwtSecret, 'asoiu-career', 'storage-signed-url-v1', 32));
   const uploadContext = new WeakMap<FastifyRequest, Context>();
 
   app.removeAllContentTypeParsers();

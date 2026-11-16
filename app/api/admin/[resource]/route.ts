@@ -1,7 +1,7 @@
 import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUDIT_WARNING, getAdminContext, loadLookups, loadResource, resourceKeys, writeAudit } from '@/lib/admin-data';
-import { escapeLike, functionError, httpsUrl, publicError, webUrl } from '@/lib/admin-input';
+import { escapeLike, functionError, httpsUrl, publicError, webUrl, amount, intInRange, peopleFields } from '@/lib/admin-input';
 import { can } from '@/lib/permissions';
 import type { ResourceKey } from '@/lib/types';
 
@@ -41,15 +41,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   /* Hesablar e-poçtsuz, müvəqqəti şifrə ilə yaradılır (SMTP tələb olunmur) */
   if (people.has(key)) {
+    // Only the fields of this section go to the function (M38).
     const { data, error } = await context.db.functions.invoke('admin-users', {
-      body: { ...body, action: 'create', resource: key }
+      body: { ...peopleFields(key, body), action: 'create', resource: key }
     });
     if (error || !data?.ok) return NextResponse.json({ error: await functionError(error, data, 'Hesab yaradılmadı') }, { status: 400 });
     return NextResponse.json(data, { status: 201 });
   }
 
   if (key === 'awards') {
-    const year = number(body.year, new Date().getFullYear());
+    const year = intInRange(body.year, 2000, 2100, new Date().getFullYear());
+    if (year === 'invalid') return NextResponse.json({ error: '“year” sahəsinin dəyəri yanlışdır' }, { status: 400 });
     const nomination = text(body.nomination);
     const companyId = text(body.company_id);
     let companyName = text(body.company_name);
@@ -73,14 +75,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (key === 'companies') {
     payload = { name: title, sector: text(body.sector), email: text(body.email), phone: text(body.phone), website: webUrl(body.website) ?? '', company_size: text(body.company_size), address: text(body.address), logo_url: httpsUrl(body.logo_url), about: text(body.about), contact: text(body.contact), contact_position: text(body.contact_position), contact_email: text(body.contact_email), contact_phone: text(body.contact_phone), verified: bool(body.verified), status: text(body.status) || 'pending' };
   } else if (key === 'jobs') {
-    payload = { company_id: text(body.company_id), title, type: text(body.type) || 'tecrube', mode: text(body.mode) || 'Əyani', location: text(body.location) || 'Bakı', deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: text(body.salary_min) ? number(body.salary_min) : null, salary_max: text(body.salary_max) ? number(body.salary_max) : null, currency: text(body.currency) || 'AZN', salary_visible: bool(body.salary_visible), positions: Math.max(1, number(body.positions, 1)), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: webUrl(body.application_url), changes_requested: text(body.changes_requested) || null, status: text(body.status) || 'draft' };
+    payload = { company_id: text(body.company_id), title, type: text(body.type) || 'tecrube', mode: text(body.mode) || 'Əyani', location: text(body.location) || 'Bakı', deadline: text(body.deadline), summary: text(body.summary), department: text(body.department), experience_level: text(body.experience_level), salary_min: text(body.salary_min) ? number(body.salary_min) : null, salary_max: text(body.salary_max) ? number(body.salary_max) : null, currency: text(body.currency) || 'AZN', salary_visible: bool(body.salary_visible), positions: intInRange(body.positions, 1, 1000, 1), skills: list(body.skills), preferred_skills: list(body.preferred_skills), faculty_ids: list(body.faculty_ids), major_ids: list(body.major_ids), duties: list(body.duties, '\n'), requirements: list(body.requirements, '\n'), application_method: text(body.application_method) || 'platform', application_url: webUrl(body.application_url), changes_requested: text(body.changes_requested) || null, status: text(body.status) || 'draft' };
   } else if (key === 'events') {
-    payload = { title, kind: text(body.kind), starts_at: bakuTime(body.starts_at), place: text(body.place), seats: number(body.seats), description: text(body.description) || null, organizers: list(body.organizers), image_url: httpsUrl(body.image_url) };
+    payload = { title, kind: text(body.kind), starts_at: bakuTime(body.starts_at), place: text(body.place), seats: intInRange(body.seats, 0, 100000, 0), description: text(body.description) || null, organizers: list(body.organizers), image_url: httpsUrl(body.image_url) };
   } else if (key === 'ads') {
     table = 'ads';
     const placement = text(body.placement);
     if (!placements.has(placement)) return NextResponse.json({ error: 'Reklam yerini seçin' }, { status: 400 });
-    payload = { title, advertiser: text(body.advertiser) || title, company_id: text(body.company_id) || null, description: text(body.description) || null, image_url: httpsUrl(body.image_url), link_url: httpsUrl(body.link_url), cta_label: text(body.cta_label) || 'Ətraflı', placement, starts_on: text(body.starts_on) || new Date().toISOString().slice(0, 10), ends_on: text(body.ends_on), status: adStatuses.has(text(body.status)) ? text(body.status) : 'draft', priority: number(body.priority), price_azn: text(body.price_azn) ? number(body.price_azn) : null, paid: bool(body.paid) };
+    payload = { title, advertiser: text(body.advertiser) || title, company_id: text(body.company_id) || null, description: text(body.description) || null, image_url: httpsUrl(body.image_url), link_url: httpsUrl(body.link_url), cta_label: text(body.cta_label) || 'Ətraflı', placement, starts_on: text(body.starts_on) || new Date().toISOString().slice(0, 10), ends_on: text(body.ends_on), status: adStatuses.has(text(body.status)) ? text(body.status) : 'draft', priority: intInRange(body.priority, 0, 1000, 0), price_azn: amount(body.price_azn), paid: bool(body.paid) };
   } else if (key === 'benefits') {
     let partnerId = text(body.partner_id);
     const partnerName = text(body.partner_name);
@@ -101,6 +103,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     payload = { title, content_key: text(body.content_key), summary: text(body.summary), body: text(body.body), status: text(body.status) || 'Qaralama', updated_by: context.userId };
   }
 
+  // Numbers are checked, not turned into 0 or accepted below zero (L39).
+  for (const [field, value] of Object.entries(payload)) {
+    if (value === 'invalid') return NextResponse.json({ error: `“${field}” sahəsinin dəyəri yanlışdır` }, { status: 400 });
+  }
   const { data, error } = await context.db.from(table).insert(payload).select('id').single();
   if (error) return NextResponse.json({ error: publicError(error) }, { status: 400 });
   const audited = await writeAudit(context, resource, data.id, 'create', `${title} yaradıldı`);

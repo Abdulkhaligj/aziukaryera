@@ -1,6 +1,6 @@
 import { readAdminJson } from '@/lib/request-body';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminContext } from '@/lib/admin-data';
+import { getAdminContext, writeAudit } from '@/lib/admin-data';
 import { publicError } from '@/lib/admin-input';
 
 export async function POST(request: NextRequest) {
@@ -21,5 +21,7 @@ export async function POST(request: NextRequest) {
   }
   const { data, error } = await context.db.rpc('admin_reset_platform_data', { p_confirmation: body.confirmation, p_password: body.password });
   if (error) return NextResponse.json({ error: publicError(error, 'Sıfırlama alınmadı') }, { status: 400 });
+  // The audit history is kept by the reset; the reset itself is recorded in it (M43).
+  await writeAudit(context, 'system', null, 'reset', 'Platforma məlumatları sıfırlandı');
   return NextResponse.json(data);
 }

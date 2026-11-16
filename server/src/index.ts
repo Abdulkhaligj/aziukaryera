@@ -2,13 +2,16 @@
 import { buildApp } from './app.ts';
 import { keyExpiresIn } from './context.ts';
 import { createMailer } from './auth/mailer.ts';
-import { loadConfig } from './config.ts';
+import { loadConfig, scrubProcessSecrets } from './config.ts';
 import { checkSession, createPool, drainAfterCommit } from './db.ts';
 import { loadSchema } from './schema.ts';
 import { encryptLegacyClaimCodes, rehashClaimCodes } from './maintenance.ts';
 
 const config = loadConfig();
 const pool = createPool(config.mysqlUrl);
+// The configuration and the pool have what they need; the functions run in this
+// process and get an allow-listed environment of their own (L19).
+scrubProcessSecrets();
 // Time zone, isolation and SQL mode of the sessions are what the code assumes (M22, H3).
 await checkSession(pool);
 const schema = await loadSchema(pool);

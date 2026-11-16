@@ -11,11 +11,25 @@ export async function POST(request: NextRequest) {
   const parsed = await readAdminJson(request);
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   const body = parsed.body;
-  const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
+  // Every field is checked here too (audit 2026-11-16, M39): audio only from the
+  // staff member's own folder, images only from the platform's public media,
+  // and a short history of plain turns.
+  const audioPath = typeof body.audio_path === 'string' ? body.audio_path : '';
+  if (audioPath && !new RegExp(`^${context.userId}/[0-9a-f-]{36}\\.wav$`).test(audioPath)) {
+    return NextResponse.json({ error: 'Yanlış səs faylı' }, { status: 400 });
+  }
+  const imageUrl = typeof body.image_url === 'string' ? body.image_url : '';
+  const mediaBase = `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')}/storage/v1/object/public/public-media/`;
+  if (imageUrl && (!imageUrl.startsWith(mediaBase) || !/^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.(png|jpe?g|webp)$/.test(imageUrl.slice(mediaBase.length)))) {
+    return NextResponse.json({ error: 'Şəkil yalnız panelin öz yükləməsindən ola bilər' }, { status: 400 });
+  }
+  const history = (Array.isArray(body.history) ? body.history : []).slice(-6)
+    .filter((h): h is { role: string; text: string } => !!h && typeof h === 'object' && typeof (h as { text?: unknown }).text === 'string')
+    .map(h => ({ role: h.role === 'assistant' ? 'assistant' : 'user', text: h.text.slice(0, 600) }));
   const payload = {
     text: typeof body.text === 'string' ? body.text.slice(0, 4000) : '',
-    audio_path: typeof body.audio_path === 'string' ? body.audio_path : '',
-    image_url: typeof body.image_url === 'string' ? body.image_url : '',
+    audio_path: audioPath,
+    image_url: imageUrl,
     history
   };
   const { data, error } = await context.db.functions.invoke('admin-assistant', { body: payload });

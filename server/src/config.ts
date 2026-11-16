@@ -45,14 +45,27 @@ export interface Config {
   jobs: boolean;
   /** Browser origins allowed to call the API (CORS). */
   corsOrigins: string[];
+  /** STORAGE_SIGNING_KEY: own key for signed storage URLs (optional). */
+  storageSigningKey?: string;
 }
 
+import { fileURLToPath } from 'node:url';
 import { intEnv } from './db.ts';
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
+}
+
+/** Secrets that only the API's own code reads. Once the configuration has them,
+ *  they are removed from process.env, so code loaded later in the same process
+ *  (the functions) cannot read them there (audit 2026-11-16, L19). The functions
+ *  get their own allow-listed environment through the Deno shim. */
+export const PROCESS_SECRETS = ['JWT_SECRET', 'MYSQL_URL', 'DATA_ENCRYPTION_KEY', 'SMTP_PASS', 'STORAGE_SIGNING_KEY', 'MODERATION_WEBHOOK_SECRET',
+  'SERVICE_ROLE_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY'];
+export function scrubProcessSecrets(env: NodeJS.ProcessEnv = process.env) {
+  for (const name of PROCESS_SECRETS) delete env[name];
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -96,12 +109,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       pass: env.SMTP_PASS || '',
       from: `${env.SMTP_SENDER_NAME || 'ADNSU Karyera Mərkəzi'} <${env.SMTP_ADMIN_EMAIL || 'career@asoiu.edu.az'}>`
     } : null,
-    storageDir: env.STORAGE_DIR || new URL('../storage/', import.meta.url).pathname,
-    functionsDir: env.FUNCTIONS_DIR || new URL('../functions/', import.meta.url).pathname,
+    // fileURLToPath: a file path on every system (pathname is /C:/… on Windows: L55).
+    storageDir: env.STORAGE_DIR || fileURLToPath(new URL('../storage/', import.meta.url)),
+    functionsDir: env.FUNCTIONS_DIR || fileURLToPath(new URL('../functions/', import.meta.url)),
     // Only what the functions need; not the database URL or other secrets (#63).
     functionEnv: Object.fromEntries(Object.entries(env).filter(([k]) => /^(GEMINI_|GROQ_|MODERATION_WEBHOOK_SECRET$|PUBLIC_SITE_URL$|SITE_URL$|TZ$|NODE_ENV$)/.test(k))),
     dataEncryptionKey: env.DATA_ENCRYPTION_KEY || undefined,
     moderationSecret: env.MODERATION_WEBHOOK_SECRET || undefined,
+    storageSigningKey: env.STORAGE_SIGNING_KEY || undefined,
     jobs: (env.ENABLE_JOBS ?? 'true') === 'true',
     corsOrigins: [...new Set([siteUrl, ...(env.CORS_ORIGINS || '').split(','), ...(env.ADDITIONAL_REDIRECT_URLS || '').split(',')]
       .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))]
