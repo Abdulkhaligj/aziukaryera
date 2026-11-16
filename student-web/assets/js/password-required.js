@@ -9,7 +9,19 @@
   if (typeof Backend === 'undefined' || typeof Backend.init !== 'function' || !Backend.init() || !Backend.sb) return;
   const sb = Backend.sb;
   // The recovery link's tokens arrive in the address; remember that before the client clears it.
-  let recovery = /(?:^|[#&])type=recovery(?:&|$)/.test(String(window.location.hash || ''));
+  // Backend.init() takes a link's session from the address and keeps its type.
+  let recovery = /(?:^|[#&])type=recovery(?:&|$)/.test(String(window.location.hash || '')) || Backend.linkType === 'recovery';
+  // An invited account has no password yet: the invitation link asks for one,
+  // also after a reload of the page in the same tab.
+  let invited = /(?:^|[#&])type=invite(?:&|$)/.test(String(window.location.hash || '')) || Backend.linkType === 'invite';
+  const INVITE_KEY = 'pw-required-invite';
+  function invitedSession(token) {
+    try {
+      if (invited && token.session_id) { sessionStorage.setItem(INVITE_KEY, token.session_id); return true; }
+      return !!token.session_id && sessionStorage.getItem(INVITE_KEY) === token.session_id;
+    } catch { return invited; }
+  }
+  function forgetInvite() { invited = false; try { sessionStorage.removeItem(INVITE_KEY); } catch { /* storage blocked */ } }
   let shown = false;
 
   function claims(session) {
@@ -23,6 +35,7 @@
     if (!session) return null;
     const token = claims(session);
     if (recovery || token.restricted === true) return 'recovery';
+    if (invitedSession(token)) return 'invite';
     if (session.user?.app_metadata?.must_change_password === true) return 'temporary';
     return null;
   }
@@ -45,7 +58,9 @@
       <h2 id="pw-req-title" style="margin:0;font-size:20px">Yeni şifrə təyin edin</h2>
       <p style="margin:0;color:#4a5578">${mode === 'recovery'
         ? 'Bərpa linki ilə daxil oldunuz. Davam etmək üçün yeni şifrə qurun.'
-        : 'Hesabınıza müvəqqəti şifrə ilə daxil oldunuz. Davam etmək üçün yalnız sizin bildiyiniz yeni şifrə qurun.'}</p>
+        : mode === 'invite'
+          ? 'Dəvət linki ilə daxil oldunuz. Növbəti girişlər üçün hesabınıza şifrə qurun.'
+          : 'Hesabınıza müvəqqəti şifrə ilə daxil oldunuz. Davam etmək üçün yalnız sizin bildiyiniz yeni şifrə qurun.'}</p>
       ${mode === 'temporary' ? field('pw-req-current', 'Müvəqqəti şifrə', 'current-password') : ''}
       ${field('pw-req-new', 'Yeni şifrə', 'new-password')}
       ${field('pw-req-new2', 'Yeni şifrənin təkrarı', 'new-password')}
@@ -75,6 +90,7 @@
       // A fresh token without the recovery mark or the temporary-password flag.
       try { await sb.auth.refreshSession(); } catch { /* the reload signs in again if needed */ }
       recovery = false;
+      forgetInvite();
       window.location.replace(window.location.pathname);
     });
     box.querySelector('input')?.focus();
@@ -87,7 +103,9 @@
 
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') recovery = true;
-    if (event === 'SIGNED_OUT') { recovery = false; return; }
+    // The code-flow client refuses a link's fragment with a SIGNED_OUT while the
+    // tokens are still in the address, before the site takes the session from it.
+    if (event === 'SIGNED_OUT') { if (!/access_token=/.test(window.location.hash)) { recovery = false; forgetInvite(); } return; }
     // Do not call Auth APIs inside the client's auth callback.
     setTimeout(() => check(session), 0);
   });

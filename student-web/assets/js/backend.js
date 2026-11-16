@@ -38,6 +38,7 @@ const Backend = {
       // so no token stays in the address bar or the history (audit 2026-11-16, L48).
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', ...authOptions }
     });
+    this.takeLinkSession();
     window.CareerSession?.connect(this.sb);
     if (window.CVDrafts) void window.CVDrafts.connect(this.sb);
     return true;
@@ -208,6 +209,25 @@ const Backend = {
     } catch (e) { return null; }
   },
 
+  /** Links the server makes without this browser's verifier (an invitation, a
+   *  resent confirmation, an email change) still bring the session in the
+   *  fragment, which the code-flow client refuses (L48). It is taken when the
+   *  client is made, before the app starts, as the client itself did before,
+   *  and the fragment leaves the address at once. Not async: the session guard
+   *  wraps async methods only. */
+  takeLinkSession() {
+    try {
+      const url = new URL(window.location.href);
+      const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+      const accessToken = fragment.get('access_token'), refreshToken = fragment.get('refresh_token');
+      if (!accessToken || !refreshToken) return;
+      this.linkType = fragment.get('type') || null;
+      history.replaceState(history.state, '', url.pathname + url.search);
+      this.linkSession = this.sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => error || null, error => error);
+    } catch { /* the address cannot be read: nothing to take */ }
+  },
+
   /** An email link in the code flow (L48) works only in the browser that asked
    *  for it. Opened elsewhere, the client leaves the code in the address: it is
    *  removed and the person is told what to do. */
@@ -216,6 +236,11 @@ const Backend = {
       if (!this.init()) return null;
       const { error } = await this.sb.auth.initialize();
       const url = new URL(window.location.href);
+      if (this.linkSession) {
+        const linkError = await this.linkSession;
+        this.linkSession = null;
+        if (linkError) return 'Linkin vaxtı keçib və ya o artıq istifadə olunub. Yenidən sorğu göndərin.';
+      }
       if (!url.searchParams.has('code') && !error) return null;
       if (url.searchParams.has('code')) {
         url.searchParams.delete('code');

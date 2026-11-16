@@ -31,15 +31,18 @@ const HALF_CONFIRMED = 'Confirmation link accepted. Please proceed to confirm li
 
 export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const { config, pool, schema, mailer } = deps;
-  const signIns = new RateLimiter(30, 5 * 60_000);
-  const refreshes = new RateLimiter(150, 5 * 60_000);
-  const emailsPerIp = new RateLimiter(30, 60 * 60_000);
+  // Limits per client address are wide: a whole lab or the campus Wi-Fi reaches
+  // the API from one address (NAT). The narrow limits are per account and per
+  // email address below (failed passwords, link cooldowns).
+  const signIns = new RateLimiter(300, 5 * 60_000);
+  const refreshes = new RateLimiter(3000, 5 * 60_000);
+  const emailsPerIp = new RateLimiter(300, 60 * 60_000);
   // Per address and client (#16): someone else asking for links to your address
   // cannot use up your cooldown; the address itself has a larger hourly cap.
   const emailCooldown = new RateLimiter(1, 60_000);
   const emailPerClient = new RateLimiter(3, 60 * 60_000);
   const emailPerAddress = new RateLimiter(20, 60 * 60_000);
-  const signups = new RateLimiter(30, 60 * 60_000);
+  const signups = new RateLimiter(300, 60 * 60_000);
   // Failed passwords per account and client (audit 2026-11-16, M7): a stranger's
   // wrong passwords lock only the stranger out. Per account, from any client, many
   // failures slow every attempt down instead of locking the owner out.

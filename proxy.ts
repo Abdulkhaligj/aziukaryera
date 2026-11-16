@@ -45,8 +45,7 @@ export async function proxy(request: NextRequest) {
   // recorded sign-in time, is ended; the next page is the sign-in.
   const path = request.nextUrl.pathname;
   const authCookies = request.cookies.getAll().filter(c => /^sb-.+-auth-token(\.\d+)?$/.test(c.name));
-  const started = Number(request.cookies.get(SESSION_STARTED)?.value);
-  if (path !== '/login' && authCookies.length && (!Number.isFinite(started) || !started || Date.now() - started > SESSION_MAX_MS)) {
+  const endSession = () => {
     const ended = path.startsWith('/api/')
       ? NextResponse.json({ error: 'Sessiya bitib. Yenidən daxil olun.' }, { status: 401 })
       : NextResponse.redirect(new URL('/login', request.url));
@@ -54,7 +53,9 @@ export async function proxy(request: NextRequest) {
     ended.cookies.delete(SESSION_STARTED);
     ended.headers.set('content-security-policy', csp);
     return ended;
-  }
+  };
+  const started = Number(request.cookies.get(SESSION_STARTED)?.value);
+  if (path !== '/login' && authCookies.length && (!Number.isFinite(started) || !started || Date.now() - started > SESSION_MAX_MS)) return endSession();
   const db = createServerClient(url, key, {
     cookieOptions: sessionCookieOptions,
     cookies: {
@@ -67,7 +68,11 @@ export async function proxy(request: NextRequest) {
       }
     }
   });
-  await db.auth.getClaims();
+  const { data } = await db.auth.getClaims();
+  // The cookie above is only a hint the browser can change. The limit itself is
+  // the sign-in time the API signed into the token (amr), which a refresh keeps.
+  const signedIn = Number((data?.claims as { amr?: { timestamp?: number }[] } | undefined)?.amr?.[0]?.timestamp) * 1000;
+  if (path !== '/login' && Number.isFinite(signedIn) && signedIn > 0 && Date.now() - signedIn > SESSION_MAX_MS) return endSession();
   return response;
 }
 

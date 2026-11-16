@@ -274,3 +274,15 @@ test('M13/M14: a file moved aside comes back, and a placed file can be taken bac
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('M41: a staff session is not refreshed 12 hours after sign-in; a student session is', async () => {
+  await staff('v3.saat@asoiu.edu.az', 'editor');
+  const editor = h.anon();
+  assert.equal((await editor.auth.signInWithPassword({ email: 'v3.saat@asoiu.edu.az', password: 'Sifre2026!' })).error, null);
+  const pupil = h.anon();
+  assert.equal((await pupil.auth.signInWithPassword({ email: 'v3.telebe@asoiu.edu.az', password: 'Sifre2026!' })).error, null);
+  await exec(h.pool, `UPDATE auth_sessions s JOIN auth_users u ON u.id = s.user_id SET s.created_at = DATE_SUB(UTC_TIMESTAMP(6), INTERVAL 13 HOUR)
+    WHERE u.email IN ('v3.saat@asoiu.edu.az', 'v3.telebe@asoiu.edu.az')`);
+  assert.ok((await editor.auth.refreshSession()).error, 'the staff session ends');
+  assert.equal((await pupil.auth.refreshSession()).error, null, 'a student stays signed in');
+});
