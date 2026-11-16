@@ -155,6 +155,17 @@ Deno.serve(async (req: Request) => {
     admin_role: resource === "admins" ? (body.admin_role || "reviewer") : null,
   };
 
+  // A failed step after the account was made removes the account again; if that
+  // fails too, the staff member is told, not shown a plain error (audit 2026-11-16, M33).
+  const undoAccount = async (userId: string, message: string) => {
+    const { error: undoError } = await service.auth.admin.deleteUser(userId);
+    if (undoError) {
+      console.error("admin-users: the half-made account could not be removed", { userId, error: undoError.message });
+      return json({ ok: false, error: message + " Yarımçıq hesab silinmədi; İT-yə bildirin (ID: " + userId + ")." }, 500);
+    }
+    return json({ ok: false, error: message }, 400);
+  };
+
   if (action === "create") {
     if (!profileData.full_name || !profileData.email) return json({ ok: false, error: "Ad və e-poçt məcburidir" }, 400);
     if (resource === "admins") {
@@ -178,10 +189,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: /already|registered|exists/i.test(message) ? "Bu e-poçt ilə hesab artıq var" : message }, 400);
     }
     const { error: profileError } = await service.from("profiles").update({ ...profileData, role: identity.role }).eq("id", created.user.id);
-    if (profileError) {
-      await service.auth.admin.deleteUser(created.user.id);
-      return json({ ok: false, error: profileError.message }, 400);
-    }
+    if (profileError) return undoAccount(created.user.id, profileError.message);
     if ((await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} hesabı yaradıldı`, resource, resource_id: created.user.id, action: "create-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     /* Şifrə yalnız bu cavabda bir dəfə qaytarılır, heç yerdə saxlanmır. */
     return json({ ok: true, id: created.user.id, email: profileData.email, temporaryPassword: password }, 201);
@@ -208,17 +216,11 @@ Deno.serve(async (req: Request) => {
       const { error: authRoleError } = await service.auth.admin.updateUserById(invited.user.id, {
         app_metadata: { admin_role: profileData.admin_role },
       });
-      if (authRoleError) {
-        await service.auth.admin.deleteUser(invited.user.id);
-        return json({ ok: false, error: authRoleError.message }, 400);
-      }
+      if (authRoleError) return undoAccount(invited.user.id, authRoleError.message);
     }
 
     const { error: profileError } = await service.from("profiles").update({ ...profileData, role: identity.role }).eq("id", invited.user.id);
-    if (profileError) {
-      await service.auth.admin.deleteUser(invited.user.id);
-      return json({ ok: false, error: profileError.message }, 400);
-    }
+    if (profileError) return undoAccount(invited.user.id, profileError.message);
     if ((await service.from("admin_audit_logs").insert({ title: `${profileData.full_name} dəvət edildi`, resource, resource_id: invited.user.id, action: "invite", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true, id: invited.user.id, invited: true }, 201);
   }
@@ -299,7 +301,21 @@ Deno.serve(async (req: Request) => {
       if (authUpdateError) return json({ ok: false, error: authUpdateError.message }, 400);
     }
     const { error: profileUpdateError } = await service.from("profiles").update(patch).eq("id", id);
-    if (profileUpdateError) return json({ ok: false, error: profileUpdateError.message }, 400);
+    if (profileUpdateError) {
+      // The account and the profile stay alike: the account change is undone (audit 2026-11-16, M33).
+      if (Object.keys(authUpdate).length) {
+        const previous: Record<string, unknown> = {};
+        if (authUpdate.user_metadata) previous.user_metadata = targetAuth.user.user_metadata ?? {};
+        if (authUpdate.email) previous.email = targetAuth.user.email;
+        if (authUpdate.app_metadata) previous.app_metadata = { admin_role: targetAuth.user.app_metadata?.admin_role ?? null };
+        const { error: undoError } = await service.auth.admin.updateUserById(id, previous as never);
+        if (undoError) {
+          console.error("admin-users: the account change could not be undone", { id, error: undoError.message });
+          return json({ ok: false, error: "Profil yenilənmədi və hesab dəyişikliyi geri qaytarılmadı. İT-yə bildirin (ID: " + id + ")." }, 500);
+        }
+      }
+      return json({ ok: false, error: profileUpdateError.message }, 400);
+    }
     if ((await service.from("admin_audit_logs").insert({ title: `${(patch.full_name as string) || target.full_name} yeniləndi`, resource, resource_id: id, action: "update-user", actor_id: actor.id, actor_name: clean(actor.user_metadata?.full_name) || actor.email || "Admin" })).error) return json({ ok: false, error: "Əməliyyat icra edildi, yekun audit qeydi saxlanmadı." }, 503);
     return json({ ok: true });
   }
