@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { sessionCookieOptions } from '@/lib/backend/cookies';
+import { SESSION_MAX_MS, SESSION_STARTED, sessionCookieOptions } from '@/lib/backend/cookies';
 
 // Content-Security-Policy with a fresh nonce per response (audit 2026-11-13,
 // #58): only the scripts Next.js renders with this nonce run; an injected
@@ -23,7 +23,8 @@ function contentSecurityPolicy(nonce: string) {
   ].join('; ');
 }
 
-const AUTH_PATHS = /^\/(admin|account|login)(\/|$)/;
+// /api/admin too: its requests refresh the session like the pages (L42).
+const AUTH_PATHS = /^\/(admin|account|login|api\/admin)(\/|$)/;
 
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
@@ -40,6 +41,20 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_API_URL;
   const key = process.env.NEXT_PUBLIC_API_KEY;
   if (!url || !key || !AUTH_PATHS.test(request.nextUrl.pathname)) return response;
+  // Absolute time-out (M41): a session older than 12 hours, or one without a
+  // recorded sign-in time, is ended; the next page is the sign-in.
+  const path = request.nextUrl.pathname;
+  const authCookies = request.cookies.getAll().filter(c => /^sb-.+-auth-token(\.\d+)?$/.test(c.name));
+  const started = Number(request.cookies.get(SESSION_STARTED)?.value);
+  if (path !== '/login' && authCookies.length && (!Number.isFinite(started) || !started || Date.now() - started > SESSION_MAX_MS)) {
+    const ended = path.startsWith('/api/')
+      ? NextResponse.json({ error: 'Sessiya bitib. Yenidən daxil olun.' }, { status: 401 })
+      : NextResponse.redirect(new URL('/login', request.url));
+    for (const cookie of authCookies) ended.cookies.delete(cookie.name);
+    ended.cookies.delete(SESSION_STARTED);
+    ended.headers.set('content-security-policy', csp);
+    return ended;
+  }
   const db = createServerClient(url, key, {
     cookieOptions: sessionCookieOptions,
     cookies: {

@@ -14,12 +14,15 @@ import { DbRuleError } from '../errors.ts';
 import type { Schema } from '../schema.ts';
 import { deleteRow, insertRow, nowText, updateRow, type WriteEnv } from '../write/pipeline.ts';
 import { FileStore, validBucket, validKey } from './files.ts';
-import { storageAllows } from './policy.ts';
+import { selectFilter, storageAllows } from './policy.ts';
+import { clientKey, RateLimiter } from '../auth/rate-limit.ts';
 
 export interface StorageDeps { config: Config; pool: Pool; schema: Schema }
 const MAX_UPLOAD = 50 * 1024 * 1024;
 /** Room for the multipart boundary and headers around the file. */
 const MULTIPART_SLACK = 64 * 1024;
+/** Body limit of every storage request that is not an upload (M11). */
+const SMALL_BODY = 1024 * 1024;
 // Bulk calls and listings are bounded (audit 2026-11-13, #47).
 const MAX_BULK = 100;
 const MAX_LIST = 1000;
@@ -104,7 +107,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   const { config, pool, schema } = deps;
   const files = new FileStore(config.storageDir);
   // Signed URLs have their own key, so a URL signature is never a valid session token (#21).
-  const key = new Uint8Array(hkdfSync('sha256', process.env.STORAGE_SIGNING_KEY || config.jwtSecret, 'asoiu-career', 'storage-signed-url-v1', 32));
+  const key = new Uint8Array(hkdfSync('sha256', config.storageSigningKey || config.jwtSecret, 'asoiu-career', 'storage-signed-url-v1', 32));
   const uploadContext = new WeakMap<FastifyRequest, Context>();
 
   app.removeAllContentTypeParsers();
@@ -134,19 +137,43 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   // #46: an upload is checked (key, session, bucket, declared size) before its
   // body is read, and the body stops at the bucket's size limit.
   const tooLarge = () => new StorageError(413, 'Payload too large', 'The object exceeded the maximum allowed size');
-  app.addHook('preParsing', async (req, _reply, payload) => {
-    if ((req.method !== 'POST' && req.method !== 'PUT') || !req.routeOptions.url?.endsWith('/object/:bucket/*')) return payload;
-    const ctx = await context(req);
-    if (ctx.role === 'anon') throw denied();
-    const { bucket } = target(req);
-    const settings = await bucketRow(pool, bucket);
-    const limit = Math.min(MAX_UPLOAD, settings.file_size_limit ?? MAX_UPLOAD) + MULTIPART_SLACK;
-    if (Number(req.headers['content-length'] ?? 0) > limit) throw tooLarge();
-    uploadContext.set(req, ctx);
+  /** Counts the body as it arrives and stops it at the limit. */
+  const capped = (payload: NodeJS.ReadableStream, limit: number) => {
     let seen = 0;
     return payload.pipe(new Transform({
       transform(chunk: Buffer, _encoding, done) { seen += chunk.length; if (seen > limit) done(tooLarge()); else done(null, chunk); }
     }));
+  };
+  app.addHook('preParsing', async (req, _reply, payload) => {
+    const isUpload = (req.method === 'POST' || req.method === 'PUT') && !!req.routeOptions.url?.endsWith('/object/:bucket/*');
+    if (!isUpload) {
+      // Every other storage request is a small JSON document: 1 MB, checked as
+      // it arrives, before any key or session is looked at (audit 2026-11-16, M11).
+      if (Number(req.headers['content-length'] ?? 0) > SMALL_BODY) throw tooLarge();
+      return capped(payload, SMALL_BODY);
+    }
+    const ctx = await context(req);
+    if (ctx.role === 'anon') throw denied();
+    if (ctx.mustChangePassword) throw new StorageError(403, 'Unauthorized', 'Əvvəlcə yeni şifrə təyin edin');
+    const { bucket, name } = target(req);
+    const settings = await bucketRow(pool, bucket);
+    const limit = Math.min(MAX_UPLOAD, settings.file_size_limit ?? MAX_UPLOAD) + MULTIPART_SLACK;
+    if (Number(req.headers['content-length'] ?? 0) > limit) throw tooLarge();
+    // The caller may write this path at all (folder, bucket, role) before the body
+    // is read; size and type are checked again with the file (M12).
+    const replaces = req.method === 'PUT' || String(req.headers['x-upsert'] ?? '').toLowerCase() === 'true';
+    const allowed = await transaction(pool, async tx => {
+      const existing = await objectRow(tx, bucket, name);
+      // Replacing needs SELECT and UPDATE on the object; a plain create of an
+      // existing path is answered in the upload (409 or 403, L8).
+      if (existing) return !replaces || (await storageAllows(tx, ctx, 'SELECT', existing) && await storageAllows(tx, ctx, 'UPDATE', existing));
+      // PUT of a missing object is a 404 in the upload.
+      if (req.method === 'PUT') return true;
+      return storageAllows(tx, ctx, 'INSERT', { bucket_id: bucket, name });
+    });
+    if (!allowed) throw denied();
+    uploadContext.set(req, ctx);
+    return capped(payload, limit);
   });
 
   function target(req: FastifyRequest): { bucket: string; name: string } {
@@ -203,13 +230,26 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const declared = SNIFFED[file.mime.split(';')[0].trim().toLowerCase()];
     if (declared && sniff(file.bytes) !== declared) throw new StorageError(415, 'invalid_mime_type', `The file content is not ${file.mime}`);
     const upsert = mode === 'update' || String(req.headers['x-upsert'] ?? '').toLowerCase() === 'true';
-    const temp = await files.stage(bucket, name, file.bytes);
+    const temp = await files.stage(file.bytes);
+    // The new file goes in place inside the transaction (the row lock orders
+    // concurrent uploads); the old one is moved aside and put back if the
+    // transaction fails (M13). A deadlock retry first undoes the previous
+    // attempt, so it starts from the same files (M14).
     let placed = false;
-    let created = false;
+    let aside: string | null = null;
+    const undo = async () => {
+      if (placed) { await files.unplace(bucket, name, temp); placed = false; }
+      if (aside) { await files.restore(aside, bucket, name); aside = null; }
+    };
     try {
       const stored = await transaction(pool, async tx => {
+        await undo();
         const existing = await objectRow(tx, bucket, name, true);
-        if (existing && !upsert) throw new StorageError(409, 'Duplicate', 'The resource already exists');
+        // Whether an object exists is told only to who may see it (L8).
+        if (existing && !upsert) {
+          if (!await storageAllows(tx, ctx, 'SELECT', existing)) throw denied();
+          throw new StorageError(409, 'Duplicate', 'The resource already exists');
+        }
         if (!existing && mode === 'update') throw notFound();
         const next = { bucket_id: bucket, name, owner_id: ctx.uid, mimetype: file.mime, size: file.bytes.length, cache_control: file.cacheControl };
         let row: Row;
@@ -224,16 +264,17 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
           // WITH CHECK is evaluated before the row exists (the folder room count excludes it).
           if (!await storageAllows(tx, ctx, 'INSERT', next)) throw denied();
           row = await insertRow(env(tx, ctx), 'storage_objects', next);
-          created = true;
         }
+        aside = await files.setAside(bucket, name);
         await files.place(temp, bucket, name);
         placed = true;
         return row;
       });
+      if (aside) await files.discard(aside).catch(error => req.log.error({ err: error }, 'old object file not removed'));
       return reply.send({ Key: `${bucket}/${name}`, Id: stored.id });
     } catch (error) {
-      if (!placed) await files.discard(temp);
-      else if (created) await files.remove(bucket, name);
+      await undo().catch(undoError => req.log.error({ err: undoError, bucket, name }, 'storage rollback of the files failed'));
+      await files.discard(temp).catch(() => {});
       throw error;
     }
   }
@@ -327,6 +368,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   app.delete('/object/:bucket', async (req) => {
     const bucket = (req.params as { bucket: string }).bucket;
     const ctx = await context(req);
+    if (ctx.mustChangePassword) throw new StorageError(403, 'Unauthorized', 'Əvvəlcə yeni şifrə təyin edin');
     const prefixes = (req.body as { prefixes?: unknown } | undefined)?.prefixes;
     if (!Array.isArray(prefixes) || !prefixes.length) throw new StorageError(400, 'Bad Request', 'prefixes must be a non-empty array');
     if (prefixes.length > MAX_BULK) throw new StorageError(400, 'Bad Request', `At most ${MAX_BULK} objects per request`);
@@ -342,13 +384,16 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
       }
       return out;
     });
-    for (const row of deleted) await files.remove(bucket, row.name as string).catch(() => {});
+    // A file that could not be removed is logged: it is orphaned on disk (L28).
+    for (const row of deleted) await files.remove(bucket, row.name as string).catch(error => req.log.error({ err: error, bucket, name: row.name }, 'deleted object file not removed'));
     return deleted.map(fileObject);
   });
 
-  app.post('/object/list/:bucket', async (req) => {
+  const listings = new RateLimiter(60, 60_000);
+  app.post('/object/list/:bucket', async (req, reply) => {
     const bucket = (req.params as { bucket: string }).bucket;
     const ctx = await context(req);
+    if (!listings.take(`${clientKey(req.ip)}|${ctx.uid ?? ''}`)) throw new StorageError(429, 'Too many requests', 'Too many listings; try again in a minute');
     await bucketRow(pool, bucket);
     const body = (req.body ?? {}) as { prefix?: string; limit?: number; offset?: number; search?: string; sortBy?: { column?: string; order?: string } };
     let prefix = String(body.prefix ?? '').replace(/^\/+/, '');
@@ -358,13 +403,19 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const search = String(body.search ?? '').toLowerCase();
     const column = ['name', 'created_at', 'updated_at', 'last_accessed_at'].includes(String(body.sortBy?.column)) ? String(body.sortBy!.column) : 'name';
     const descending = String(body.sortBy?.order ?? 'asc').toLowerCase() === 'desc';
-    const candidates = await rows<Row & { bucket_id: string; name: string }>(pool, `SELECT * FROM storage_objects WHERE bucket_id = ? AND LEFT(name, ?) = ? ORDER BY name LIMIT ${MAX_LIST_SCAN}`,
-      [bucket, [...prefix].length, prefix]);
-    const visible = await transaction(pool, async tx => {
-      const out: Row[] = [];
-      for (const row of candidates) if (await storageAllows(tx, ctx, 'SELECT', row)) out.push(row);
-      return out;
+    // The SELECT policies run in the query (M15); one row more than the scan limit
+    // tells that the listing was cut, which the answer says in a header (L29).
+    const found = await transaction(pool, async tx => {
+      const filter = await selectFilter(tx, ctx);
+      return rows<Row & { bucket_id: string; name: string }>(tx, `SELECT so.* FROM storage_objects so
+         WHERE so.bucket_id = ? AND LEFT(so.name, ?) = ? AND (${filter.sql}) ORDER BY so.name LIMIT ${MAX_LIST_SCAN + 1}`,
+        [bucket, [...prefix].length, prefix, ...filter.params]);
     });
+    const visible = found.slice(0, MAX_LIST_SCAN);
+    if (found.length > MAX_LIST_SCAN) {
+      reply.header('x-list-truncated', 'true');
+      req.log.warn({ bucket, prefix }, `storage listing cut at ${MAX_LIST_SCAN} objects`);
+    }
     const folders = new Map<string, Row>();
     const items: Row[] = [];
     for (const row of visible) {

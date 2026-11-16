@@ -1,9 +1,11 @@
 // Field encryption at rest (audit 2026-11-13, #73): AES-256-GCM with a key from
 // DATA_ENCRYPTION_KEY (32 bytes, base64), or derived from the JWT secret when
 // that is not set. Values look like "enc:v1:<iv>:<tag>:<ciphertext>" (base64url).
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from 'node:crypto';
 
 let key: Buffer | null = null;
+/** A separate key for the lookup hash of claim codes (L13). */
+let lookupKey: Buffer | null = null;
 export function setEncryptionKey(dataKey: string | undefined, jwtSecret: string) {
   if (dataKey) {
     const raw = Buffer.from(dataKey, 'base64');
@@ -12,6 +14,7 @@ export function setEncryptionKey(dataKey: string | undefined, jwtSecret: string)
   } else {
     key = Buffer.from(hkdfSync('sha256', Buffer.from(jwtSecret), Buffer.alloc(0), Buffer.from('asoiu-career field encryption v1'), 32));
   }
+  lookupKey = Buffer.from(hkdfSync('sha256', key, Buffer.alloc(0), Buffer.from('asoiu-career claim code lookup v1'), 32));
 }
 const need = () => { if (!key) throw new Error('encryption key not set'); return key; };
 
@@ -33,8 +36,13 @@ export function decryptField(value: unknown): unknown {
   return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
 }
 
-/** The lookup key of a claim code: SHA-256 of the trimmed, upper-case code. */
-export const codeHash = (code: string) => createHash('sha256').update(code.trim().toUpperCase()).digest('hex');
+/** The lookup key of a claim code: HMAC-SHA-256 of the trimmed, upper-case code
+ *  with a key derived from the encryption key. A copy of the database alone
+ *  does not let anyone try codes against the hashes (audit 2026-11-16, L13). */
+export function codeHash(code: string): string {
+  if (!lookupKey) throw new Error('encryption key not set');
+  return createHmac('sha256', lookupKey).update(code.trim().toUpperCase()).digest('hex');
+}
 
 /** Columns stored encrypted and shown decrypted to the readers the policies allow. */
 export const ENCRYPTED_COLUMNS: Record<string, string[]> = { benefit_claims: ['code'] };

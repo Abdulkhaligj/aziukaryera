@@ -2,7 +2,7 @@
 // WITH CHECK on the resulting row, USING (and SELECT USING, as for any
 // UPDATE/DELETE with a WHERE clause) on the rows being changed.
 import type { Context } from '../context.ts';
-import { one, rows as queryRows, type Row, type Tx } from '../db.ts';
+import { one, rollbackTo, rows as queryRows, savepoint, type Row, type Tx } from '../db.ts';
 import { table as tableOf, type Schema, type Table } from '../schema.ts';
 import { deleteRow, insertPrepared, prepareInsert, q, toParam, updateRow, type WriteEnv, type WriteOptions } from '../write/pipeline.ts';
 import { PgError, pgErrors } from './errors.ts';
@@ -80,6 +80,9 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
       : { ...raw };
     validateColumns(t, values);
     // NEW after defaults and BEFORE INSERT triggers; ON CONFLICT compares this row.
+    // For an upsert the triggers run inside a savepoint: when the row turns out to
+    // exist, what they did (quota, notifications) is undone (audit 2026-11-16, L6).
+    const mark = options.resolution ? await savepoint(tx, 'upsert_row') : null;
     const prepared = await prepareInsert(env, tableName, values);
     if (options.resolution) {
       const conflict = options.onConflict ?? t.primaryKey;
@@ -95,9 +98,13 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
           conflict.map(c => toParam(t.columns.get(c)!, proposed[c])))
         : null;
       if (existing) {
+        await rollbackTo(tx, mark!);
         // A conflicting row the caller may not see answers like a refused
         // insert, not like "exists" (H-08).
         if (!await rowPasses(tx, t, existing, usingSql(tableName, ctx, 'SELECT'))) throw pgErrors.rls(ctx, tableName);
+        // As in Postgres, the proposed row must pass the INSERT policies even when
+        // it ends as an update or is skipped (audit 2026-11-16, M19).
+        if (!await proposedPasses(tx, t, proposed, insertCheck)) throw pgErrors.rls(ctx, tableName);
         if (options.resolution === 'ignore') continue;
         if (!await rowPasses(tx, t, existing, usingSql(tableName, ctx, 'UPDATE'))) throw pgErrors.rlsUsing(ctx, tableName);
         // PostgREST sets every payload column to EXCLUDED.col (the row after BEFORE INSERT triggers).
@@ -114,9 +121,16 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
   return keys;
 }
 
+/** At most this many rows change in one PATCH or DELETE (M20). */
+const MAX_WRITE_ROWS = 1000;
+
 async function targets(tx: Tx, t: Table, ctx: Context, cmd: 'UPDATE' | 'DELETE', where: Where): Promise<Row[]> {
   const clause = [usingSql(t.name, ctx, cmd), usingSql(t.name, ctx, 'SELECT'), ...where.sql].map(s => `(${s})`).join(' AND ');
-  return queryRows(tx, `SELECT * FROM ${q(t.name)} WHERE ${clause} ORDER BY ${t.primaryKey.map(q).join(', ')} FOR UPDATE`, where.params);
+  // READ COMMITTED (db.ts) locks the matching rows only, not gaps; and a filter
+  // that matches too many rows is refused instead of locking them all (M20).
+  const found = await queryRows(tx, `SELECT * FROM ${q(t.name)} WHERE ${clause} ORDER BY ${t.primaryKey.map(q).join(', ')} LIMIT ${MAX_WRITE_ROWS + 1} FOR UPDATE`, where.params);
+  if (found.length > MAX_WRITE_ROWS) throw new PgError(400, '54000', `the filter matches more than ${MAX_WRITE_ROWS} rows; narrow it`);
+  return found;
 }
 
 export async function updateRows(tx: Tx, schema: Schema, ctx: Context, tableName: string, changes: Row, where: Where): Promise<Row[]> {

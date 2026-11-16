@@ -29,6 +29,26 @@ const db = createClient(API_URL, Deno.env.get("SERVICE_ROLE_KEY") ?? "", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+/** Reservations a provider already answered for (bounded). */
+const paid = new Set<string>();
+function markPaid(id: string) {
+  paid.add(id);
+  if (paid.size > 10_000) paid.delete(paid.values().next().value as string);
+}
+/** Gives a reservation back when no provider answered for it: a timeout, a 5xx,
+ *  no provider budget (M27). A paid answer that was unusable still counts. */
+async function releaseReservation(reservationId: string) {
+  if (paid.delete(reservationId)) return;
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
+/** Usage rows are checked: a failed insert is logged, not ignored (M26). */
+async function recordUsage(row: Record<string, unknown>) {
+  const { error } = await db.from("ai_usage").insert(row);
+  if (error) console.error("ai_usage insert failed:", error.message);
+}
+
+
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
 type Action = { type: string; summary: string; data: Record<string, unknown>; missing: string[] };
 
@@ -61,7 +81,11 @@ function toBase64(bytes: Uint8Array) {
 async function providerFetch(reservationId: string, input: string, init: RequestInit) {
   const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
   if (error || data !== true) throw new Error("provider_budget_unavailable");
-  return fetch(input, init);
+  const response = await fetch(input, init);
+  // A provider that answered was paid, whatever the answer is worth: that
+  // reservation is not given back (M27).
+  if (response.ok) markPaid(reservationId);
+  return response;
 }
 
 function safeJson(text: string) {
@@ -267,7 +291,7 @@ Deno.serve(async (req: Request) => {
       if (a.type === "create_event" || a.type === "create_ad") a.data.image_url = imageUrl;
       if (a.type === "create_company" || a.type === "create_award") a.data.logo_url = imageUrl;
     }
-    await db.from("ai_usage").insert({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: out.text.length, success: true, error_code: null });
+    await recordUsage({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: out.text.length, success: true, error_code: null });
     return json({
       ok: true, model,
       transcript: String(parsed?.transcript || "").slice(0, 4000),
@@ -277,7 +301,8 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("admin-assistant failed:", message);
-    await db.from("ai_usage").insert({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: 0, success: false, error_code: message === "blocked" ? "safety" : "provider_error" });
+    if (message !== "blocked") await releaseReservation(reservation.reservation_id);
+    await recordUsage({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: 0, success: false, error_code: message === "blocked" ? "safety" : "provider_error" });
     return json({ ok: false, error: message === "blocked" ? "AI bu sorğunu emal etmədi. Başqa sözlərlə yazın." : "AI cavab vermədi. Bir az sonra yenidən cəhd edin." }, 502);
   }
 });

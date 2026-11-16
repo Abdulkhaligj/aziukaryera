@@ -57,3 +57,42 @@ export async function functionError(error: unknown, data: { error?: string } | n
   }
   return fallback;
 }
+
+/** The fields admin-users may change for each section; anything else in the
+ *  request is dropped, so a manager cannot pass role or admin_role through a
+ *  student form (audit 2026-11-16, M38). */
+const PEOPLE_FIELDS: Record<string, string[]> = {
+  students: ['full_name', 'email', 'personal_email', 'phone', 'city', 'faculty_id', 'major_id', 'course', 'gpa', 'status'],
+  master_students: ['full_name', 'email', 'personal_email', 'phone', 'city', 'faculty_id', 'major_id', 'course', 'gpa', 'status'],
+  alumni: ['full_name', 'email', 'personal_email', 'phone', 'city', 'faculty_id', 'major_id', 'status', 'alumni_verified'],
+  admins: ['full_name', 'email', 'phone', 'status', 'admin_role']
+};
+export function peopleFields(resource: string, body: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries((PEOPLE_FIELDS[resource] ?? []).filter(field => sent(body, field)).map(field => [field, body[field]]));
+}
+
+/** A whole number in a range, or the fallback when the field is empty (L39). */
+export function intInRange(value: unknown, min: number, max: number, fallback: number | null = null): number | null | 'invalid' {
+  if (value === '' || value === null || value === undefined) return fallback;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= min && n <= max ? n : 'invalid';
+}
+/** A non-negative amount with at most two decimals, or null when empty (L39). */
+export function amount(value: unknown, max = 1_000_000): number | null | 'invalid' {
+  if (value === '' || value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 && n <= max && Math.round(n * 100) === n * 100 ? n : 'invalid';
+}
+
+/** A short audit title built by the server; client text is cut (L37). */
+export const auditTitle = (text: string, suffix: string) => `${text.replace(/\s+/g, ' ').trim().slice(0, 120) || 'Qeyd'} ${suffix}`;
+
+/** The bytes are what the image or audio type says (L40). */
+export function sniffMedia(bytes: Uint8Array): string | null {
+  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
+  if (bytes.length >= 8 && bytes[0] === 0x89 && ascii(1, 4) === 'PNG') return 'image/png';
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE') return 'audio/wav';
+  return null;
+}

@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import type { Config } from '../config.ts';
 import { contextFromHeaders } from '../context.ts';
+import { clientKey } from '../auth/rate-limit.ts';
 import { FunctionRuntime } from './runtime.ts';
 
 const VERIFY_JWT = new Set(['admin-users']);
@@ -27,6 +28,11 @@ export async function functionRoutes(app: FastifyInstance, deps: { config: Confi
       if (!token) return reply.code(401).send({ code: 401, message: 'Missing authorization header' });
       const ctx = await contextFromHeaders(config, undefined, req.headers.authorization, pool);
       if (!ctx || ctx.restricted) return reply.code(401).send({ code: 401, message: 'Invalid JWT' });
+    } else if (req.headers.authorization) {
+      // A recovery-link session sets a password and calls no function; an account
+      // with a temporary password calls only admin-users, to change it (L7, M44).
+      const ctx = await contextFromHeaders(config, undefined, req.headers.authorization, pool);
+      if (ctx?.restricted || ctx?.mustChangePassword) return reply.code(403).send({ code: 403, message: 'Set a new password first' });
     }
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
@@ -36,7 +42,8 @@ export async function functionRoutes(app: FastifyInstance, deps: { config: Confi
     // The functions rate-limit guests by IP (cf-connecting-ip, then x-real-ip):
     // set it here so a client cannot pick its own.
     headers.delete('cf-connecting-ip');
-    headers.set('x-real-ip', req.ip);
+    // Per /64 for IPv6, so guests cannot reset their quota by rotating addresses (L12).
+    headers.set('x-real-ip', clientKey(req.ip));
     const body = req.method === 'GET' || req.method === 'HEAD' || !Buffer.isBuffer(req.body) ? undefined : new Uint8Array(req.body);
     const request = new Request(config.publicUrl + req.url, { method: req.method, headers, body });
     let response: Response;

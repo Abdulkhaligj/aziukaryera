@@ -30,6 +30,26 @@ const db = createClient(Deno.env.get("API_URL") ?? "", SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+/** Reservations a provider already answered for (bounded). */
+const paid = new Set<string>();
+function markPaid(id: string) {
+  paid.add(id);
+  if (paid.size > 10_000) paid.delete(paid.values().next().value as string);
+}
+/** Gives a reservation back when no provider answered for it: a timeout, a 5xx,
+ *  no provider budget (M27). A paid answer that was unusable still counts. */
+async function releaseReservation(reservationId: string) {
+  if (paid.delete(reservationId)) return;
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
+/** Usage rows are checked: a failed insert is logged, not ignored (M26). */
+async function recordUsage(row: Record<string, unknown>) {
+  const { error } = await db.from("ai_usage").insert(row);
+  if (error) console.error("ai_usage insert failed:", error.message);
+}
+
+
 const KNOWLEDGE = `ADNSU Karyera (ASOIU Karyera Mərkəzi, https://asoiu-career.vercel.app) — Azərbaycan Dövlət Neft və Sənaye Universitetinin (ADNSU, ingiliscə ASOIU) karyera platforması. Tələbələri iş, təcrübə, graduate proqramları və könüllülük imkanları ilə birləşdirir; hər tələbə üçün hər elana uyğunluq faizi hesablanır.
 - Tələbələr üçün tamamilə pulsuzdur; ödənişli tələbə planı yoxdur.
 - Qeydiyyat: bakalavr və magistr tələbələri universitet e-poçtu (@asoiu.edu.az) ilə qeydiyyatdan keçir, e-poçta gələn təsdiq kodunu yazır. Magistrlər ayrıca magistr kimi qeydiyyatdan keçib bakalavr və magistr təhsilini birlikdə göstərə bilər. Məzunlar şəxsi e-poçtla qeydiyyatdan keçir və Karyera Mərkəzinin yoxlamasından sonra tam giriş alır. Şirkətlər korporativ e-poçtla qeydiyyatdan keçir, təsdiqdən sonra elan dərc edir.
@@ -68,7 +88,11 @@ async function clientHash(req: Request, day: string) {
 async function providerFetch(reservationId: string, input: string, init: RequestInit) {
   const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
   if (error || data !== true) throw new Error("provider_budget_unavailable");
-  return fetch(input, init);
+  const response = await fetch(input, init);
+  // A provider that answered was paid, whatever the answer is worth: that
+  // reservation is not given back (M27).
+  if (response.ok) markPaid(reservationId);
+  return response;
 }
 
 function safeJson(text: string) {
@@ -109,6 +133,8 @@ async function callGemini(reservationId: string, key: string, { system, user }: 
         ({ res, data } = await send(false));
       }
     } catch (error) {
+      // No provider budget left: stop here, every further model would fail too (L32).
+      if (error instanceof Error && error.message === "provider_budget_unavailable") throw error;
       // A timed-out model must not block the next available Gemini model.
       lastError = "Model response timed out";
       console.warn("aida model timeout, trying fallback:", model);
@@ -129,7 +155,7 @@ async function callGemini(reservationId: string, key: string, { system, user }: 
 
 /* Public data any visitor can already see on the site */
 async function liveData(today: string) {
-  const [jobs, events, benefits, content, awards] = await Promise.all([
+  const results = await Promise.all([
     db.from("jobs").select("title,type,mode,location,deadline,salary_min,salary_max,salary_visible,skills,companies(name)")
       .in("status", ["approved", "published"]).gte("deadline", today).order("deadline").limit(30),
     db.from("events").select("title,kind,starts_at,place,organizers").gte("starts_at", `${today}T00:00:00+04:00`).order("starts_at").limit(15),
@@ -137,8 +163,16 @@ async function liveData(today: string) {
     db.from("site_content").select("title,summary,body").eq("status", "Aktiv").limit(10),
     db.from("company_awards").select("year,nomination,tier,company_name,companies(name)").eq("published", true).order("year", { ascending: false }).limit(12),
   ]);
+  // A section that could not be read is named as missing, so AIDA does not
+  // answer "there are none" from an empty result (audit 2026-11-16, M25).
+  const names = ["vakansiyalar", "tədbirlər", "güzəştlər", "saytın mətnləri", "mükafatlar"];
+  const failed = results.map((r, i) => (r.error ? names[i] : null)).filter(Boolean);
+  for (const [i, r] of results.entries()) if (r.error) console.error(`aida live data (${names[i]}) failed:`, r.error.message);
+  if (failed.length === results.length) throw new Error("live data unavailable");
+  const [jobs, events, benefits, content, awards] = results as any[];
   const typeLabel: Record<string, string> = { is: "iş", tecrube: "təcrübə", graduate: "graduate", konullu: "könüllülük" };
   const lines: string[] = [];
+  if (failed.length) lines.push(`DİQQƏT: bu məlumat hazırda oxunmadı: ${failed.join(", ")}. Onlar barədə "yoxdur" demə; saytda baxmağı və ya sonra yenidən soruşmağı tövsiyə et.`);
   lines.push(`Aktiv vakansiyalar (${(jobs.data || []).length}):`);
   for (const j of jobs.data || []) {
     const pay = j.salary_visible && (j.salary_min || j.salary_max) ? `, maaş ${[j.salary_min, j.salary_max].filter(Boolean).join("–")} AZN` : "";
@@ -255,12 +289,16 @@ Deno.serve(async (req: Request) => {
       .slice(0, 2).map((l: any) => ({ target: String(l.target), label: String(l.label || "").trim().slice(0, 40) }));
     const suggestions = (Array.isArray(parsed?.suggestions) ? parsed.suggestions : [])
       .map((s: unknown) => String(s).trim()).filter(Boolean).slice(0, 3).map((s: string) => s.slice(0, 60));
-    await db.from("ai_usage").insert({ profile_id: userId, company_id: null, client_hash: hash, task: TASK, provider: "gemini", model, input_chars: message.length + history.length, output_chars: out.text.length, success: true, error_code: null });
+    await recordUsage({ profile_id: userId, company_id: null, client_hash: hash, task: TASK, provider: "gemini", model, input_chars: message.length + history.length, output_chars: out.text.length, success: true, error_code: null });
     return json({ ok: true, model, reply, links, suggestions });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("aida-chat failed:", msg);
-    await db.from("ai_usage").insert({ profile_id: userId, company_id: null, client_hash: hash, task: TASK, provider: "gemini", model, input_chars: message.length, output_chars: 0, success: false, error_code: msg === "blocked" ? "safety" : "provider_error" });
-    return json({ ok: false, error: msg === "blocked" ? "Bu suala cavab verə bilmirəm. Başqa cür soruşun." : "AIDA hazırda cavab verə bilmir. Bir azdan yenidən yazın." });
+    if (msg !== "blocked") await releaseReservation(reservation.reservation_id);
+    await recordUsage({ profile_id: userId, company_id: null, client_hash: hash, task: TASK, provider: "gemini", model, input_chars: message.length, output_chars: 0, success: false, error_code: msg === "blocked" ? "safety" : "provider_error" });
+    // A provider failure is not a success (M26); a refused question is an answer.
+    return msg === "blocked"
+      ? json({ ok: false, error: "Bu suala cavab verə bilmirəm. Başqa cür soruşun." })
+      : json({ ok: false, error: "AIDA hazırda cavab verə bilmir. Bir azdan yenidən yazın." }, 502);
   }
 });

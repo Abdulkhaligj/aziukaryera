@@ -28,6 +28,9 @@ export interface Context {
   /** A session opened by a password-recovery link: it may only set a new
    *  password (audit 2026-11-13, #15). */
   restricted?: boolean;
+  /** A temporary password set by the Career Centre: the account reads, and
+   *  changes nothing but its password (audit 2026-11-16, M44). */
+  mustChangePassword?: boolean;
 }
 
 export const systemContext: Context = { role: 'system', uid: null, claims: null };
@@ -61,7 +64,7 @@ const live = (key: string) => (keyExpiresIn(key) ?? 1) > 0;
 // and kept for a few seconds: a revoked, expired, banned or deleted account
 // stops working at once instead of when its access token expires (H-10).
 const SESSION_CACHE_MS = 5000;
-const sessionCache = new Map<string, { at: number; ok: boolean; restricted: boolean }>();
+const sessionCache = new Map<string, { at: number; ok: boolean; restricted: boolean; mustChange: boolean }>();
 export function forgetSessions(...ids: (string | undefined | null)[]) {
   for (const id of ids) if (id) sessionCache.delete(id);
 }
@@ -70,10 +73,12 @@ export function forgetAllSessions() { sessionCache.clear(); }
 async function sessionState(db: Pool, uid: string, sessionId: string) {
   const hit = sessionCache.get(sessionId);
   if (hit && Date.now() - hit.at < SESSION_CACHE_MS) return hit;
-  const row = await one<{ restricted: boolean }>(db, `SELECT s.restricted FROM auth_sessions s JOIN auth_users u ON u.id = s.user_id
+  const row = await one<{ restricted: boolean; must_change: number }>(db, `SELECT s.restricted,
+       IF(JSON_EXTRACT(u.raw_app_meta_data, '$.must_change_password') = CAST('true' AS JSON), 1, 0) AS must_change
+     FROM auth_sessions s JOIN auth_users u ON u.id = s.user_id
      WHERE s.id = ? AND s.user_id = ? AND s.revoked_at IS NULL AND s.expires_at > CURRENT_TIMESTAMP(6)
        AND u.deleted_at IS NULL AND (u.banned_until IS NULL OR u.banned_until <= CURRENT_TIMESTAMP(6))`, [sessionId, uid]);
-  const state = { at: Date.now(), ok: !!row, restricted: !!row?.restricted };
+  const state = { at: Date.now(), ok: !!row, restricted: !!row?.restricted, mustChange: Number(row?.must_change) === 1 };
   if (sessionCache.size > 50_000) sessionCache.clear();
   sessionCache.set(sessionId, state);
   return state;
@@ -95,5 +100,5 @@ export async function contextFromHeaders(config: Config, apikey: string | undefi
   if (typeof claims.session_id !== 'string') return null;
   const state = await sessionState(db, claims.sub, claims.session_id);
   if (!state.ok) return null;
-  return { role: 'authenticated', uid: claims.sub, claims, restricted: state.restricted };
+  return { role: 'authenticated', uid: claims.sub, claims, restricted: state.restricted, mustChangePassword: state.mustChange };
 }

@@ -62,6 +62,23 @@ const RESTRICTIVE: Record<StorageCmd, Rule[]> = {
   DELETE: [notReferencedAvatar]
 };
 
+/** The SELECT policies above as one SQL condition on storage_objects (alias so),
+ *  for listings: one query instead of a policy check per row (audit 2026-11-16, M15).
+ *  Keep in step with PERMISSIVE.SELECT (a test compares them). */
+export async function selectFilter(tx: Tx, ctx: Context): Promise<{ sql: string; params: unknown[] }> {
+  if (ctx.role === 'service_role' || ctx.role === 'system') return { sql: 'TRUE', params: [] };
+  if (ctx.role !== 'authenticated' || !ctx.uid) return { sql: 'FALSE', params: [] };
+  const admin = (await currentAdminRole(tx, ctx)) !== null;
+  const own = "LEFT(so.name, CHAR_LENGTH(?) + 1) = CONCAT(?, '/')";
+  const parts = [
+    admin ? `(so.bucket_id = 'assistant-audio' AND ${own})` : null,
+    admin ? "so.bucket_id = 'public-media'" : null,
+    `(so.bucket_id = 'avatars' AND (${own} OR ${admin ? 'TRUE' : "EXISTS (SELECT 1 FROM profiles pr WHERE pr.avatar_path = so.name COLLATE utf8mb4_bin AND pr.status = 'active')"}))`
+  ].filter(Boolean);
+  const params = admin ? [ctx.uid, ctx.uid, ctx.uid, ctx.uid] : [ctx.uid, ctx.uid];
+  return { sql: parts.map(p => `(${p})`).join(' OR '), params };
+}
+
 /** USING (or WITH CHECK) of every policy for `cmd` on one object. */
 export async function storageAllows(tx: Tx, ctx: Context, cmd: StorageCmd, object: ObjectRow): Promise<boolean> {
   if (ctx.role === 'service_role' || ctx.role === 'system') return true;

@@ -69,6 +69,11 @@ export async function startHarness(env: Record<string, string> = {}): Promise<Ha
   };
 }
 
+/** A browser-like client in the code (PKCE) flow, as the portal uses it, with its own storage. */
+export function codeFlowClient(url: string, key: string, storage: { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }): ApiClient {
+  return createClient(url, key, { auth: { flowType: 'pkce', storage, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false } });
+}
+
 /** Reference rows the signup flow depends on (same values as production). */
 async function seed(pool: ReturnType<typeof createPool>) {
   await exec(pool, `INSERT INTO plans (id, name, monthly_price, currency, active, sort_order) VALUES

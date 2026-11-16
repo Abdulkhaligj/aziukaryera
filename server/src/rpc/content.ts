@@ -46,7 +46,7 @@ rpc({
     if (!benefit) throw new DbRuleError('Güzəşt tapılmadı və ya aktiv deyil', 'P0002');
     if (benefit.valid_to != null && benefit.valid_to < utcDate(env.now)) throw new DbRuleError('Güzəştin müddəti bitib', '23514');
     const existing = await one(env.tx, `SELECT * FROM benefit_claims WHERE benefit_id = ? AND profile_id = ?
-       AND redeemed_at IS NULL AND expires_at > ? LIMIT 1`, [a.p_benefit, me, toMysqlDatetime(env.now)]);
+       AND redeemed_at IS NULL AND expires_at > ? LIMIT 1 FOR UPDATE`, [a.p_benefit, me, toMysqlDatetime(env.now)]);
     if (existing) return { ...existing, code: decryptField(existing.code) };
     // The code is stored encrypted and found by its hash (#73).
     const code = newClaimCode();
@@ -66,9 +66,10 @@ rpc({
       [{ status, student_name: student, faculty, benefit, partner, redeemed_at: at }];
     if (!claim) return result('tapilmadi');
     const benefit = await one<{ title: string; partner_id: string | null }>(env.tx, 'SELECT title, partner_id FROM benefits WHERE id = ?', [claim.benefit_id]);
-    const partner = benefit?.partner_id ? await one<{ name: string; owner_id: string | null }>(env.tx,
-      'SELECT name, owner_id FROM benefit_partners WHERE id = ?', [benefit.partner_id]) : null;
-    if (!(await isAdmin(env) || (partner?.owner_id != null && partner.owner_id === me))) {
+    const partner = benefit?.partner_id ? await one<{ name: string; owner_id: string | null; status: string }>(env.tx,
+      'SELECT name, owner_id, status FROM benefit_partners WHERE id = ?', [benefit.partner_id]) : null;
+    // A partner redeems only while the Career Centre has it approved (audit 2026-11-16, L5).
+    if (!(await isAdmin(env) || (partner?.owner_id != null && partner.owner_id === me && partner.status === 'active'))) {
       throw new DbRuleError('Bu kodu təsdiqləmək icazəniz yoxdur', '42501');
     }
     const student = await one<{ full_name: string; faculty_id: string | null }>(env.tx, 'SELECT full_name, faculty_id FROM profiles WHERE id = ?', [claim.profile_id]);

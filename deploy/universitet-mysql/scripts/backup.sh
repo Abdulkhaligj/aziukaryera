@@ -31,4 +31,8 @@ echo "Backup: $db, $files"
 if [ -n "${BACKUP_REMOTE:-}" ]; then
   rsync -a "$db" "$files" "$BACKUP_REMOTE/"
   echo "Off-host copy: $BACKUP_REMOTE"
+else
+  # Audit 2026-11-16, I6: the backups and backup.key are on this server only.
+  echo "XƏBƏRDARLIQ: BACKUP_REMOTE boşdur — backup-lar yalnız bu serverdədir. Disk və ya server itəndə bərpa mümkün olmayacaq." >&2
+  echo "kit.env-də BACKUP_REMOTE təyin edin; backup.key-in nüsxəsini isə ayrıca (məs. seyfdə) saxlayın." >&2
 fi

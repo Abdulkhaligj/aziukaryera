@@ -15,6 +15,9 @@ const MODERATION_FIELDS = ['moderation_status', 'moderation_reason', 'moderated_
 /** The webhook secret, from the API environment (not the database: #73). */
 let webhookSecret: string | null = null;
 export function setModerationSecret(secret: string | undefined) { webhookSecret = secret || null; }
+/** The API's public URL; the webhook goes to its own function route only (L17). */
+let publicUrl: () => string = () => '';
+export function setModerationTarget(url: () => string) { publicUrl = url; }
 
 /** private.moderation_send: POST {table, id} to the configured endpoint once committed. */
 export async function moderationSend(env: WriteEnv, tableName: string, id: unknown) {
@@ -22,13 +25,18 @@ export async function moderationSend(env: WriteEnv, tableName: string, id: unkno
     'SELECT endpoint, secret FROM private_moderation_webhook_config WHERE singleton AND enabled');
   // Unconfigured: content stays pending and no external system is called.
   if (!config) return;
+  // The table only switches the webhook on: the secret goes to this API's own
+  // moderation route, never to a host written into the table (L17).
+  const endpoint = `${publicUrl().replace(/\/$/, '')}/functions/v1/content-moderation`;
   onCommit(env.tx, async () => {
-    const response = await fetch(config.endpoint, {
+    const response = await fetch(endpoint, {
       method: 'POST', signal: AbortSignal.timeout(30_000),
       headers: { 'Content-Type': 'application/json', 'x-moderation-secret': webhookSecret ?? config.secret },
       body: JSON.stringify({ table: tableName, id })
     });
     await response.body?.cancel();
+    // A refused or failed call is an error with its status, not a silent success (M23).
+    if (!response.ok) throw new Error(`moderation webhook for ${tableName} ${id} answered ${response.status}`);
   });
 }
 

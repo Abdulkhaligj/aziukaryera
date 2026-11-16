@@ -1,4 +1,5 @@
 import 'server-only';
+import { canView } from '@/lib/permissions';
 import { createClient } from '@/lib/backend/server';
 import type { AdminRole, AdminRow, Lookups, ResourceKey, Status } from '@/lib/types';
 
@@ -311,14 +312,27 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
 }
 
 /* Hər bölmə ayrıca yüklənir: biri xəta versə, panel açılır və həmin bölmədə səbəb göstərilir. */
+/** The minimum every panel row has. */
+export function isAdminRow(row: unknown): row is AdminRow {
+  if (!row || typeof row !== 'object') return false;
+  const r = row as Record<string, unknown>;
+  return typeof r.id === 'string' && r.id.length > 0 && typeof r.title === 'string';
+}
+
 export async function loadAdminData(context: AdminContext): Promise<AdminLoad> {
   const lookups = await loadLookups(context);
-  const results = await Promise.allSettled(resourceKeys.map((key) => loadResource(context, key, lookups)));
+  // Only the sections this role may see are read (L41).
+  const results = await Promise.allSettled(resourceKeys.map((key) => canView(context.role, key) ? loadResource(context, key, lookups) : Promise.resolve([])));
   const data = {} as AdminStore;
   const errors: Partial<Record<ResourceKey, string>> = {};
   resourceKeys.forEach((key, index) => {
     const result = results[index];
-    if (result.status === 'fulfilled') data[key] = result.value;
+    // A row without the shape the panel relies on (an object with a string id) is
+    // dropped and logged, instead of surfacing later as a silent undefined (L44).
+    if (result.status === 'fulfilled') {
+      data[key] = result.value.filter(isAdminRow);
+      if (data[key].length !== result.value.length) console.error(`admin data: ${result.value.length - data[key].length} malformed row(s) in ${key}`);
+    }
     else {
       data[key] = [];
       const reason = result.reason as { message?: string } | undefined;
@@ -328,7 +342,9 @@ export async function loadAdminData(context: AdminContext): Promise<AdminLoad> {
   return { data, errors, lookups };
 }
 
-export async function writeAudit(context: AdminContext, resource: string, resourceId: string | null, action: string, title: string) {
+export async function writeAudit(context: AdminContext, resource: string, resourceId: string | null, action: string, rawTitle: string) {
+  // The title is short and built by the server (L37).
+  const title = rawTitle.replace(/\s+/g, ' ').trim().slice(0, 200);
   const auditResourceId = resourceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(resourceId) ? resourceId : null;
   const { error } = await context.db.from('admin_audit_logs').insert({ title, resource, resource_id: auditResourceId, action, actor_id: context.userId, actor_name: context.fullName });
   // The change is already saved (and the database audit triggers recorded it):

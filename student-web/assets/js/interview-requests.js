@@ -170,7 +170,10 @@
         let secureLink='';
         try {
           const url=new URL(slot.meeting_url||'');
-          if(url.protocol==='https:')secureLink='<a class="ir-meeting-link" href="'+E(url.href)+'" target="_blank" rel="noopener noreferrer">Görüş linkini aç ↗</a>';
+          // The same services the server accepts (audit 2026-11-16, L49).
+          const host=url.hostname.toLowerCase();
+          const known=['meet.google.com','teams.microsoft.com','teams.live.com'].includes(host)||host==='zoom.us'||host.endsWith('.zoom.us');
+          if(url.protocol==='https:'&&known&&!url.username&&!url.password&&!url.port)secureLink='<a class="ir-meeting-link" href="'+E(url.href)+'" target="_blank" rel="noopener noreferrer">Görüş linkini aç ↗</a>';
         }catch(_error){/* Do not render invalid or unsafe links. */}
         const details=[
           ['Tarix və saat',displayDate(slot.starts_at)],

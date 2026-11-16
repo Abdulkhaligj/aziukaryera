@@ -1,7 +1,8 @@
 // The pg_cron jobs: private.avatar_moderation_retry and private.moderation_retry
 // (every minute) and private.process_subscription_lifecycle (minute 7 of every hour);
 // since the audit of 2026-11-13 also job-deadlines (hourly) and data-retention (daily).
-import { exec, rows, toMysqlDatetime, type Row } from '../db.ts';
+import { exec, rows, toMysqlDatetime, transaction, type Row } from '../db.ts';
+import type { Pool } from 'mysql2/promise';
 import { nowText, updateRow, type WriteEnv } from '../write/pipeline.ts';
 import { ensureInvoice, money } from '../write/rules/billing.ts';
 import { bakuText, notifyAdmins, notifyCompany } from '../write/rules/core.ts';
@@ -89,8 +90,9 @@ export async function expireJobs(env: WriteEnv) {
 
 /** #71: how long rows that only serve security or bookkeeping are kept. */
 const RETENTION: { table: string; where: string; days: number }[] = [
-  { table: 'auth_sessions', where: '(revoked_at IS NOT NULL OR expires_at < CURRENT_TIMESTAMP(6)) AND refreshed_at < ?', days: 30 },
+  { table: 'auth_sessions', where: '(revoked_at IS NOT NULL OR expires_at < CURRENT_TIMESTAMP(6)) AND COALESCE(refreshed_at, created_at) < ?', days: 30 },
   { table: 'auth_one_time_tokens', where: '(used_at IS NOT NULL OR expires_at < CURRENT_TIMESTAMP(6)) AND created_at < ?', days: 7 },
+  { table: 'auth_flow_codes', where: 'created_at < ?', days: 1 },
   { table: 'private_ai_reservations', where: 'created_at < ?', days: 90 },
   { table: 'private_ai_budget_locks', where: 'created_at < ?', days: 40 },
   { table: 'private_moderation_claims', where: 'finished = 1 AND claimed_until < ?', days: 30 },
@@ -99,22 +101,35 @@ const RETENTION: { table: string; where: string; days: number }[] = [
   { table: 'notifications', where: 'created_at < ?', days: 365 }
 ];
 
-/** #71: removes expired sessions, used links, old AI reservations and old read notifications. */
-export async function dataRetention(env: WriteEnv) {
+/** #71: removes expired sessions, used links, old AI reservations and old read
+ *  notifications. Every batch of 1000 rows is its own transaction, so no lock is
+ *  held long; what is left after 50 batches waits for the next run and the
+ *  result says so (audit 2026-11-16, M28). */
+export async function dataRetention(pool: Pool, env: Omit<WriteEnv, 'tx'>) {
   const removed: Record<string, number> = {};
+  let more = false;
   for (const rule of RETENTION) {
     const before = toMysqlDatetime(new Date(env.now.getTime() - rule.days * DAY));
-    // In batches, so no statement holds many locks for long.
-    for (let batch = 0; batch < 50; batch++) {
-      const result = await exec(env.tx, `DELETE FROM \`${rule.table}\` WHERE ${rule.where} LIMIT 1000`, [before]);
+    let batch = 0;
+    for (; batch < 50; batch++) {
+      const result = await transaction(pool, tx => exec(tx, `DELETE FROM \`${rule.table}\` WHERE ${rule.where} LIMIT 1000`, [before]));
       removed[rule.table] = (removed[rule.table] ?? 0) + result.affectedRows;
       if (result.affectedRows < 1000) break;
     }
+    if (batch === 50) more = true;
   }
-  return { removed, ran_at: nowText(env) };
+  return { removed, more, ran_at: timestampNow(env.now) };
 }
+const timestampNow = (now: Date) => `${toMysqlDatetime(now).replace(' ', 'T')}+00:00`;
 
-export interface Job { name: string; schedule: string; run: (env: WriteEnv) => Promise<Record<string, unknown>> }
+export interface Job {
+  name: string;
+  schedule: string;
+  /** In one transaction. */
+  run?: (env: WriteEnv) => Promise<Record<string, unknown>>;
+  /** Commits in steps of its own. */
+  runWithPool?: (pool: Pool, env: Omit<WriteEnv, 'tx'>) => Promise<Record<string, unknown>>;
+}
 
 /** Same names and schedules as the pg_cron jobs (cron.job). */
 export const JOBS: Job[] = [
@@ -122,5 +137,5 @@ export const JOBS: Job[] = [
   { name: 'content-moderation-retry', schedule: '* * * * *', run: moderationRetry },
   { name: 'subscription-lifecycle', schedule: '7 * * * *', run: processSubscriptionLifecycle },
   { name: 'job-deadlines', schedule: '12 * * * *', run: expireJobs },
-  { name: 'data-retention', schedule: '30 23 * * *', run: dataRetention }
+  { name: 'data-retention', schedule: '30 23 * * *', runWithPool: dataRetention }
 ];

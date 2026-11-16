@@ -12,6 +12,8 @@ before('profiles', 'profiles_admin_seat_limit', ['insert', 'update'], async (env
   const consumesSeat = row.role === 'admin' && row.status === 'active'
     && (!old || old.role !== row.role || old.status !== row.status);
   if (!consumesSeat) return;
+  // One lock for every seat change, then the count of committed rows (audit 2026-11-16, H4).
+  await one(env.tx, `SELECT value FROM private_sequences WHERE name = 'admin_seat_lock' FOR UPDATE`);
   const other = await one<{ n: number }>(env.tx,
     `SELECT COUNT(*) AS n FROM profiles WHERE role = 'admin' AND status = 'active' AND id <> ?`, [row.id]);
   if ((other?.n ?? 0) >= 5) throw new DbRuleError('Admin giriş limiti dolub (maksimum 5 aktiv hesab)', 'P0001');

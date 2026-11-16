@@ -861,9 +861,13 @@ function cvDesigner() {
     </div>
   </div>
   <div class="cv-builder-wrap">
+    <!-- Audit 2026-11-16, L47: only what the builder uses (its scripts, its
+         own drafts and session on this site, downloads, the print dialog).
+         It has no forms, popups or top navigation. Its real guard is its own
+         hash-only CSP: a page of this site could lift its sandbox. -->
     <iframe id="cv-builder-frame" class="cv-builder-frame" src="cv-builder.html?embed=1"
-      title="ASOIU şablonlu CV qurucusu" loading="eager"
-      sandbox="allow-scripts allow-same-origin allow-downloads allow-modals allow-forms"></iframe>
+      title="ASOIU şablonlu CV qurucusu" loading="eager" referrerpolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-downloads allow-modals"></iframe>
   </div>`;
 }
 
@@ -1728,7 +1732,7 @@ function viewCompanyDashboard() {
           <div class="row" style="justify-content:space-between;align-items:center;gap:14px">
             <div style="min-width:0">
               <b style="font-size:13px">${esc(top.student.name)}</b>
-              <div style="color:var(--muted);font-size:11.5px">${esc(top.student.major)} · ${top.student.course}. kurs · GPA ${top.student.gpa}</div>
+              <div style="color:var(--muted);font-size:11.5px">${esc(top.student.major)} · ${esc(top.student.course)}. kurs · GPA ${esc(top.student.gpa)}</div>
             </div>
             <div style="width:170px;flex:none">${meterHTML(top.report)}</div>
           </div>
@@ -1888,7 +1892,7 @@ function viewCandidates() {
             <td><div class="row tight" style="flex-wrap:nowrap"><span class="avatar sm" data-avatar-id="${esc(student.id)}">${esc(initials(student.name))}</span>
               <div class="who"><b>${esc(student.name)}</b><small>${esc(student.faculty)}</small></div></div></td>
             <td style="font-size:12.5px">${esc(student.major)}</td>
-            <td class="num">${student.course}</td>
+            <td class="num">${esc(student.course)}</td>
             <td class="num">${student.gpa}</td>
             <td>${meterHTML(report)}</td>
             <td><div class="skillrow">${report.matched.map(s => `<span class="sk hit">${esc(s)}</span>`).join('') || '<span style="color:var(--muted);font-size:11.5px">—</span>'}</div></td>
@@ -1961,7 +1965,7 @@ function viewSearch() {
         <div style="flex:1;min-width:0">
           <b style="font-size:13.5px">${esc(s.name)}</b>
           <div style="color:var(--muted);font-size:11.5px;margin-top:2px">${esc(s.major)}</div>
-          <div style="color:var(--muted);font-size:11.5px">${s.course}. kurs · GPA ${s.gpa}</div>
+          <div style="color:var(--muted);font-size:11.5px">${esc(s.course)}. kurs · GPA ${esc(s.gpa)}</div>
         </div>
       </div>
       <div class="skillrow" style="margin-top:12px">
@@ -1988,7 +1992,7 @@ function viewInvites() {
       const r = matchReport(job, st);
       return `<tr>
         <td><div class="row tight" style="flex-wrap:nowrap"><span class="avatar sm" data-avatar-id="${esc(i.studentId)}">${esc(initials(st.name))}</span>
-          <div class="who"><b>${esc(st.name)}</b><small>${esc(st.major)} · ${st.course}. kurs</small></div></div></td>
+          <div class="who"><b>${esc(st.name)}</b><small>${esc(st.major)} · ${esc(st.course)}. kurs</small></div></div></td>
         <td style="font-size:12.5px">${esc(job.title)}</td>
         <td class="num">${r.score}%</td>
         <td class="num">${fmtDate(i.at)}</td>
@@ -2210,7 +2214,7 @@ function viewAdminStudents() {
         <td><b>${esc(s.name)}</b></td>
         <td style="font-size:12px;color:var(--muted)">${esc(s.faculty.replace(' fakültəsi', ''))}</td>
         <td style="font-size:12.5px">${esc(s.major)}</td>
-        <td class="num">${s.course}</td>
+        <td class="num">${esc(s.course)}</td>
         <td class="num">${s.gpa}</td>
         <td class="num">${s.skills.length}</td>
         <td>${best ? meterHTML(best.report) : '—'}</td>
@@ -2897,6 +2901,11 @@ function goAuthStep(n) {
 /* ================================================================ *
  * Router
  * ================================================================ */
+/** Only a screen of this role, never an inherited name such as __proto__ (audit 2026-11-16, L45). */
+function hasView(role, name) {
+  return typeof name === 'string' && Object.hasOwn(VIEWS, role) && Object.hasOwn(VIEWS[role], name) && typeof VIEWS[role][name] === 'function';
+}
+
 const VIEWS = {
   student: {
     dashboard: viewStudentDashboard, jobs: viewJobs, applications: viewApplications,
@@ -3043,7 +3052,7 @@ function render() {
   }
 
   const role = user.role;
-  const view = VIEWS[role][st.view] ? st.view : 'dashboard';
+  const view = hasView(role, st.view) ? st.view : 'dashboard';
   st.view = view;
   const pendingCo = role === 'company' && user.status === 'pending';
 
@@ -3272,7 +3281,7 @@ document.addEventListener('click', e => {
       item.readAt = item.readAt || new Date().toISOString();
       UI.notificationsOpen = false;
       const role = Auth.role();
-      if (item.link && VIEWS[role] && VIEWS[role][item.link]) S.view = item.link;
+      if (item.link && hasView(role, item.link)) S.view = item.link;
       rerender();
       if (Store.mode === 'remote') Backend.markNotificationRead(item).then(result => { if (result?.stale) return;
         if (!result.ok) refreshNotifications(false);
@@ -4295,7 +4304,7 @@ async function probeBackend() {
   if (online) {
     /* Google-dan qayıdış xətası varsa (məs. universitet hesabı deyil),
        onu ünvandan oxuyub istifadəçiyə göstəririk. */
-    const oauthErr = Backend.readOAuthError();
+    const oauthErr = Backend.readOAuthError() || await Backend.readCodeLinkError();
     if (oauthErr) { UI.auth.error = oauthErr; UI.publicView = 'auth'; }
     try {
       await Auth.restoreRemote();          // səhifə yenilənəndə sessiyanı bərpa et

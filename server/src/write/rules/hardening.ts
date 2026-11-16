@@ -155,12 +155,24 @@ before('benefit_partners', '001_security_partner_status', ['insert', 'update'], 
   if (await privileged(env)) return;
   if (!old) row.status = 'pending';
   else if (changed(row, old, 'status')) deny('Tərəfdaşın statusunu yalnız Karyera Mərkəzi dəyişə bilər');
+  // L4: an approved partner that changes what students see is reviewed again.
+  else if (old.status === 'active' && changed(row, old, 'name', 'category', 'city', 'about', 'website', 'emoji', 'logo_url')) row.status = 'pending';
   if (!old || changed(row, old, 'logo_url')) ownImage('logo_url', row.logo_url);
 });
 before('benefits', '001_security_benefit_active', ['insert', 'update'], async (env, row, old) => {
   if (await privileged(env)) return;
   if (!old) row.active = false;
   else if (changed(row, old, 'active')) deny('Güzəşti yalnız Karyera Mərkəzi aktivləşdirə bilər');
+  // L4: a changed offer, or one moved to another partner, waits for review again.
+  else if (old.active && changed(row, old, 'partner_id', 'title', 'description', 'discount_label', 'terms', 'valid_from', 'valid_to')) row.active = false;
+});
+
+// L3: the review fields and the creation time of a vacancy are the server's;
+// a company cannot write them (a future created_at would keep it on top).
+before('jobs', '001_security_job_review_fields', ['insert', 'update'], async (env, row, old) => {
+  if (await privileged(env)) return;
+  for (const field of ['approved_by', 'approved_at', 'rejection_reason', 'changes_requested'] as const) row[field] = old ? old[field] : null;
+  row.created_at = old ? old.created_at : nowText(env);
 });
 
 // ---- audit log (#30) -----------------------------------------------------

@@ -83,7 +83,7 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 ### 3.4 E-poçt (SMTP)
 - **SMTP məcburidir:** e-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`).
 - **Lazım olan məlumatlar:** host, port, istifadəçi, şifrə və göndərən ünvan (`career@asoiu.edu.az`). Bunlar API-nin `api.env` faylına yazılır.
-- **SMTP olmadan:** `03-start.sh` dayanır.
+- **SMTP olmadan:** API production rejimində başlamır; `03-start.sh` bunu əvvəlcədən yoxlayıb dayanır.
 - **Microsoft (Outlook) ilə giriş:** yeni backend-də hələ yoxdur.
 
 ## 4. Təhlükəsizlik xülasəsi
@@ -116,7 +116,19 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
   - API açarları 2 il yaşayır, vaxtı keçmiş açar qəbul edilmir; `rotate-keys.sh` onları yeniləyir.
   - Şirkət qeydiyyatda loqo linki vermir; loqonu Karyera Mərkəzi admin paneldən yükləyir.
 
+- **16.11.2026 auditi (C1, H1–H4, M1–M44, L1–L55, I1–I16) üzrə əsas əlavələr:**
+  - Status və rol kimi sütunlar yalnız dəqiq dəyəri qəbul edir (rəqəm, boşluq, böyük hərf, tam enli hərf ilə yazılmış dəyər xətadır).
+  - Admin yerləri, güzəşt kodları və şirkət limitləri eyni anda gələn sorğularda da aşılmır; sessiyalar READ COMMITTED və UTC ilə işləyir.
+  - Dayandırılmış və ya rədd edilmiş şirkət öz qeydlərini dəyişə, paket istəyə bilmir; rədd edilmiş hesab mesaj, əlaqə və izləmə göndərə bilmir; gizli paylaşımların mediası görünmür.
+  - Bərpa linki və müvəqqəti şifrə ilə açılan sessiya yalnız oxuyur və funksiyaları çağıra bilmir.
+  - E-poçt linkləri kod (PKCE) axını ilə işləyir: ünvan sətrində token qalmır, kod yalnız linki istəyən brauzerdə və bir dəfə işləyir.
+  - Şirkətin müsahibə linki yalnız Google Meet, Zoom və ya Microsoft Teams ola bilər.
+  - Fayl əvəzlənəndə yazı alınmasa, köhnə fayl yerinə qaytarılır.
+  - API öz təhlükəsizlik başlıqlarını göndərir; `/rest` və `/storage` üçün ümumi limit var.
+  - Sayt: çıxışda offline keş silinir; demo hesablar universitet domenində deyil; Referrer-Policy hər yerdə `no-referrer`, HSTS Nginx-də də var.
+
 ## 5. Testlər (13.11.2026)
+- **16.11.2026 (audit v3-dən sonra):** saytlar və admin panel 96/96, MySQL API 127/127 (18 yeni audit testi və PKCE testi), TypeScript yoxlaması və `next build` uğurludur. Kod axını ilə şifrə bərpası lokal serverdə brauzerdə yoxlanılıb.
 - **Saytlar və admin panel:** 95/95 test keçir, TypeScript yoxlaması və `next build` uğurludur.
 - **MySQL API:** 108/108 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).
 - **CI:** `npm audit` (yüksək və kritik zəifliklər build-i dayandırır).

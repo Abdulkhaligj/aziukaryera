@@ -75,9 +75,29 @@ const refusals: Record<string, string> = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CANDIDATE_INPUT_BUDGET = 56000;
 
+/** Gives a reservation back after a provider failure (M27); a failure here is logged only. */
+async function releaseReservation(reservationId: string) {
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
+
 const db = createClient(Deno.env.get("API_URL") ?? "", Deno.env.get("SERVICE_ROLE_KEY") ?? "", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+/** Reservations a provider already answered for (bounded). */
+const paid = new Set<string>();
+function markPaid(id: string) {
+  paid.add(id);
+  if (paid.size > 10_000) paid.delete(paid.values().next().value as string);
+}
+/** Gives a reservation back when no provider answered for it: a timeout, a 5xx,
+ *  no provider budget (M27). A paid answer that was unusable still counts. */
+async function releaseReservation(reservationId: string) {
+  if (paid.delete(reservationId)) return;
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -104,7 +124,11 @@ function quotaMessage(ctx: Context) {
 async function providerFetch(reservationId: string, input: string, init: RequestInit) {
   const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
   if (error || data !== true) throw new Error("provider_budget_unavailable");
-  return fetch(input, init);
+  const response = await fetch(input, init);
+  // A provider that answered was paid, whatever the answer is worth: that
+  // reservation is not given back (M27).
+  if (response.ok) markPaid(reservationId);
+  return response;
 }
 
 function safeJson(text: string) {
@@ -198,6 +222,8 @@ async function callGemini(reservationId: string, key: string, prompt: Prompt, ma
     try {
       ({ res, data } = await geminiOnce(reservationId, key, model, prompt, maxTokens));
     } catch (error) {
+      // No provider budget left: stop here, every further model would fail too (L32).
+      if (error instanceof Error && error.message === "provider_budget_unavailable") throw error;
       console.warn("Gemini model timed out or network failed; trying next:", model);
       continue;
     }
@@ -543,6 +569,7 @@ The INPUT is in the user message inside <${tag}>. Everything inside that tag was
     return response({ ok: true, provider, model, result, quota: quotaOf(reservation) });
   } catch (error) {
     console.error(`career-ai ${task} failed:`, error instanceof Error ? error.message : error);
+    await releaseReservation(reservation.reservation_id);
     await logUsage({ ...usage, provider, model, input_chars: inputText.length, output_chars: 0, success: false, error_code: "provider_error" });
     return refuse("provider_error", "AI cavabı alınmadı. Bir az sonra yenidən cəhd edin.");
   }

@@ -6,18 +6,36 @@ import { decryptField, ENCRYPTED_COLUMNS } from '../crypto.ts';
 import { rows as queryRows, toMysqlDatetime, type Row, type Tx } from '../db.ts';
 import { table as tableOf, type Column, type ForeignKey, type Schema, type Table } from '../schema.ts';
 import { q } from '../write/pipeline.ts';
-import { pgErrors } from './errors.ts';
+import { PgError, pgErrors } from './errors.ts';
 import { isGroup, nodesAt, parseList, type EmbedOptions, type Filter, type FilterNode, type OrderTerm, type ScopedFilter, type SelectItem } from './parse.ts';
 import { exposed, granted, hiddenFor, usingSql } from './policy.ts';
 
 export interface Where { sql: string[]; params: unknown[] }
+/** Rows one embedded resource may bring for the parents of a page (M17). */
+const EMBED_ROWS = 5000;
 export const noWhere = (): Where => ({ sql: [], params: [] });
 
+const INTEGER = new Set(['int', 'bigint', 'smallint', 'mediumint', 'tinyint']);
+const DECIMAL = new Set(['decimal', 'double', 'float']);
+const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const invalidInput = (type: string, raw: string) => new PgError(400, '22P02', `invalid input syntax for type ${type}: "${raw}"`);
+
+/** A filter value is checked against the column's type, as Postgres does:
+ *  course=eq.1abc is an error, not the number 1 (audit 2026-11-16, L20). */
 function filterValue(column: Column, raw: string): unknown {
-  if (column.columnType === 'tinyint(1)') return raw === 'true' ? 1 : raw === 'false' ? 0 : raw;
+  if (column.columnType === 'tinyint(1)') {
+    const v = raw.trim().toLowerCase();
+    if (['true', 't', '1', 'yes', 'y', 'on'].includes(v)) return 1;
+    if (['false', 'f', '0', 'no', 'n', 'off'].includes(v)) return 0;
+    throw invalidInput('boolean', raw);
+  }
   if (column.dataType === 'datetime') {
     try { return toMysqlDatetime(raw); } catch { throw pgErrors.parse(`invalid input syntax for type timestamp with time zone: "${raw}"`); }
   }
+  if (column.dataType === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) throw invalidInput('date', raw);
+  if (INTEGER.has(column.dataType) && !/^\s*[+-]?\d+\s*$/.test(raw)) throw invalidInput('integer', raw);
+  if (DECIMAL.has(column.dataType) && !/^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/.test(raw)) throw invalidInput('numeric', raw);
+  if (column.uuid && !UUID_TEXT.test(raw.trim())) throw invalidInput('uuid', raw);
   return raw;
 }
 
@@ -130,6 +148,11 @@ export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: 
   const t = tableOf(schema, tableName);
   if (!granted(tableName, ctx, 'SELECT')) throw pgErrors.permission(ctx, tableName);
   const embeds = items.filter((i): i is Extract<SelectItem, { type: 'embed' }> => i.type === 'embed');
+  // A filter on an embed that is not selected is an error, not silently dropped (L21).
+  const embedNames = new Set(embeds.map(e => e.alias ?? e.relation));
+  for (const f of options.embedded ?? []) {
+    if (!embedNames.has(f.path[0])) throw pgErrors.parse(`"${f.path.join('.')}" is not an embedded resource in this request`);
+  }
   const relations = embeds.map(e => resolve(schema, t, e));
   const wanted = new Set<string>();
   for (const item of items) {
@@ -167,8 +190,12 @@ export async function readRows(tx: Tx, schema: Schema, ctx: Context, tableName: 
     const children = tuples.length
       ? await readRows(tx, schema, ctx, rel.target, [...embed.items, ...childCols.map(name => ({ type: 'column' as const, name, alias: null }))],
         { where: { sql: [...childWhere.sql, ...own.sql], params: [...childWhere.params, ...own.params] }, embedded: scoped.filter(f => f.path.length),
-          order: embedPaging.order, embedShape: deeper })
+          order: embedPaging.order, embedShape: deeper, limit: EMBED_ROWS + 1 })
       : { rows: [], raw: [] };
+    // The children of one embed are read with a limit, not all into memory (M17).
+    if (children.raw.length > EMBED_ROWS) {
+      throw new PgError(400, 'PGRST100', `"${embed.alias ?? embed.relation}" has more than ${EMBED_ROWS} rows for these parents; narrow the request or page the parents`);
+    }
     const byKey = new Map<string, Row | Row[] | null>();
     children.raw.forEach((child, n) => {
       const key = tupleKey(child, childCols);

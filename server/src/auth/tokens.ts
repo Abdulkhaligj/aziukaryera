@@ -1,6 +1,6 @@
 // Access tokens (HS256 JWT, same claims as before the move) and refresh-token
 // sessions. Only SHA-256 hashes of refresh and one-time tokens are stored.
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { SignJWT } from 'jose';
 import type { Pool } from 'mysql2/promise';
 import type { Config } from '../config.ts';
@@ -99,20 +99,58 @@ export async function sessionIsActive(db: Tx | Pool, sessionId: string | undefin
 /** One-time email token (recovery, confirmation, invite, magic link). */
 /** A new single-use link token; earlier unused ones of the same purpose (and
  *  the same target address, for email changes) stop working. */
-export async function createOneTimeToken(tx: Tx, userId: string, purpose: string, ttlMinutes = 60, relatesTo: string | null = null) {
+/** `keepEarlier`: a new recovery or magic link does not cancel the one already
+ *  sent, so someone asking in another's name cannot void it (audit 2026-11-16, M8);
+ *  using any of them voids the others. */
+/** A PKCE challenge sent with the request that asked for the link (L48). */
+export interface CodeChallenge { challenge: string; method: 's256' | 'plain' }
+
+export async function createOneTimeToken(tx: Tx, userId: string, purpose: string, ttlMinutes = 60, relatesTo: string | null = null, keepEarlier = false,
+  pkce: CodeChallenge | null = null) {
   const token = newSecret();
-  await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND purpose = ? AND used_at IS NULL
-      AND (relates_to <=> ?)`, [userId, purpose, relatesTo]);
-  await exec(tx, `INSERT INTO auth_one_time_tokens (id, user_id, purpose, token_hash, expires_at, relates_to) VALUES (UUID(), ?, ?, ?, ?, ?)`,
-    [userId, purpose, sha256(token), toMysqlDatetime(new Date(Date.now() + ttlMinutes * 60_000)), relatesTo]);
+  if (!keepEarlier) {
+    await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND purpose = ? AND used_at IS NULL
+        AND (relates_to <=> ?)`, [userId, purpose, relatesTo]);
+  }
+  await exec(tx, `INSERT INTO auth_one_time_tokens (id, user_id, purpose, token_hash, expires_at, relates_to, code_challenge, code_challenge_method)
+      VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, purpose, sha256(token), toMysqlDatetime(new Date(Date.now() + ttlMinutes * 60_000)), relatesTo, pkce?.challenge ?? null, pkce?.method ?? null]);
   return token;
 }
 
 export async function consumeOneTimeToken(tx: Tx, token: string, purposes: string[]) {
-  const row = await one<{ id: string; user_id: string; purpose: string; relates_to: string | null }>(tx,
-    `SELECT id, user_id, purpose, relates_to FROM auth_one_time_tokens WHERE token_hash = ? AND used_at IS NULL
+  const row = await one<{ id: string; user_id: string; purpose: string; relates_to: string | null; code_challenge: string | null; code_challenge_method: string | null }>(tx,
+    `SELECT id, user_id, purpose, relates_to, code_challenge, code_challenge_method FROM auth_one_time_tokens WHERE token_hash = ? AND used_at IS NULL
        AND expires_at > CURRENT_TIMESTAMP(6) FOR UPDATE`, [sha256(token)]);
   if (!row || !purposes.includes(row.purpose)) throw authErrors.otpExpired();
   await exec(tx, 'UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [row.id]);
+  // The other links of the same kind stop working (an email change needs both of its own).
+  if (row.purpose !== 'email_change') {
+    await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6)
+        WHERE user_id = ? AND purpose = ? AND used_at IS NULL`, [row.user_id, row.purpose]);
+  }
   return row;
+}
+
+/** An authorization code for the PKCE flow: valid five minutes, once (L48). */
+export async function createFlowCode(tx: Tx, userId: string, purpose: string, pkce: CodeChallenge): Promise<string> {
+  const code = newSecret();
+  await exec(tx, `INSERT INTO auth_flow_codes (code_hash, user_id, purpose, code_challenge, code_challenge_method, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?)`, [sha256(code), userId, purpose, pkce.challenge, pkce.method, toMysqlDatetime(new Date(Date.now() + 5 * 60_000))]);
+  return code;
+}
+
+/** Trades a code and its verifier for the user and the link's purpose (L48). */
+export async function consumeFlowCode(tx: Tx, code: string, verifier: string): Promise<{ user_id: string; purpose: string } | null> {
+  const row = await one<{ user_id: string; purpose: string; code_challenge: string; code_challenge_method: string }>(tx,
+    `SELECT user_id, purpose, code_challenge, code_challenge_method FROM auth_flow_codes
+      WHERE code_hash = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP(6) FOR UPDATE`, [sha256(code)]);
+  if (!row) return null;
+  // Used up either way: a wrong verifier does not leave the code open to guessing.
+  await exec(tx, 'UPDATE auth_flow_codes SET used_at = CURRENT_TIMESTAMP(6) WHERE code_hash = ?', [sha256(code)]);
+  const expected = row.code_challenge_method === 's256'
+    ? createHash('sha256').update(verifier).digest('base64url')
+    : verifier;
+  const a = Buffer.from(expected), b = Buffer.from(row.code_challenge);
+  return a.length === b.length && timingSafeEqual(a, b) ? { user_id: row.user_id, purpose: row.purpose } : null;
 }

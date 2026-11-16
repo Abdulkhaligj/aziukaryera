@@ -166,7 +166,9 @@
     if (!matches(token) || (payload.ok && payload.uid !== token.ownerId)) return stale();
     return payload.ok ? api.markPayload(payload, token) : payload;
   };
-  const excluded = new Set(['getSession','loadAll','signIn','signUp','signOut','providers','signInWithGoogle','signInWithAzure','signInWithMagicLink','resetPassword','resendConfirmation']);
+  // Sign-in steps and device clean-up belong to no account's session (the
+  // email-link code and the offline cache: audit 2026-11-16, L48 and L50).
+  const excluded = new Set(['getSession','loadAll','signIn','signUp','signOut','providers','signInWithGoogle','signInWithAzure','signInWithMagicLink','resetPassword','resendConfirmation','readCodeLinkError','clearOfflineCache']);
   for (const name of Object.keys(Backend)) {
     const original = Backend[name];
     if (excluded.has(name) || original?.constructor?.name !== 'AsyncFunction') continue;

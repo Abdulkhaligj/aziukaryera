@@ -12,6 +12,15 @@ const EmployerTools = {
   },
   appointments: [],
   partnerships: [],
+  /** The video-call services the server accepts for an interview link (audit 2026-11-16, L49). */
+  meetingUrlAllowed(value) {
+    try {
+      const url = new URL(String(value || '').trim());
+      const host = url.hostname.toLowerCase();
+      return url.protocol === 'https:' && !url.username && !url.password && !url.port &&
+        (['meet.google.com', 'teams.microsoft.com', 'teams.live.com'].includes(host) || host === 'zoom.us' || host.endsWith('.zoom.us'));
+    } catch { return false; }
+  },
   loaded: { calendar: false, partnerships: false, adminPartnerships: false },
   userId: null,
 
@@ -275,7 +284,7 @@ function viewEmployerCalendar() {
       '<div class="em-form-two"><label>Müddət<select name="duration_minutes">'+[30,45,60,90].map(n=>'<option value="'+n+'"'+(n===45?' selected':'')+'>'+n+' dəq</option>').join('')+'</select></label>'+
       '<label>Format<select name="meeting_mode"><option value="on_site">Əyani</option><option value="online">Onlayn</option><option value="phone">Telefon</option></select></label></div>'+
       '<label>Məkan<input name="location" maxlength="300" placeholder="Bakı, ofis / ünvan"></label>'+
-      '<label>Görüş linki (onlayn)<input name="meeting_url" type="url" placeholder="https://..." maxlength="1000"></label>'+
+      '<label>Görüş linki (onlayn)<input name="meeting_url" type="url" placeholder="https://meet.google.com/… (Meet, Zoom, Teams)" maxlength="1000"></label>'+
       '<label>Qısa qeyd<textarea name="notes" maxlength="2000" rows="2" placeholder="Namizədə göndəriləcək qeydlər"></textarea></label>'+
       '<button class="btn primary block" type="submit"'+(em.ui.busy?' disabled':'')+'>Müsahibəni təyin et</button></form>')+
     '</section></div>'+
@@ -422,7 +431,7 @@ document.addEventListener('submit',async e=>{
       const when=new Date(dt);
       if(!v('date')||!v('time')||!Number.isFinite(when.getTime())||when<=new Date())throw new Error('Gələcək tarix və vaxt seçin.');
       const url=v('meeting_url');
-      if(url&&!/^https:\/\/[^ ]+$/i.test(url))throw new Error('Görüş linki https:// ilə başlamalıdır.');
+      if(url&&!EmployerTools.meetingUrlAllowed(url))throw new Error('Görüş linki yalnız Google Meet, Zoom və ya Microsoft Teams ünvanı ola bilər (https://).');
       const payload={application_id:v('application_id'),starts_at:when.toISOString(),
         duration_minutes:Number(v('duration_minutes'))||45,meeting_mode:v('meeting_mode'),
         location:v('location'),meeting_url:url,notes:v('notes')};

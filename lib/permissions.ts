@@ -36,6 +36,14 @@ export function can(role: AdminRole | string, action: Action, resource: Resource
   return false;
 }
 
+/** Sections a role loads at all (audit 2026-11-16, L41): staff accounts for
+ *  super admins, money for super admins and managers, the rest for every role. */
+export function canView(role: AdminRole | string, resource: ResourceKey): boolean {
+  if (resource === 'admins') return role === 'super_admin';
+  if (commerce.has(resource) && resource !== 'ads') return role === 'super_admin' || role === 'manager';
+  return true;
+}
+
 /** Approving or publishing a vacancy (audit 2026-11-13, #31): not for editors,
  *  who write vacancies; the API refuses it for them as well. */
 export const canApproveJobs = (role: AdminRole | string) => role === 'super_admin' || role === 'manager';

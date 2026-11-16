@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getAdminContext } from '@/lib/admin-data';
 import { reviewPartnership } from './actions';
 import styles from './partnerships.module.css';
+import { publicError } from '@/lib/admin-input';
 
 type Partnership = {
   id:string; company_id:string; category:string; title:string; details:string;
@@ -57,7 +58,7 @@ export default async function PartnershipAdminPage({
           <Link href="/admin" className={styles.back}>← Admin panelinə qayıt</Link>
         </header>
         {notice[result] && <div className={styles.notice} role="status">{notice[result]}</div>}
-        {error && <div className={styles.notice} role="alert">Müraciətlər yüklənmədi: {error.message}</div>}
+        {error && <div className={styles.notice} role="alert">Müraciətlər yüklənmədi: {publicError(error, 'yenidən cəhd edin')}</div>}
         <p className={styles.count}>{rows.length} müraciət · {canReview?'Qərar vermək aktivdir':'Yalnız baxış rejimi'}</p>
         <section className={styles.items}>
           {rows.length===0 && !error && <div className={styles.empty}>Hələ şirkətlərdən əməkdaşlıq müraciəti daxil olmayıb.</div>}

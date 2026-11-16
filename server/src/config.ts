@@ -45,7 +45,15 @@ export interface Config {
   jobs: boolean;
   /** Browser origins allowed to call the API (CORS). */
   corsOrigins: string[];
+  /** STORAGE_SIGNING_KEY: own key for signed storage URLs (optional). */
+  storageSigningKey?: string;
+  /** Requests per minute to /rest and /storage: per account, and per address
+   *  for calls without a signed-in person (audit 2026-11-16, I10). */
+  requestsPerMinute: { user: number; address: number };
 }
+
+import { fileURLToPath } from 'node:url';
+import { intEnv } from './db.ts';
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
@@ -53,14 +61,32 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
+/** Secrets that only the API's own code reads. Once the configuration has them,
+ *  they are removed from process.env, so code loaded later in the same process
+ *  (the functions) cannot read them there (audit 2026-11-16, L19). The functions
+ *  get their own allow-listed environment through the Deno shim. */
+export const PROCESS_SECRETS = ['JWT_SECRET', 'MYSQL_URL', 'DATA_ENCRYPTION_KEY', 'SMTP_PASS', 'STORAGE_SIGNING_KEY', 'MODERATION_WEBHOOK_SECRET',
+  'SERVICE_ROLE_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY'];
+export function scrubProcessSecrets(env: NodeJS.ProcessEnv = process.env) {
+  for (const name of PROCESS_SECRETS) delete env[name];
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const jwtSecret = required(env, 'JWT_SECRET');
   if (jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
   const publicUrl = required(env, 'API_EXTERNAL_URL').replace(/\/$/, '');
   const siteUrl = (env.SITE_URL || 'https://asoiu-career.vercel.app').replace(/\/$/, '');
+  // In production the API does not start without what keeps it honest (M30, M32):
+  // its own field-encryption key (not derived from JWT_SECRET, which rotate-keys.sh
+  // replaces), real email delivery, and the moderation secret.
+  if (env.NODE_ENV === 'production') {
+    const missing = ['DATA_ENCRYPTION_KEY', 'SMTP_HOST', 'MODERATION_WEBHOOK_SECRET'].filter(name => !env[name]);
+    if (missing.length) throw new Error(`production needs ${missing.join(', ')}`);
+    if ((env.MODERATION_WEBHOOK_SECRET ?? '').length < 32) throw new Error('MODERATION_WEBHOOK_SECRET must be at least 32 characters');
+  }
   return {
     host: env.HOST || '127.0.0.1',
-    port: Number(env.PORT || 8000),
+    port: intEnv(env, 'PORT', 8000, 1, 65535),
     mysqlUrl: required(env, 'MYSQL_URL'),
     publicUrl,
     siteUrl,
@@ -68,29 +94,37 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwtSecret,
     anonKey: required(env, 'ANON_KEY'),
     serviceRoleKey: required(env, 'SERVICE_ROLE_KEY'),
-    accessTokenTtl: Number(env.JWT_EXPIRY || 3600),
-    refreshTokenTtlDays: Number(env.REFRESH_TOKEN_TTL_DAYS || 30),
+    accessTokenTtl: intEnv(env, 'JWT_EXPIRY', 3600, 60, 86400),
+    refreshTokenTtlDays: intEnv(env, 'REFRESH_TOKEN_TTL_DAYS', 30, 1, 365),
     // H-01 (audit 2026-11-12): sign-ups confirm their email unless explicitly disabled.
     mailerAutoconfirm: (env.ENABLE_EMAIL_AUTOCONFIRM ?? 'false') === 'true',
     secureEmailChange: (env.SECURE_EMAIL_CHANGE ?? 'true') === 'true',
     disableSignup: env.DISABLE_SIGNUP === 'true',
     // At least 8 characters (#64).
-    passwordMinLength: Math.max(8, Number(env.PASSWORD_MIN_LENGTH || 8)),
+    // A value that is not a whole number stops the start, instead of becoming NaN
+    // and letting any password through (audit 2026-11-16, M6).
+    passwordMinLength: intEnv(env, 'PASSWORD_MIN_LENGTH', 8, 8, 72),
     universityDomain: env.UNIVERSITY_EMAIL_DOMAIN || 'asoiu.edu.az',
     smtp: env.SMTP_HOST ? {
       host: env.SMTP_HOST,
-      port: Number(env.SMTP_PORT || 587),
+      port: intEnv(env, 'SMTP_PORT', 587, 1, 65535),
       user: env.SMTP_USER || '',
       pass: env.SMTP_PASS || '',
       from: `${env.SMTP_SENDER_NAME || 'ADNSU Karyera Mərkəzi'} <${env.SMTP_ADMIN_EMAIL || 'career@asoiu.edu.az'}>`
     } : null,
-    storageDir: env.STORAGE_DIR || new URL('../storage/', import.meta.url).pathname,
-    functionsDir: env.FUNCTIONS_DIR || new URL('../functions/', import.meta.url).pathname,
+    // fileURLToPath: a file path on every system (pathname is /C:/… on Windows: L55).
+    storageDir: env.STORAGE_DIR || fileURLToPath(new URL('../storage/', import.meta.url)),
+    functionsDir: env.FUNCTIONS_DIR || fileURLToPath(new URL('../functions/', import.meta.url)),
     // Only what the functions need; not the database URL or other secrets (#63).
     functionEnv: Object.fromEntries(Object.entries(env).filter(([k]) => /^(GEMINI_|GROQ_|MODERATION_WEBHOOK_SECRET$|PUBLIC_SITE_URL$|SITE_URL$|TZ$|NODE_ENV$)/.test(k))),
     dataEncryptionKey: env.DATA_ENCRYPTION_KEY || undefined,
     moderationSecret: env.MODERATION_WEBHOOK_SECRET || undefined,
+    storageSigningKey: env.STORAGE_SIGNING_KEY || undefined,
     jobs: (env.ENABLE_JOBS ?? 'true') === 'true',
+    requestsPerMinute: {
+      user: intEnv(env, 'API_REQUESTS_PER_MINUTE_USER', 600, 60, 100_000),
+      address: intEnv(env, 'API_REQUESTS_PER_MINUTE_ADDRESS', 1200, 60, 100_000)
+    },
     corsOrigins: [...new Set([siteUrl, ...(env.CORS_ORIGINS || '').split(','), ...(env.ADDITIONAL_REDIRECT_URLS || '').split(',')]
       .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))]
   };

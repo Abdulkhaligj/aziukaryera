@@ -86,6 +86,10 @@ export function fromDatabase(error: unknown, table: string, ctx: Context | null 
       return new PgError(400, '22P02', `invalid input value for column "${msg.match(/column '([^']+)'/i)?.[1] ?? 'unknown'}"`);
     case 1054: return new PgError(400, '42703', `column "${msg.match(/column '([^']+)'/i)?.[1] ?? 'unknown'}" does not exist`);
     case 1644: return new PgError(400, e.sqlState || 'P0001', msg); // our own SIGNAL text
+    // Out of range, as Postgres numeric_value_out_of_range (M21).
+    case 1264: case 1690: return new PgError(400, '22003', `value out of range for column "${msg.match(/column '([^']+)'/i)?.[1] ?? 'unknown'}"`);
+    // Lock wait or statement time-out: busy, try again (M21).
+    case 1205: case 3024: return new PgError(503, '57014', 'canceling statement due to timeout');
     default: return null;
   }
 }

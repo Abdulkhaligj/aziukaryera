@@ -7,14 +7,32 @@ import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql
 export type Row = Record<string, unknown>;
 export type Tx = PoolConnection;
 
-export function createPool(url: string): Pool {
+/** A whole number from the environment, within limits; anything else stops the start (M6, L33). */
+export function intEnv(env: NodeJS.ProcessEnv, name: string, fallback: number, min: number, max: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!/^\s*\d+\s*$/.test(raw) || !Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be a whole number from ${min} to ${max} (got "${raw}")`);
+  }
+  return value;
+}
+
+/** Session settings of every connection: the same time zone, isolation and
+ *  SQL mode as the code assumes, wherever the server's defaults differ. */
+const SQL_MODE = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+export const SESSION_VARIABLES = '@auth_uid, @auth_role, @is_admin, @admin_role, @actor_is_staff, @jwt_admin_role';
+
+export function createPool(url: string, env: NodeJS.ProcessEnv = process.env): Pool {
+  const lockWait = intEnv(env, 'MYSQL_LOCK_WAIT_SECONDS', 10, 1, 300);
+  const maxExecution = intEnv(env, 'MYSQL_MAX_EXECUTION_MS', 15000, 100, 600000);
   const pool = mysql.createPool({
     uri: url,
     charset: 'UTF8MB4_0900_AI_CI',
     timezone: 'Z',
     // A full pool queues at most queueLimit requests; the rest fail fast (#49).
-    connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 20),
-    queueLimit: Number(process.env.MYSQL_QUEUE_LIMIT || 200),
+    connectionLimit: intEnv(env, 'MYSQL_POOL_SIZE', 20, 1, 500),
+    queueLimit: intEnv(env, 'MYSQL_QUEUE_LIMIT', 200, 0, 100000),
     connectTimeout: 10_000,
     decimalNumbers: true,
     dateStrings: true,
@@ -32,11 +50,17 @@ export function createPool(url: string): Pool {
   });
   // Same collation as the columns, so literals and session variables compare
   // without "Illegal mix of collations". (The handshake can only carry ids ≤ 255.)
-  (pool as unknown as { pool: { on(event: 'connection', cb: (c: { query(sql: string): void }) => void): void } })
+  // Every statement runs before any other on the connection; a failure is logged (L33).
+  // READ COMMITTED as in Postgres: a count after a lock sees what others committed (H3).
+  // UTC session time zone, so CURRENT_TIMESTAMP defaults are UTC like the code (M22).
+  // A fixed SQL mode: strict, and backslash escaping as the driver expects (L22).
+  type Raw = { query(sql: string, cb: (error: Error | null) => void): void };
+  (pool as unknown as { pool: { on(event: 'connection', cb: (c: Raw) => void): void } })
     .pool.on('connection', connection => {
-      connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_ci');
-      // A request waits at most 10 s for a row lock and a read runs at most 15 s (#49).
-      connection.query(`SET SESSION innodb_lock_wait_timeout = ${Number(process.env.MYSQL_LOCK_WAIT_SECONDS || 10)}, max_execution_time = ${Number(process.env.MYSQL_MAX_EXECUTION_MS || 15000)}`);
+      const report = (error: Error | null) => { if (error) console.error('MySQL session setup failed:', error.message); };
+      connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_0900_as_ci', report);
+      connection.query(`SET SESSION transaction_isolation = 'READ-COMMITTED', time_zone = '+00:00', sql_mode = '${SQL_MODE}',
+        innodb_lock_wait_timeout = ${lockWait}, max_execution_time = ${maxExecution}`, report);
     });
   return pool;
 }
@@ -82,11 +106,40 @@ export async function insertOnce(db: Pool | Tx, sql: string, params: unknown[]):
 type Task = () => Promise<unknown>;
 const afterCommit = new WeakMap<Tx, Task[]>();
 
+/** Settings a connection must have; checked at start-up (M22, H3). */
+export async function checkSession(pool: Pool): Promise<void> {
+  const [row] = await rows<{ tz: string; iso: string; mode: string }>(pool,
+    'SELECT @@session.time_zone AS tz, @@session.transaction_isolation AS iso, @@session.sql_mode AS mode');
+  if (row.tz !== '+00:00' || row.iso !== 'READ-COMMITTED' || !/STRICT_TRANS_TABLES/.test(row.mode)) {
+    throw new Error(`MySQL session settings were not applied (time_zone=${row.tz}, isolation=${row.iso})`);
+  }
+}
+
+/** After-commit work still running, so a shutdown can wait for it (M24). */
+const pending = new Set<Promise<unknown>>();
+export async function drainAfterCommit(timeoutMs: number): Promise<number> {
+  const left = [...pending];
+  await Promise.race([Promise.allSettled(left), new Promise(resolve => setTimeout(resolve, timeoutMs).unref())]);
+  return pending.size;
+}
+
 /** Work that may only happen once the transaction is committed, such as
  *  the moderation webhook (pg_net sent its queued requests the same way). */
 export function onCommit(tx: Tx, task: Task): void {
   if (!afterCommit.has(tx)) afterCommit.set(tx, []);
   afterCommit.get(tx)!.push(task);
+}
+
+/** A savepoint; rolling back to it also drops the after-commit work added since (L6). */
+export interface Savepoint { name: string; tasks: number }
+export async function savepoint(tx: Tx, name: string): Promise<Savepoint> {
+  if (!/^\w+$/.test(name)) throw new Error('bad savepoint name');
+  await tx.query(`SAVEPOINT ${name}`);
+  return { name, tasks: afterCommit.get(tx)?.length ?? 0 };
+}
+export async function rollbackTo(tx: Tx, mark: Savepoint): Promise<void> {
+  await tx.query(`ROLLBACK TO SAVEPOINT ${mark.name}`);
+  afterCommit.get(tx)?.splice(mark.tasks);
 }
 
 /** A deadlock rolls the whole transaction back; it is tried again twice (#49). */
@@ -104,21 +157,28 @@ export async function transaction<T>(pool: Pool, work: (tx: Tx) => Promise<T>): 
 async function transactionOnce<T>(pool: Pool, work: (tx: Tx) => Promise<T>): Promise<T> {
   const tx = await pool.getConnection();
   afterCommit.delete(tx);
+  let broken = false;
   try {
     await tx.beginTransaction();
     const result = await work(tx);
     await tx.commit();
     const tasks = afterCommit.get(tx) ?? [];
     afterCommit.delete(tx);
-    for (const task of tasks) {
-      task().catch(error => console.error('after-commit task failed:', error instanceof Error ? error.message : error));
+    for (const [index, task] of tasks.entries()) {
+      const running: Promise<unknown> = task()
+        .catch(error => console.error(`after-commit task ${index + 1}/${tasks.length} failed:`, error instanceof Error ? error.stack ?? error.message : error))
+        .finally(() => pending.delete(running));
+      pending.add(running);
     }
     return result;
   } catch (error) {
     afterCommit.delete(tx);
-    await tx.rollback().catch(() => {});
+    // A connection that cannot roll back is not given to the next request (L27).
+    await tx.rollback().catch(() => { broken = true; });
     throw error;
   } finally {
-    tx.release();
+    // The caller's identity does not stay on a pooled connection (L23).
+    if (!broken) await tx.query(`SET ${SESSION_VARIABLES.split(', ').map(v => `${v} = NULL`).join(', ')}`).catch(() => { broken = true; });
+    if (broken) tx.destroy(); else tx.release();
   }
 }

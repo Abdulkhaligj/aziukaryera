@@ -129,7 +129,7 @@ function EditorFields({ resource, row, data, lookups, mode, self = false, role =
   if (resource === 'jobs') return <>
     <label className="field">Elanın adı<input name="title" defaultValue={row?.title} required/></label>
     <div className="formGrid"><label className="field">Şirkət<select name="company_id" defaultValue={String(f.company_id || companies[0]?.id || '')} required>{companies.map(company => <option key={company.id} value={company.id}>{company.title}</option>)}</select></label><label className="field">Elan növü<select name="type" defaultValue={String(f.type || 'tecrube')}><option value="is">İş</option><option value="tecrube">Təcrübə</option><option value="graduate">Məzun proqramı</option><option value="konullu">Könüllülük</option></select></label></div>
-    <div className="formGrid"><label className="field">Status<select name="status" defaultValue={String(f.status || 'draft')}><option value="draft">Qaralama</option><option value="pending_approval">Təsdiq gözləyir</option><option value="changes_requested">Düzəliş tələb olunur</option><option value="approved">Təsdiqlənib</option><option value="published">Dərc olunub</option><option value="rejected">Rədd edilib</option><option value="expired">Müddəti bitib</option><option value="archived">Arxiv</option></select></label><label className="field">Son müraciət tarixi<input name="deadline" type="date" defaultValue={String(f.deadline || '')} required/></label></div>
+    <div className="formGrid"><label className="field">Status<select name="status" defaultValue={String(f.status || 'draft')}><option value="draft">Qaralama</option><option value="pending_approval">Təsdiq gözləyir</option><option value="changes_requested">Düzəliş tələb olunur</option><option value="approved" disabled={!canApproveJobs(role) && f.status !== 'approved'}>Təsdiqlənib</option><option value="published" disabled={!canApproveJobs(role) && f.status !== 'published'}>Dərc olunub</option><option value="rejected">Rədd edilib</option><option value="expired">Müddəti bitib</option><option value="archived">Arxiv</option></select></label><label className="field">Son müraciət tarixi<input name="deadline" type="date" defaultValue={String(f.deadline || '')} required/></label></div>
     <label className="field">Düzəliş tələbi / rədd səbəbi<textarea name="changes_requested" rows={2} placeholder="Status 'Düzəliş tələb olunur' və ya 'Rədd edilib' olanda şirkətə göstərilir" defaultValue={String(f.changes_requested || f.rejection_reason || '')}/></label>
     <div className="formGrid"><label className="field">İş rejimi<select name="mode" defaultValue={String(f.mode || 'Əyani')}><option>Əyani</option><option>Hibrid</option><option>Uzaqdan</option></select></label><label className="field">Məkan<input name="location" defaultValue={String(f.location || 'Bakı')} required/></label></div>
     <label className="field">Qısa təsvir<textarea name="summary" rows={3} defaultValue={String(f.summary || '')}/></label>
@@ -147,8 +147,8 @@ function EditorFields({ resource, row, data, lookups, mode, self = false, role =
   </>;
   if (resource === 'companies') return <>
     <label className="field">Şirkətin adı<input name="title" defaultValue={row?.title} required/></label>
-    <div className="formGrid"><label className="field">Sektor<input name="sector" defaultValue={row?.subtitle === 'Şirkət' ? '' : row?.subtitle}/></label><label className="field">Status<select name="status" defaultValue={String(f.status || 'pending')}><option value="pending">Yoxlamada</option><option value="active">Aktiv (təsdiqlənib)</option><option value="rejected">Rədd edilib</option></select></label></div>
-    <label className="checkLine"><input type="checkbox" name="verified" value="true" defaultChecked={Boolean(f.verified)}/> Təsdiqlənmiş şirkət nişanı</label>
+    <div className="formGrid"><label className="field">Sektor<input name="sector" defaultValue={row?.subtitle === 'Şirkət' ? '' : row?.subtitle}/></label><label className="field">Status<select name="status" defaultValue={String(f.status || 'pending')} disabled={!canApproveJobs(role)}><option value="pending">Yoxlamada</option><option value="active">Aktiv (təsdiqlənib)</option><option value="rejected">Rədd edilib</option></select></label></div>
+    <label className="checkLine"><input type="checkbox" name="verified" value="true" defaultChecked={Boolean(f.verified)} disabled={!canApproveJobs(role)}/> Təsdiqlənmiş şirkət nişanı</label>
     <div className="formGrid"><label className="field">E-poçt<input name="email" type="email" defaultValue={String(f.email || '')}/></label><label className="field">Telefon<input name="phone" type="tel" defaultValue={String(f.phone || '')}/></label></div>
     <div className="formGrid"><label className="field">Vebsayt<input name="website" type="url" defaultValue={String(f.website || '')}/></label><label className="field">Şirkət ölçüsü<input name="company_size" defaultValue={String(f.company_size || '')}/></label></div>
     <label className="field">Şirkət haqqında<textarea name="about" rows={3} defaultValue={String(f.about || '')}/></label>
@@ -366,6 +366,11 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     finally { setRefreshing(false); }
   }
 
+  /** After a saved change: the list is reloaded; if that fails the change is still saved, and the toast says so. */
+  function refreshAfterSave(resource: ResourceKey) {
+    refreshResource(resource).catch(error => setToast({ tone: 'bad', text: `Yadda saxlanıldı, amma siyahı yenilənmədi: ${error instanceof Error ? error.message : 'yenidən cəhd edin'}` }));
+  }
+
   async function refreshResource(resource: ResourceKey) {
     const response = await fetch(`/api/admin/${resource}`, { cache: 'no-store' });
     const result = await readJson(response);
@@ -398,11 +403,12 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       const result = await readJson(response);
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'Əməliyyat alınmadı');
-      await refreshResource(active);
+      // Saved: the form closes now, so a second click cannot save it twice (audit 2026-11-16, M40).
       if (modal.origin) setAssistantDone(previous => ({ ...previous, [modal.origin as string]: 'done' }));
       setModal(null);
       if (result.temporaryPassword) setSecret({ title: 'Hesab yaradıldı', email: String(result.email || payload.email || ''), password: result.temporaryPassword });
-      else setToast({ tone: 'good', text: modal.mode === 'create' ? 'Əlavə edildi.' : 'Dəyişikliklər yadda saxlanıldı.' });
+      else setToast({ tone: result.warning ? 'bad' : 'good', text: result.warning || (modal.mode === 'create' ? 'Əlavə edildi.' : 'Dəyişikliklər yadda saxlanıldı.') });
+      refreshAfterSave(active);
     } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Əməliyyat alınmadı'); }
     finally { setBusy(false); }
   }
@@ -441,9 +447,9 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       const response = await fetch(`/api/admin/${active}/${row.id}`, { method: 'DELETE' });
       const result = await readJson(response);
       if (!response.ok) throw new Error(result.error || 'Silmək mümkün olmadı');
-      await refreshResource(active);
       setModal(null);
       setToast({ tone: 'good', text: 'Qeyd silindi.' });
+      refreshAfterSave(active);
     } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Silmək mümkün olmadı'); }
     finally { setBusy(false); }
   }
@@ -458,7 +464,7 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       if (!response.ok) throw new Error(result.error || 'Şifrə sıfırlanmadı');
       setModal(null);
       setSecret({ title: 'Şifrə sıfırlandı', email: String(result.email || ''), password: result.temporaryPassword });
-      await refreshResource(active);
+      refreshAfterSave(active);
     } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Şifrə sıfırlanmadı'); }
     finally { setBusy(false); }
   }
@@ -477,8 +483,8 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
       if (response.status === 401) { window.location.href = '/login'; return; }
       if (!response.ok) throw new Error(result.error || 'Yaradılmadı');
       setAssistantDone(previous => ({ ...previous, [key]: 'done' }));
-      await refreshResource(resource);
       setToast({ tone: 'good', text: `${titles[resource]}: yeni qeyd dərc olundu.` });
+      refreshAfterSave(resource);
     } catch (caught) {
       setAssistantDone(previous => ({ ...previous, [key]: caught instanceof Error ? caught.message : 'Yaradılmadı' }));
     }

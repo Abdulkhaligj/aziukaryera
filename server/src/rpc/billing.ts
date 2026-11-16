@@ -14,6 +14,10 @@ rpc({
          AND m.status = 'active' AND m.member_role IN ('owner', 'admin'))
        ORDER BY c.owner_id = ? DESC LIMIT 1`, [me, me, me]) : null;
     if (!company) throw new DbRuleError('Şirkət hesabı tapılmadı', 'P0001');
+    // A rejected company or a blocked owner requests no package and no invoice (audit 2026-11-16, M4).
+    const live = await one(env.tx, `SELECT 1 AS ok FROM companies c JOIN profiles op ON op.id = c.owner_id
+       WHERE c.id = ? AND c.status = 'active' AND op.status = 'active'`, [company.id]);
+    if (!live) throw new DbRuleError('Şirkət hesabı aktiv deyil', '42501');
     if (!await one(env.tx, 'SELECT id FROM plans WHERE id = ? AND active', [a.p_plan_id])) throw new DbRuleError('Paket tapılmadı', 'P0001');
     // ON CONFLICT (company_id) DO NOTHING
     if (!await one(env.tx, 'SELECT id FROM subscriptions WHERE company_id = ? FOR UPDATE', [company.id])) {

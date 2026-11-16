@@ -50,21 +50,26 @@ CREATE TABLE IF NOT EXISTS `private_candidate_search_log` (
 -- #54: deleting a person's profile no longer deletes their company (and with it
 -- every vacancy and application); the company stays without an owner. Payments
 -- are financial records: a company that has any cannot be deleted.
+-- Each step is one ALTER TABLE that adds a key and drops the other, so the table
+-- is never without its foreign key, and the final name is the Postgres one
+-- (relationship hints use it). Re-running continues where a step stopped (L24).
 SET @s = IF((SELECT delete_rule FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE()
-    AND constraint_name = 'companies_owner_id_fkey') = 'CASCADE',
-  'ALTER TABLE `companies` DROP FOREIGN KEY `companies_owner_id_fkey`', 'DO 0');
+    AND constraint_name = 'companies_owner_id_fkey') = 'CASCADE'
+    AND (SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND constraint_name = 'companies_owner_id_fkey_new') = 0,
+  'ALTER TABLE `companies` ADD CONSTRAINT `companies_owner_id_fkey_new` FOREIGN KEY (`owner_id`) REFERENCES `profiles` (`id`) ON DELETE SET NULL, DROP FOREIGN KEY `companies_owner_id_fkey`', 'DO 0');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
-SET @s = IF((SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE()
-    AND constraint_name = 'companies_owner_id_fkey') = 0,
-  'ALTER TABLE `companies` ADD CONSTRAINT `companies_owner_id_fkey` FOREIGN KEY (`owner_id`) REFERENCES `profiles` (`id`) ON DELETE SET NULL', 'DO 0');
+SET @s = IF((SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND constraint_name = 'companies_owner_id_fkey_new') = 1
+    AND (SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND constraint_name = 'companies_owner_id_fkey') = 0,
+  'ALTER TABLE `companies` ADD CONSTRAINT `companies_owner_id_fkey` FOREIGN KEY (`owner_id`) REFERENCES `profiles` (`id`) ON DELETE SET NULL, DROP FOREIGN KEY `companies_owner_id_fkey_new`', 'DO 0');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 SET @s = IF((SELECT delete_rule FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE()
-    AND constraint_name = 'payments_company_id_fkey') = 'CASCADE',
-  'ALTER TABLE `payments` DROP FOREIGN KEY `payments_company_id_fkey`', 'DO 0');
+    AND constraint_name = 'payments_company_id_fkey') = 'CASCADE'
+    AND (SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND constraint_name = 'payments_company_id_fkey_new') = 0,
+  'ALTER TABLE `payments` ADD CONSTRAINT `payments_company_id_fkey_new` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT, DROP FOREIGN KEY `payments_company_id_fkey`', 'DO 0');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
-SET @s = IF((SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE()
-    AND constraint_name = 'payments_company_id_fkey') = 0,
-  'ALTER TABLE `payments` ADD CONSTRAINT `payments_company_id_fkey` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT', 'DO 0');
+SET @s = IF((SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND constraint_name = 'payments_company_id_fkey_new') = 1
+    AND (SELECT COUNT(*) FROM information_schema.referential_constraints WHERE constraint_schema = DATABASE() AND constraint_name = 'payments_company_id_fkey') = 0,
+  'ALTER TABLE `payments` ADD CONSTRAINT `payments_company_id_fkey` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE RESTRICT, DROP FOREIGN KEY `payments_company_id_fkey_new`', 'DO 0');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 
 -- H-06: a company manages its data only while it is active and its owner is.
@@ -74,5 +79,11 @@ CREATE FUNCTION `owns_active_company`(c_id CHAR(36) CHARACTER SET ascii COLLATE 
   RETURN EXISTS (SELECT 1 FROM `companies` c JOIN `profiles` p ON p.`id` = c.`owner_id`
     WHERE c.`id` = c_id AND c.`owner_id` = @auth_uid AND c.`status` = 'active' AND p.`status` = 'active');
 
--- #73: the moderation webhook secret lives only in the API's environment.
+-- #73: the moderation webhook secret lives only in the API's environment. The
+-- old CHECK (at least 32 characters) is dropped first, or the empty secret is
+-- refused (ERROR 3819) and 03-start.sh stops (audit 2026-11-16, H2).
+SET @s = IF((SELECT COUNT(*) FROM information_schema.check_constraints WHERE constraint_schema = DATABASE()
+    AND constraint_name = 'moderation_webhook_config_secret_check') = 1,
+  'ALTER TABLE `private_moderation_webhook_config` DROP CHECK `moderation_webhook_config_secret_check`', 'DO 0');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
 UPDATE `private_moderation_webhook_config` SET `secret` = '' WHERE `secret` <> '';
