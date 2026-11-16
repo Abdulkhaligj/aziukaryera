@@ -2,8 +2,12 @@
 # Starts the stack and points the moderation webhook at this server.
 . "$(dirname "$0")/lib.sh"
 load_env
+# The API image runs in production mode and does not start without e-mail
+# (links, invitations) or the encryption key (audit 2026-11-16, M30 and M32).
+[ -n "$(api_env_get SMTP_HOST)" ] || die "api.env: SMTP_HOST boşdur. SMTP_* dəyərlərini doldurun — API onsuz başlamır."
+[ -n "$(api_env_get DATA_ENCRYPTION_KEY)" ] || die "api.env: DATA_ENCRYPTION_KEY boşdur. scripts/01-init.sh onu yaradır."
 case "$(api_env_get ENABLE_EMAIL_AUTOCONFIRM)" in
-  false|'') [ -n "$(api_env_get SMTP_HOST)" ] || die "api.env: e-poçt təsdiqi aktivdir, amma SMTP_HOST boşdur. SMTP_* dəyərlərini doldurun." ;;
+  false|'') ;;
   true) echo "XƏBƏRDARLIQ: ENABLE_EMAIL_AUTOCONFIRM=true — e-poçt təsdiqsiz qeydiyyat. Yalnız sınaq üçün." ;;
   *) die "api.env: ENABLE_EMAIL_AUTOCONFIRM true və ya false olmalıdır." ;;
 esac

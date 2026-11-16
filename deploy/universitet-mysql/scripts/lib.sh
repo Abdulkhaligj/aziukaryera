@@ -6,10 +6,16 @@ REPO_DIR="$(cd "$KIT_DIR/../.." && pwd)"
 die() { echo "XƏTA: $*" >&2; exit 1; }
 step() { echo; echo "==> $*"; }
 dc() { docker compose -f "$KIT_DIR/docker-compose.yml" --env-file "$KIT_DIR/kit.env" "$@"; }
+# A host name only (letters, digits, hyphens, dots): it is written into SQL,
+# the Caddyfile and URLs (audit 2026-11-16, L25).
+valid_domain() {
+  printf '%s' "$1" | LC_ALL=C grep -Eq '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$' && [ ${#1} -le 253 ]
+}
 load_env() {
   [ -f "$KIT_DIR/kit.env" ] || die "kit.env yoxdur. Əvvəlcə scripts/01-init.sh işlədin."
   [ -f "$KIT_DIR/api.env" ] || die "api.env yoxdur. Əvvəlcə scripts/01-init.sh işlədin."
   set -a; . "$KIT_DIR/kit.env"; set +a
+  valid_domain "${API_DOMAIN:-}" || die "kit.env: API_DOMAIN domen adı olmalıdır (kiçik hərflər, məs. api.career.asoiu.edu.az)."
 }
 api_env_get() { awk -v k="$1" 'index($0, k"=")==1 { v=substr($0, length(k)+2) } END { print v }' "$KIT_DIR/api.env"; }
 # KEY=VALUE in a file; the value travels through the environment, not argv.

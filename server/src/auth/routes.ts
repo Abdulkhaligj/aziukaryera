@@ -13,7 +13,7 @@ import { composeMail, type Mailer, type MailKind } from './mailer.ts';
 import { handleNewUser } from './new-user.ts';
 import { deleteRow } from '../write/pipeline.ts';
 import { clientKey, RateLimiter } from './rate-limit.ts';
-import { consumeOneTimeToken, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession } from './tokens.ts';
+import { consumeFlowCode, consumeOneTimeToken, createFlowCode, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession, type CodeChallenge } from './tokens.ts';
 import { findUserByEmail, findUserById, isBanned, mergeMetadata, normalizeEmail, toGoTrueUser, validEmail, type AuthUser } from './users.ts';
 
 export interface AuthDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer }
@@ -59,6 +59,16 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   const deliver = (mail: ReturnType<typeof composeMail>) => {
     void mailer.send(mail).catch(error => app.log.error({ err: error, kind: mail.kind }, 'email delivery failed'));
   };
+  /** The PKCE challenge of a request, as GoTrue reads it (L48). */
+  function pkceOf(body: Body): CodeChallenge | null {
+    if (body.code_challenge === undefined || body.code_challenge === null || body.code_challenge === '') return null;
+    const challenge = String(body.code_challenge);
+    const method = String(body.code_challenge_method ?? 's256').toLowerCase();
+    if (!/^[A-Za-z0-9._~-]{43,128}$/.test(challenge) || (method !== 's256' && method !== 'plain')) {
+      throw authErrors.validation('Invalid code_challenge or code_challenge_method');
+    }
+    return { challenge, method };
+  }
   /** user_metadata is copied into every token: it stays small (L14). */
   function checkMetadata(data: unknown) {
     if (data === undefined) return;
@@ -194,7 +204,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         throw error;
       }
       if (config.mailerAutoconfirm) return { session: await startSession(tx, config, user, 'password', meta(req)) };
-      return { user, token: await createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES) };
+      return { user, token: await createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES, null, false, pkceOf(body)) };
     });
     if ('session' in outcome) return outcome.session;
     const sentAt = new Date().toISOString();
@@ -215,6 +225,22 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       const result = await transaction(pool, tx => refreshSession(tx, config, body.refresh_token));
       if ('replayed' in result) throw authErrors.refreshUsed();
       return result;
+    }
+    if (req.query.grant_type === 'pkce') {
+      // The code from an email link and the verifier kept by the browser that
+      // asked for the link (L48). A code works once, for five minutes.
+      limit(signIns, ipKey(req));
+      if (typeof body.auth_code !== 'string' || typeof body.code_verifier !== 'string') throw authErrors.validation('auth_code and code_verifier are required');
+      // The code is used up in its own transaction, so a wrong verifier closes it
+      // too (an error in the session transaction would roll that back).
+      const flow = await transaction(pool, tx => consumeFlowCode(tx, body.auth_code, body.code_verifier));
+      if (!flow) throw new AuthError(400, 'flow_state_not_found', 'invalid flow state, no valid flow state found');
+      return transaction(pool, async tx => {
+        const user = await findUserById(tx, flow.user_id);
+        if (!user) throw new AuthError(400, 'flow_state_not_found', 'invalid flow state, no valid flow state found');
+        if (isBanned(user)) throw authErrors.banned();
+        return startSession(tx, config, user, AMR[flow.purpose] || 'otp', meta(req), flow.purpose === 'recovery');
+      });
     }
     if (req.query.grant_type !== 'password') throw new AuthError(400, 'validation_failed', 'unsupported_grant_type');
     limit(signIns, ipKey(req));
@@ -329,7 +355,8 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     cooldown(email, req.ip);
     const user = await findUserByEmail(pool, email);
     if (user) {
-      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'recovery', LINK_MINUTES, null, true));
+      const pkce = pkceOf(req.body || {});
+      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'recovery', LINK_MINUTES, null, true, pkce));
       deliver(composeMail('recovery', user.email!, verifyLink(token, 'recovery', redirectTarget(req.query.redirect_to ?? req.body?.redirect_to)), LINK_MINUTES));
     }
     return {};
@@ -352,7 +379,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         try { user = await createAuthUser(tx, { email, password: null, confirmed: false, userMeta: body.data }); }
         catch (error) { if (isRuleFailure(error)) throw authErrors.databaseSignup(); throw error; }
       }
-      return { user, token: await createOneTimeToken(tx, user.id, 'magic_link', LINK_MINUTES, null, true) };
+      return { user, token: await createOneTimeToken(tx, user.id, 'magic_link', LINK_MINUTES, null, true, pkceOf(body)) };
     });
     if (outcome) deliver(composeMail('magic_link', outcome.user.email!, verifyLink(outcome.token, 'magiclink', redirect), LINK_MINUTES));
     return {};
@@ -395,7 +422,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     cooldown(email, req.ip);
     const user = await findUserByEmail(pool, email);
     if (user && !user.email_confirmed_at) {
-      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES));
+      const token = await transaction(pool, tx => createOneTimeToken(tx, user.id, 'email_confirmation', LINK_MINUTES, null, false, pkceOf(body)));
       deliver(composeMail('confirmation', user.email!, verifyLink(token, 'signup', redirectTarget(req.query.redirect_to ?? body.options?.emailRedirectTo)), LINK_MINUTES));
     }
     return {};
@@ -403,7 +430,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   /** Consumes an email token, confirms the address and opens a session. For an
    *  email change confirmed on one of two addresses, returns the GoTrue message. */
-  async function verify(token: string, type: string, req: FastifyRequest): Promise<Awaited<ReturnType<typeof startSession>> | { msg: string }> {
+  async function verify(token: string, type: string, req: FastifyRequest): Promise<Awaited<ReturnType<typeof startSession>> | { msg: string } | { code: string }> {
     // Own keys only: type=constructor is not a purpose (#75).
     const purposes = Object.hasOwn(PURPOSE, type) ? PURPOSE[type] : null;
     if (!purposes || !token) throw authErrors.otpExpired();
@@ -431,6 +458,11 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       const user = await findUserById(tx, used.user_id);
       if (!user) throw authErrors.otpExpired();
       if (isBanned(user)) throw authErrors.banned();
+      // Code flow: the browser that asked for the link gets a one-time code, and
+      // trades it (with its verifier) for the session; no token in the address (L48).
+      if (used.code_challenge && used.code_challenge_method) {
+        return { code: await createFlowCode(tx, user.id, used.purpose, { challenge: used.code_challenge, method: used.code_challenge_method as CodeChallenge['method'] }) };
+      }
       return startSession(tx, config, user, AMR[used.purpose] || 'otp', meta(req), used.purpose === 'recovery');
     });
   }
@@ -441,6 +473,10 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     try {
       const session = await verify(String(token ?? ''), String(type ?? ''), req);
       if ('msg' in session) return reply.redirect(`${redirect}#${new URLSearchParams({ message: session.msg })}`, 303);
+      if ('code' in session) {
+        const [base, fragment] = redirect.split('#');
+        return reply.redirect(`${base}${base.includes('?') ? '&' : '?'}code=${encodeURIComponent(session.code)}${fragment !== undefined ? `#${fragment}` : ''}`, 303);
+      }
       const hash = new URLSearchParams({
         access_token: session.access_token, expires_at: String(session.expires_at), expires_in: String(session.expires_in),
         refresh_token: session.refresh_token, token_type: 'bearer', type: String(type)

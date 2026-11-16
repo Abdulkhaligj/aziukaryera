@@ -92,6 +92,7 @@ export async function expireJobs(env: WriteEnv) {
 const RETENTION: { table: string; where: string; days: number }[] = [
   { table: 'auth_sessions', where: '(revoked_at IS NOT NULL OR expires_at < CURRENT_TIMESTAMP(6)) AND COALESCE(refreshed_at, created_at) < ?', days: 30 },
   { table: 'auth_one_time_tokens', where: '(used_at IS NOT NULL OR expires_at < CURRENT_TIMESTAMP(6)) AND created_at < ?', days: 7 },
+  { table: 'auth_flow_codes', where: 'created_at < ?', days: 1 },
   { table: 'private_ai_reservations', where: 'created_at < ?', days: 90 },
   { table: 'private_ai_budget_locks', where: 'created_at < ?', days: 40 },
   { table: 'private_moderation_claims', where: 'finished = 1 AND claimed_until < ?', days: 30 },

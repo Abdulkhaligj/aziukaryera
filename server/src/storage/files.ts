@@ -48,7 +48,12 @@ export class FileStore {
     return aside;
   }
   /** Puts a file moved aside back in place (M13). */
-  async restore(aside: string, bucket: string, name: string) { await rename(aside, this.path(bucket, name)); }
+  async restore(aside: string, bucket: string, name: string) {
+    // unplace() may have removed the emptied folder (an avatar is user/avatar.webp).
+    const target = this.path(bucket, name);
+    await mkdir(dirname(target), { recursive: true });
+    await rename(aside, target);
+  }
   /** Takes a placed file back to the staging path, so a retried transaction can place it again (M14). */
   async unplace(bucket: string, name: string, temp: string) { await rename(this.path(bucket, name), temp); await this.prune(bucket, name); }
   async discard(path: string) { await rm(path, { force: true }); }

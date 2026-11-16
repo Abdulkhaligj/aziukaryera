@@ -15,8 +15,24 @@ for k in JWT_SECRET ANON_KEY SERVICE_ROLE_KEY; do
 done
 step "API yenidən başladılır"
 dc up -d --force-recreate api
-echo
-echo "Hazırdır. Əvvəlki api.env: $KIT_DIR/api.env.before-rotate (yoxlamadan sonra silin)."
+# The copy with the old secrets is kept only until the API answers with the
+# new ones (audit 2026-11-16, L34).
+healthy=0
+for _ in $(seq 1 30); do
+  if dc exec -T api node -e "fetch('http://127.0.0.1:8000/auth/v1/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))" >/dev/null 2>&1; then healthy=1; break; fi
+  sleep 2
+done
+if [ $healthy -eq 1 ]; then
+  rm -f "$KIT_DIR/api.env.before-rotate"
+  echo
+  echo "Hazırdır. API yeni açarlarla işləyir; köhnə secret-lərin nüsxəsi silindi."
+else
+  echo
+  echo "XƏTA: API cavab vermir. Köhnə açarlara qayıtmaq üçün:" >&2
+  echo "  cp $KIT_DIR/api.env.before-rotate $KIT_DIR/api.env && docker compose ... up -d --force-recreate api" >&2
+  echo "Problem həll olunanda $KIT_DIR/api.env.before-rotate faylını silin." >&2
+  exit 1
+fi
 echo "İndi yeni ANON_KEY (api.env) bu iki yerə yazılmalıdır:"
 echo "  1. student-web/assets/js/runtime-config.js → apiKey, sonra commit və push."
 echo "  2. Vercel → admin panel → NEXT_PUBLIC_API_KEY (Production), sonra redeploy."

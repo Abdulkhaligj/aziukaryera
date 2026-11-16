@@ -34,7 +34,9 @@ const Backend = {
       return true;
     }
     this.sb = window.ApiClient.createClient(API_URL, API_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, ...authOptions }
+      // Code (PKCE) flow: an email link brings a one-time code, not the tokens,
+      // so no token stays in the address bar or the history (audit 2026-11-16, L48).
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', ...authOptions }
     });
     window.CareerSession?.connect(this.sb);
     if (window.CVDrafts) void window.CVDrafts.connect(this.sb);
@@ -206,8 +208,37 @@ const Backend = {
     } catch (e) { return null; }
   },
 
+  /** An email link in the code flow (L48) works only in the browser that asked
+   *  for it. Opened elsewhere, the client leaves the code in the address: it is
+   *  removed and the person is told what to do. */
+  async readCodeLinkError() {
+    try {
+      if (!this.init()) return null;
+      const { error } = await this.sb.auth.initialize();
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('code') && !error) return null;
+      if (url.searchParams.has('code')) {
+        url.searchParams.delete('code');
+        history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+      }
+      if (error && !/pkce|flow state/i.test(String(error.message))) return this.translate(error.message);
+      return 'Bu link başqa brauzerdə və ya cihazda istənib, ya da vaxtı keçib. E-poçt təsdiqi tamamlanıbsa, sadəcə daxil olun. Şifrə bərpası üçün linki sorğu göndərdiyiniz brauzerdə açın və ya yenidən sorğu göndərin.';
+    } catch { return null; }
+  },
+
+  /** On a shared computer the next person must not get the previous one's
+   *  cached files (audit 2026-11-16, L50). */
+  async clearOfflineCache() {
+    try {
+      if (!('caches' in window)) return;
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(key => key.startsWith('adnsu-career-')).map(key => caches.delete(key)));
+    } catch { /* nothing cached or storage blocked */ }
+  },
+
   async signOut() {
     if (!this.init()) return { ok: false, error: 'Giriş xidməti əlçatan deyil.' };
+    void this.clearOfflineCache();
     try {
       const { error } = await this.sb.auth.signOut();
       return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
@@ -236,6 +267,7 @@ const Backend = {
 
   /** The device forgets the session even when the server cannot be reached (#80). */
   async forgetLocalSession() {
+    void this.clearOfflineCache();
     try { await this.sb?.auth?._removeSession?.(); } catch { /* storage below */ }
     try {
       for (const key of Object.keys(window.localStorage)) {
@@ -930,7 +962,8 @@ const Adapt = {
          qoymaq yanlış uyğunluq faizləri göstərərdi. */
       faculty: tax.facultyNameById[row.faculty_id] || '',
       major: tax.majorNameById[row.major_id] || '',
-      course: row.course || 1,
+      // A number, whatever the column holds (audit 2026-11-16, L46).
+      course: Number(row.course) || 1,
       startYear: row.start_year || new Date().getFullYear(),
       gpa: row.gpa == null ? '' : Number(row.gpa),
       skills: row.skills || [],

@@ -437,12 +437,3 @@ const Auth = {
     if (changed) Store.save();
   }
 };
-
-/* Sınaq üçün demo hesabları — giriş ekranında bir kliklə doldurulur. */
-/* Demo mode only (data stays in this browser). The addresses are not real
-   mailboxes, so these passwords can never belong to a real account. */
-const DEMO_ACCOUNTS = [
-  { role: 'student', email: 'demo.telebe@asoiu.edu.az', password: 'Telebe2026', label: 'Tələbə kabineti' },
-  { role: 'company', email: 'demo.sirket@example.com',  password: 'Sirket2026', label: 'Şirkət kabineti' },
-  { role: 'admin',   email: 'demo.admin@asoiu.edu.az',  password: 'Merkez2026', label: 'Karyera Mərkəzi' }
-];

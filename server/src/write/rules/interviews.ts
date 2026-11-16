@@ -41,6 +41,28 @@ before('company_interview_slots', 'company_interview_slots_validate', ['insert',
   }
 }, ['application_id', 'starts_at', 'duration_minutes', 'meeting_mode', 'location', 'status']);
 
+// Audit 2026-11-16, L49: a company's interview link may only point to a known
+// video-call service, so a candidate is not sent to a look-alike sign-in page.
+// Rows saved before this rule keep their link until it is changed.
+export const MEETING_HOSTS = ['meet.google.com', 'zoom.us', 'teams.microsoft.com', 'teams.live.com'];
+export function meetingUrlAllowed(value: unknown): boolean {
+  const text = String(value ?? '').trim();
+  if (!text) return true;
+  let url: URL;
+  try { url = new URL(text); } catch { return false; }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+  const host = url.hostname.toLowerCase();
+  return MEETING_HOSTS.some(allowed => host === allowed || (allowed === 'zoom.us' && host.endsWith('.zoom.us')));
+}
+// Named as the other audit guards (001_security_*): it has no Postgres original.
+before('company_interview_slots', '001_security_meeting_url', ['insert', 'update'], (_env, row, old) => {
+  if (old && !changed(row, old, 'meeting_url')) return;
+  row.meeting_url = String(row.meeting_url ?? '').trim();
+  if (!meetingUrlAllowed(row.meeting_url)) {
+    throw new DbRuleError('Görüş linki yalnız Google Meet, Zoom və ya Microsoft Teams ünvanı ola bilər', '23514');
+  }
+}, ['meeting_url']);
+
 // EXCLUDE company_interview_slots_no_overlap: (application_id =, [starts_at, interview_end) &&) WHERE status = 'scheduled'
 constraint('company_interview_slots', 'company_interview_slots_no_overlap', ['insert', 'update'], async (env, row) => {
   if (row.status !== 'scheduled') return;

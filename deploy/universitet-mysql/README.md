@@ -21,7 +21,7 @@ API saytların artıq istifadə etdiyi HTTP protokolunu verir. Ona görə əsas 
 - [ ] **Domen:** məsələn `api.career.asoiu.edu.az`, DNS A qeydi bu serverə yönəlmiş.
 - [ ] **Firewall:** internetdən yalnız **80 və 443**.
 - [ ] **Çıxış internet (HTTPS):** Google Gemini API, Let's Encrypt, Docker Hub, npm.
-- [ ] **SMTP (məcburi):** host, port, istifadəçi, şifrə, göndərən ünvan (qeydiyyat təsdiqi, şifrə bərpası, admin dəvətləri). E-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`); SMTP olmadan `03-start.sh` dayanır.
+- [ ] **SMTP (məcburi):** host, port, istifadəçi, şifrə, göndərən ünvan (qeydiyyat təsdiqi, şifrə bərpası, admin dəvətləri). E-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`). API production rejimində `SMTP_HOST`, `DATA_ENCRYPTION_KEY` və ən azı 32 simvolluq `MODERATION_WEBHOOK_SECRET` olmadan başlamır; `03-start.sh` bunları əvvəlcədən yoxlayır və dayanır.
 - [ ] **AI açarı:** `GEMINI_API_KEY`, istəsəniz `GROQ_API_KEY`.
 - [ ] **Backup yeri** gündəlik nüsxələr üçün, serverdən kənarda bir maşın da daxil olmaqla.
 
@@ -50,6 +50,9 @@ Sonra `deploy/universitet-mysql/api.env` faylında `SMTP_*` və `GEMINI_API_KEY`
 | `MODERATION_WEBHOOK_SECRET` | Yalnız `api.env`-də saxlanılır, bazaya yazılmır. |
 | `STORAGE_SIGNING_KEY` | İstəyə bağlı: imzalı fayl linkləri üçün ayrıca açar. Boşdursa, JWT secret-dən törədilir. |
 | `MYSQL_POOL_SIZE`, `MYSQL_QUEUE_LIMIT`, `MYSQL_LOCK_WAIT_SECONDS`, `MYSQL_MAX_EXECUTION_MS` | İstəyə bağlı: bağlantı hovuzu (20), növbə (200), kilid gözləmə (10 s) və oxuma sorğusunun maksimum müddəti (15 000 ms). |
+| `API_REQUESTS_PER_MINUTE_USER`, `API_REQUESTS_PER_MINUTE_ADDRESS` | İstəyə bağlı (16.11.2026 auditi): `/rest` və `/storage` üçün dəqiqəlik limit — daxil olmuş hər hesaba 600, hesabsız sorğularda hər ünvana 1200. Server açarı limitsizdir. |
+
+Bu parametrlərdə tam ədəd olmayan dəyər (məs. `abc`) API-ni dayandırır, səssizcə başqa dəyərə çevrilmir. `kit.env`-də `API_DOMAIN` yalnız domen adı ola bilər (kiçik hərflər, rəqəm, `-`, `.`).
 
 Şifrələr Docker əmrlərinə arqument kimi yox, mühit dəyişəni ilə ötürülür; `ps` siyahısında görünmür.
 
@@ -98,8 +101,8 @@ Saytlar hazırda "texniki işlər" səhifəsini göstərir, yazı artıq dayanı
 | Vəziyyət | `docker compose -f deploy/universitet-mysql/docker-compose.yml --env-file deploy/universitet-mysql/kit.env ps` |
 | Loglar | `… logs -f api` |
 | Yeniləmə | `git pull && deploy/universitet-mysql/scripts/03-start.sh` (yeni migration-ları root ilə tətbiq edir, `asoiu` hesabının hüquqlarını yeniləyir, sonra API-ni yenidən qurur; migration-lar təkrar işlədilə bilər) |
-| Backup | `deploy/universitet-mysql/scripts/backup.sh /srv/backups/asoiu`, cron ilə gündəlik: `30 3 * * *` |
-| Açarların yenilənməsi | `ANON_KEY` və `SERVICE_ROLE_KEY` 2 il yaşayır; `04-verify.sh` və API logu bitməyə 30–60 gün qalmış xəbərdarlıq edir. `deploy/universitet-mysql/scripts/rotate-keys.sh` yeni açarları yazır və API-ni yenidən başladır; sonra yeni `ANON_KEY` saytın `runtime-config.js` faylına və Vercel-də `NEXT_PUBLIC_API_KEY`-ə yazılır. |
+| Backup | `deploy/universitet-mysql/scripts/backup.sh /srv/backups/asoiu`, cron ilə gündəlik: `30 3 * * *`. `BACKUP_REMOTE` boşdursa, skript hər dəfə xəbərdarlıq edir. |
+| Açarların yenilənməsi | `ANON_KEY` və `SERVICE_ROLE_KEY` 2 il yaşayır; `04-verify.sh` və API logu bitməyə 30–60 gün qalmış xəbərdarlıq edir. `deploy/universitet-mysql/scripts/rotate-keys.sh` yeni açarları yazır və API-ni yenidən başladır; API yeni açarlarla cavab verəndən sonra köhnə secret-lərin nüsxəsi (`api.env.before-rotate`) avtomatik silinir. Sonra yeni `ANON_KEY` saytın `runtime-config.js` faylına və Vercel-də `NEXT_PUBLIC_API_KEY`-ə yazılır. |
 | Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması. Nüsxələr həmişə şifrələnir; əvvəlcə: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:deploy/universitet-mysql/backup.key -in db-….sql.gz.enc \| gunzip -c \| …` |
 
 Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiya təkrarları (hər dəqiqə), paket müddətləri və bitmiş vakansiyaların bağlanması (hər saat), köhnə sessiya, link, AI rezervasiyası və bildirişlərin silinməsi (hər gün 23:30 UTC).
@@ -110,5 +113,6 @@ Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiy
 - MySQL və API portları kənara açılmır, yalnız Caddy (80/443).
 - Backup fayllarında şəxsi data və şifrə hash-ləri var: həmişə AES-256 ilə şifrələnir (`BACKUP_KEY_FILE` boş olsa, `backup.sh` dayanır). `BACKUP_REMOTE` ilə serverdən kənar nüsxəni də doldurun. Açar faylının nüsxəsini serverdən kənarda saxlayın.
 - API-nin MySQL hesabı yalnız sətirləri oxuyub-yazır və funksiyaları çağırır; sxem dəyişiklikləri root ilə edilir.
-- Caddy HSTS, `nosniff`, `Referrer-Policy`, `X-Frame-Options` başlıqlarını əlavə edir və 60 MB-dan böyük sorğuları qəbul etmir.
+- Caddy HSTS, `nosniff`, `Referrer-Policy`, `X-Frame-Options` başlıqlarını əlavə edir və 60 MB-dan böyük sorğuları qəbul etmir. API-nin özü də eyni başlıqları göndərir (Caddy-siz də).
+- `/rest` və `/storage` üçün hər hesaba və ünvana dəqiqəlik limit var; IPv6 ünvanları /64 bloku üzrə sayılır.
 - Docker imicləri digest ilə sabitlənib; hər servisin yaddaş, CPU və proses limiti var. Paketlər quraşdırma skriptləri işlədilmədən (`--ignore-scripts`) qurulur.

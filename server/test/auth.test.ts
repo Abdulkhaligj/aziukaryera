@@ -4,7 +4,7 @@ import { decodeJwt } from 'jose';
 import { exec, one, rows } from '../src/db.ts';
 import { currentAdminRole } from '../src/write/rules/core.ts';
 import { loadConfig } from '../src/config.ts';
-import { startHarness, type Harness } from './helpers.ts';
+import { codeFlowClient, startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
 before(async () => { h = await startHarness(); });
@@ -298,3 +298,49 @@ test('email confirmation is on unless ENABLE_EMAIL_AUTOCONFIRM=true (audit 2026-
   assert.equal(loadConfig({ ...base, ENABLE_EMAIL_AUTOCONFIRM: 'false' } as NodeJS.ProcessEnv).mailerAutoconfirm, false);
   assert.equal(loadConfig({ ...base, ENABLE_EMAIL_AUTOCONFIRM: 'true' } as NodeJS.ProcessEnv).mailerAutoconfirm, true);
 });
+
+test('L48: email links in the code flow: no token in the address, the code works once and only with its verifier', async () => {
+  const memory = new Map<string, string>();
+  const storage = { getItem: (k: string) => memory.get(k) ?? null, setItem: (k: string, v: string) => { memory.set(k, v); }, removeItem: (k: string) => { memory.delete(k); } };
+  const client = codeFlowClient(h.url, h.config.anonKey, storage);
+  const created = await h.service().auth.admin.createUser({ email: 'pkce@asoiu.edu.az', password: 'Sifre2026!', email_confirm: true, user_metadata: { role: 'student', full_name: 'Kod Axını' } });
+  assert.equal(created.error, null);
+  const before = h.mailer.outbox!.length;
+  assert.equal((await client.auth.resetPasswordForEmail('pkce@asoiu.edu.az', { redirectTo: 'https://asoiu-career.vercel.app/' })).error, null);
+  const mail = h.mailer.outbox![before];
+  const res = await openLink(mail.link);
+  assert.equal(res.status, 303);
+  const location = new URL(res.headers.get('location')!);
+  assert.equal(location.hash, '', 'no token in the fragment');
+  const code = location.searchParams.get('code')!;
+  assert.ok(code);
+  // Another browser, without the verifier, gets nothing for the code.
+  const stranger = await fetch(`${h.url}/auth/v1/token?grant_type=pkce`, { method: 'POST',
+    headers: { apikey: h.config.anonKey, 'content-type': 'application/json' }, body: JSON.stringify({ auth_code: code, code_verifier: 'x'.repeat(50) }) });
+  assert.equal(stranger.status, 400);
+  // A failed try used the code up as well.
+  const reused = await client.auth.exchangeCodeForSession(code);
+  assert.ok(reused.error, 'the code works once');
+  // A fresh link in the same browser: the exchange gives a recovery session.
+  const second = h.mailer.outbox!.length;
+  await exec(h.pool, 'DELETE FROM auth_one_time_tokens WHERE user_id = ?', [created.data.user!.id]);
+  // (the 60-second cooldown is per address and client; a new client key is used here)
+  const next = await fetch(`${h.url}/auth/v1/recover`, { method: 'POST', headers: { apikey: h.config.anonKey, 'content-type': 'application/json', 'x-forwarded-for': '10.9.9.9' },
+    body: JSON.stringify({ email: 'pkce@asoiu.edu.az', code_challenge: await challengeFor(storage, client), code_challenge_method: 's256' }) });
+  assert.equal(next.status, 200);
+  const link = h.mailer.outbox![second]?.link;
+  assert.ok(link, 'a second recovery mail was sent');
+  const again = new URL((await openLink(link)).headers.get('location')!).searchParams.get('code')!;
+  const { data, error } = await client.auth.exchangeCodeForSession(again);
+  assert.equal(error, null);
+  assert.equal(decodeJwt(data.session!.access_token).restricted, true, 'a recovery link gives a restricted session');
+});
+
+/** The verifier the client stored, as an S256 challenge (the client keeps it under <storageKey>-code-verifier). */
+async function challengeFor(storage: { getItem(k: string): string | null; setItem(k: string, v: string): void }, client: { auth: unknown }) {
+  const { createHash, randomBytes } = await import('node:crypto');
+  const verifier = randomBytes(32).toString('base64url');
+  const key = `${(client.auth as { storageKey: string }).storageKey}-code-verifier`;
+  storage.setItem(key, JSON.stringify(`${verifier}/PASSWORD_RECOVERY`));
+  return createHash('sha256').update(verifier).digest('base64url');
+}

@@ -47,6 +47,9 @@ export interface Config {
   corsOrigins: string[];
   /** STORAGE_SIGNING_KEY: own key for signed storage URLs (optional). */
   storageSigningKey?: string;
+  /** Requests per minute to /rest and /storage: per account, and per address
+   *  for calls without a signed-in person (audit 2026-11-16, I10). */
+  requestsPerMinute: { user: number; address: number };
 }
 
 import { fileURLToPath } from 'node:url';
@@ -118,6 +121,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     moderationSecret: env.MODERATION_WEBHOOK_SECRET || undefined,
     storageSigningKey: env.STORAGE_SIGNING_KEY || undefined,
     jobs: (env.ENABLE_JOBS ?? 'true') === 'true',
+    requestsPerMinute: {
+      user: intEnv(env, 'API_REQUESTS_PER_MINUTE_USER', 600, 60, 100_000),
+      address: intEnv(env, 'API_REQUESTS_PER_MINUTE_ADDRESS', 1200, 60, 100_000)
+    },
     corsOrigins: [...new Set([siteUrl, ...(env.CORS_ORIGINS || '').split(','), ...(env.ADDITIONAL_REDIRECT_URLS || '').split(',')]
       .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))]
   };

@@ -17,10 +17,13 @@ const STORAGE_KEY = 'asoiu-career-v2';
 /* Aktiv istifadəçiyə bağlanan qısayollar — diskə ayrıca yazılmır. */
 const ALIAS_KEYS = ['student', 'company', 'applications', 'saved', 'eventRegistrations', 'interview'];
 
+/* Offline demo only (demoMode: true; data stays in this browser). The
+   addresses use the reserved example.com domain, never the university's
+   (audit 2026-11-16, L51). */
 const SEED_USERS = [
   {
     id: 'u-student-demo', role: 'student', name: 'Aylin Məmmədova',
-    email: 'demo.telebe@asoiu.edu.az', seedPassword: 'Telebe2026',
+    email: 'demo.telebe@example.com', seedPassword: 'Telebe2026',
     createdAt: '2026-09-01', status: 'active'
   },
   {
@@ -30,7 +33,7 @@ const SEED_USERS = [
   },
   {
     id: 'u-admin-demo', role: 'admin', name: 'ASOIU Karyera Mərkəzi',
-    email: 'demo.admin@asoiu.edu.az', seedPassword: 'Merkez2026',
+    email: 'demo.admin@example.com', seedPassword: 'Merkez2026',
     createdAt: '2026-08-01', status: 'active'
   }
 ];
@@ -43,7 +46,7 @@ const DEFAULT_STATE = {
   profiles: {
     'u-student-demo': {
       name: 'Aylin Məmmədova',
-      email: 'demo.telebe@asoiu.edu.az',
+      email: 'demo.telebe@example.com',
       phone: '+994 50 123 45 67',
       city: 'Bakı, Azərbaycan',
       personalEmail: 'aylin.mammadova@example.com',

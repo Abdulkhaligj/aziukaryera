@@ -75,7 +75,12 @@ for (const name of pages) {
   writeFileSync(new URL(name, portal), html);
 }
 const config = JSON.parse(readFileSync(new URL('vercel.json', portal), 'utf8'));
-const headers = config.headers[0].headers.filter(item => item.key !== 'Content-Security-Policy');
+// One Referrer-Policy for Vercel and Nginx, the same as the API and the admin
+// panel; HSTS on both (audit 2026-11-16, L53 and L54).
+const managed = ['Content-Security-Policy', 'Referrer-Policy', 'Strict-Transport-Security'];
+const headers = config.headers[0].headers.filter(item => !managed.includes(item.key));
+headers.push({ key: 'Referrer-Policy', value: 'no-referrer' });
+headers.push({ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' });
 headers.push({ key: 'Content-Security-Policy', value: policy + "; frame-ancestors 'self'" });
 config.headers[0].headers = headers;
 writeFileSync(new URL('vercel.json', portal), JSON.stringify(config, null, 2) + '\n');
@@ -85,6 +90,7 @@ writeFileSync(new URL('nginx-security-headers.conf', portal), [
   'add_header Content-Security-Policy "' + policy + "; frame-ancestors 'self'\" always;",
   'add_header X-Content-Type-Options "nosniff" always;',
   'add_header Referrer-Policy "no-referrer" always;',
+  'add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;',
   'add_header X-Frame-Options "SAMEORIGIN" always;',
   'add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;',
   'add_header Cache-Control "private, no-store, max-age=0" always;',

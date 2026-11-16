@@ -1,5 +1,5 @@
 /* ADNSU Career PWA - network first for executable code, cache v20261102. */
-const CACHE_NAME = 'adnsu-career-shell-20261113-audit-v2';
+const CACHE_NAME = 'adnsu-career-shell-20261116-audit-v3';
 const OFFLINE = ['/','/index.html','/manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE)));
@@ -31,6 +31,9 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (!['image','font','manifest'].includes(request.destination)) return;
+  // Only the site's own files are kept offline, never pictures people upload
+  // (audit 2026-11-16, L50); sign-out also empties this cache.
+  if (request.destination !== 'manifest' && !url.pathname.startsWith('/assets/')) return;
   event.respondWith(caches.match(request).then(cached => {
     if (cached) return cached;
     return fetch(request).then(response => {

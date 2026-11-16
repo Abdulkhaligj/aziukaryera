@@ -16,6 +16,8 @@ import './write/rules/index.ts';
 import { setStoragePublicBase } from './write/rules/hardening.ts';
 import { setModerationSecret, setModerationTarget } from './write/rules/moderation.ts';
 import { setEncryptionKey } from './crypto.ts';
+import { RateLimiter, clientKey } from './auth/rate-limit.ts';
+import { verifyJwt } from './context.ts';
 
 export interface AppDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer; logger?: boolean }
 
@@ -43,6 +45,35 @@ export async function buildApp(deps: AppDeps) {
     exposedHeaders: ['content-range', 'x-total-count', 'x-supabase-api-version'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     maxAge: 86400
+  });
+
+  // Audit 2026-11-16, I9: the API sets its own security headers, so an answer
+  // is safe even when nothing stands in front of it (Caddy sets the same ones).
+  // A route that set its own value (storage files) keeps it.
+  const https = deps.config.publicUrl.startsWith('https://');
+  app.addHook('onSend', async (_req, reply, payload) => {
+    const set = (name: string, value: string) => { if (!reply.hasHeader(name)) reply.header(name, value); };
+    set('x-content-type-options', 'nosniff');
+    set('referrer-policy', 'no-referrer');
+    set('x-frame-options', 'DENY');
+    if (https) set('strict-transport-security', 'max-age=63072000; includeSubDomains');
+    return payload;
+  });
+
+  // Audit 2026-11-16, I10: one budget per client for the data and file routes.
+  // A signed-in person is counted by account, since many share the campus
+  // address; other calls by address. The server's own key is not limited.
+  const perUser = new RateLimiter(deps.config.requestsPerMinute.user, 60_000);
+  const perAddress = new RateLimiter(deps.config.requestsPerMinute.address, 60_000);
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method === 'OPTIONS' || !/^\/(rest|storage)\/v1\//.test(req.url)) return;
+    const bearer = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''))?.[1];
+    const claims = bearer ? await verifyJwt(deps.config, bearer) : null;
+    if (claims?.role === 'service_role') return;
+    const [limiter, key] = claims?.sub ? [perUser, `u:${claims.sub}`] : [perAddress, `ip:${clientKey(req.ip)}`];
+    if (limiter.take(key)) return;
+    return reply.code(429).header('retry-after', String(Math.max(limiter.retryAfter(key), 1)))
+      .send({ code: '429', message: 'Too many requests', details: null, hint: 'Bir az gözləyib yenidən cəhd edin.' });
   });
 
   // The data client sends some POSTs (e.g. /logout) with a JSON content type and

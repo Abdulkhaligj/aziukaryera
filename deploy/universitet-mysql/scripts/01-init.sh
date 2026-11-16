@@ -9,6 +9,7 @@ docker compose version >/dev/null || die "Docker Compose plugin yoxdur."
 step "kit.env və api.env"
 if [ ! -f "$KIT_DIR/kit.env" ]; then
   [ -n "$DOMAIN" ] || die "Domen lazımdır: scripts/01-init.sh api.career.asoiu.edu.az"
+  valid_domain "$DOMAIN" || die "Domen adı düzgün deyil (kiçik hərflər, rəqəm, '-' və '.'): $DOMAIN"
   cp "$KIT_DIR/kit.env.example" "$KIT_DIR/kit.env"
   env_set "$KIT_DIR/kit.env" API_DOMAIN "$DOMAIN"
   env_set "$KIT_DIR/kit.env" MYSQL_ROOT_PASSWORD "$(random 32)"
