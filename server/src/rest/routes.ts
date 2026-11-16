@@ -76,7 +76,7 @@ function contentRange(offset: number, count: number, total: number | null) {
 export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
   const { config, pool, schema } = deps;
   const rpcLimiters = new Map<string, RateLimiter>();
-  const counts = new RateLimiter(120, 60_000);
+  const counts = new RateLimiter(600, 60_000); // per address, shared on campus
 
   async function context(req: FastifyRequest): Promise<Context> {
     const apikey = (req.headers.apikey as string | undefined) ?? (req.query as Query)?.apikey as string | undefined;

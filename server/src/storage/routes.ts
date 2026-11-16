@@ -389,7 +389,7 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     return deleted.map(fileObject);
   });
 
-  const listings = new RateLimiter(60, 60_000);
+  const listings = new RateLimiter(300, 60_000); // per address, shared on campus
   app.post('/object/list/:bucket', async (req, reply) => {
     const bucket = (req.params as { bucket: string }).bucket;
     const ctx = await context(req);

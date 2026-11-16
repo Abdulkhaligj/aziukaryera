@@ -62,6 +62,8 @@ export async function startSession(tx: Tx, config: Config, user: AuthUser, metho
 
 /** grant_type=refresh_token. A late replay revokes the session; that
  *  revocation must commit, so it is returned instead of thrown. */
+const STAFF_SESSION_MS = 12 * 60 * 60 * 1000;
+
 export async function refreshSession(tx: Tx, config: Config, refreshToken: string): Promise<Awaited<ReturnType<typeof issue>> | { replayed: true }> {
   const hash = sha256(refreshToken);
   const presented = await one<{ session_id: string; revoked_at: string | null }>(tx,
@@ -77,6 +79,10 @@ export async function refreshSession(tx: Tx, config: Config, refreshToken: strin
   const user = await one<AuthUser>(tx, 'SELECT * FROM auth_users WHERE id = ? AND deleted_at IS NULL', [session.user_id]);
   if (!user) throw authErrors.refreshNotFound();
   if (user.banned_until && new Date(user.banned_until) > new Date()) throw authErrors.banned();
+  // A staff session lives at most 12 hours from sign-in, on the API as in the
+  // admin panel (audit 2026-11-16, M41): a leaked refresh token stops working.
+  if (Date.now() - new Date(session.created_at).getTime() > STAFF_SESSION_MS
+    && await one(tx, `SELECT 1 AS ok FROM profiles WHERE id = ? AND role = 'admin'`, [user.id])) throw authErrors.refreshNotFound();
   if (!presented.revoked_at) await exec(tx, 'UPDATE auth_refresh_tokens SET revoked_at = CURRENT_TIMESTAMP(6) WHERE token_hash = ?', [hash]);
   await exec(tx, 'UPDATE auth_sessions SET refreshed_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [session.id]);
   return issue(tx, config, user, session, hash);

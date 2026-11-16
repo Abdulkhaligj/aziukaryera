@@ -50,7 +50,7 @@ Sonra `deploy/universitet-mysql/api.env` faylında `SMTP_*` və `GEMINI_API_KEY`
 | `MODERATION_WEBHOOK_SECRET` | Yalnız `api.env`-də saxlanılır, bazaya yazılmır. |
 | `STORAGE_SIGNING_KEY` | İstəyə bağlı: imzalı fayl linkləri üçün ayrıca açar. Boşdursa, JWT secret-dən törədilir. |
 | `MYSQL_POOL_SIZE`, `MYSQL_QUEUE_LIMIT`, `MYSQL_LOCK_WAIT_SECONDS`, `MYSQL_MAX_EXECUTION_MS` | İstəyə bağlı: bağlantı hovuzu (20), növbə (200), kilid gözləmə (10 s) və oxuma sorğusunun maksimum müddəti (15 000 ms). |
-| `API_REQUESTS_PER_MINUTE_USER`, `API_REQUESTS_PER_MINUTE_ADDRESS` | İstəyə bağlı (16.11.2026 auditi): `/rest` və `/storage` üçün dəqiqəlik limit — daxil olmuş hər hesaba 600, hesabsız sorğularda hər ünvana 1200. Server açarı limitsizdir. |
+| `API_REQUESTS_PER_MINUTE_USER`, `API_REQUESTS_PER_MINUTE_ADDRESS` | İstəyə bağlı (16.11.2026 auditi): `/rest` və `/storage` üçün dəqiqəlik limit — daxil olmuş hər hesaba 600, hesabsız sorğularda hər ünvana 6000 (kampusda çox tələbə eyni IP ilə çıxır; açılış səhifəsi ~8 sorğu edir). Server açarı limitsizdir. |
 
 Bu parametrlərdə tam ədəd olmayan dəyər (məs. `abc`) API-ni dayandırır, səssizcə başqa dəyərə çevrilmir. `kit.env`-də `API_DOMAIN` yalnız domen adı ola bilər (kiçik hərflər, rəqəm, `-`, `.`).
 

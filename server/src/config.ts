@@ -123,7 +123,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jobs: (env.ENABLE_JOBS ?? 'true') === 'true',
     requestsPerMinute: {
       user: intEnv(env, 'API_REQUESTS_PER_MINUTE_USER', 600, 60, 100_000),
-      address: intEnv(env, 'API_REQUESTS_PER_MINUTE_ADDRESS', 1200, 60, 100_000)
+      // Many students share the campus address (NAT); the home page alone makes
+      // about eight requests, so the budget for one address is wide.
+      address: intEnv(env, 'API_REQUESTS_PER_MINUTE_ADDRESS', 6000, 60, 100_000)
     },
     corsOrigins: [...new Set([siteUrl, ...(env.CORS_ORIGINS || '').split(','), ...(env.ADDITIONAL_REDIRECT_URLS || '').split(',')]
       .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))]
