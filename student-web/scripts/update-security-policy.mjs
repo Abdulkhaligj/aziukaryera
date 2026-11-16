@@ -63,8 +63,9 @@ for (const name of pages) {
 const policy = [
   "default-src 'self'", "base-uri 'self'", "object-src 'none'",
   "script-src 'self' " + [...new Set([...external, ...inline])].map(value => "'" + value + "'").join(' '),
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com", "img-src 'self' data: blob:",
+  // Fonts are served by the site itself (audit 2026-11-16, L52).
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:", "img-src 'self' data: blob:",
   "connect-src 'self'",
   "frame-src 'self'", "worker-src 'self'", "form-action 'self'"
 ].join('; ');

@@ -21,7 +21,7 @@
   },
   {
     "page": "cv-builder.html",
-    "hash": "sha256-CR7n6eXnVWV6TBVTcscM+fMjjh/k/z0tW2emBpQoO7M=",
+    "hash": "sha256-HKyzlAeD6ppup1e1rvQJemYFppPtd6/FWzX05GEeYys=",
     "start": "function __RUN_APP__() { const { useState, useEffect, "
   }
 ]
