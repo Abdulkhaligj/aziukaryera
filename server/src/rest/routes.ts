@@ -76,6 +76,7 @@ function contentRange(offset: number, count: number, total: number | null) {
 export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
   const { config, pool, schema } = deps;
   const rpcLimiters = new Map<string, RateLimiter>();
+  const counts = new RateLimiter(120, 60_000);
 
   async function context(req: FastifyRequest): Promise<Context> {
     const apikey = (req.headers.apikey as string | undefined) ?? (req.query as Query)?.apikey as string | undefined;
@@ -123,6 +124,8 @@ export async function restRoutes(app: FastifyInstance, deps: RestDeps) {
     const { table: name } = req.params;
     const query = req.query;
     const count = prefer(req).count === 'exact';
+    // An exact count reads every matching row: limited per client (L26).
+    if (count && !counts.take(clientKey(req.ip))) throw new PgError(429, '54000', 'Too many counted requests; try again in a minute');
     const { limit, offset } = paging(query);
     const filters = parseFilters(query);
     const embedShape = embedOptions(query);

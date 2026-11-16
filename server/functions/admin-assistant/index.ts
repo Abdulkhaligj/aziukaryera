@@ -29,6 +29,18 @@ const db = createClient(API_URL, Deno.env.get("SERVICE_ROLE_KEY") ?? "", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+/** Gives a reservation back after a provider failure (M27); a failure here is logged only. */
+async function releaseReservation(reservationId: string) {
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
+/** Usage rows are checked: a failed insert is logged, not ignored (M26). */
+async function recordUsage(row: Record<string, unknown>) {
+  const { error } = await db.from("ai_usage").insert(row);
+  if (error) console.error("ai_usage insert failed:", error.message);
+}
+
+
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
 type Action = { type: string; summary: string; data: Record<string, unknown>; missing: string[] };
 
@@ -267,7 +279,7 @@ Deno.serve(async (req: Request) => {
       if (a.type === "create_event" || a.type === "create_ad") a.data.image_url = imageUrl;
       if (a.type === "create_company" || a.type === "create_award") a.data.logo_url = imageUrl;
     }
-    await db.from("ai_usage").insert({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: out.text.length, success: true, error_code: null });
+    await recordUsage({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: out.text.length, success: true, error_code: null });
     return json({
       ok: true, model,
       transcript: String(parsed?.transcript || "").slice(0, 4000),
@@ -277,7 +289,8 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("admin-assistant failed:", message);
-    await db.from("ai_usage").insert({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: 0, success: false, error_code: message === "blocked" ? "safety" : "provider_error" });
+    if (message !== "blocked") await releaseReservation(reservation.reservation_id);
+    await recordUsage({ profile_id: actor.id, company_id: null, task: "admin_assistant", provider: "gemini", model, input_chars: inputBytes, output_chars: 0, success: false, error_code: message === "blocked" ? "safety" : "provider_error" });
     return json({ ok: false, error: message === "blocked" ? "AI bu sorğunu emal etmədi. Başqa sözlərlə yazın." : "AI cavab vermədi. Bir az sonra yenidən cəhd edin." }, 502);
   }
 });

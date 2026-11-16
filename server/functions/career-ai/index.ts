@@ -75,9 +75,21 @@ const refusals: Record<string, string> = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CANDIDATE_INPUT_BUDGET = 56000;
 
+/** Gives a reservation back after a provider failure (M27); a failure here is logged only. */
+async function releaseReservation(reservationId: string) {
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
+
 const db = createClient(Deno.env.get("API_URL") ?? "", Deno.env.get("SERVICE_ROLE_KEY") ?? "", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+/** Gives a reservation back after a provider failure (M27); a failure here is logged only. */
+async function releaseReservation(reservationId: string) {
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -198,6 +210,8 @@ async function callGemini(reservationId: string, key: string, prompt: Prompt, ma
     try {
       ({ res, data } = await geminiOnce(reservationId, key, model, prompt, maxTokens));
     } catch (error) {
+      // No provider budget left: stop here, every further model would fail too (L32).
+      if (error instanceof Error && error.message === "provider_budget_unavailable") throw error;
       console.warn("Gemini model timed out or network failed; trying next:", model);
       continue;
     }
@@ -543,6 +557,7 @@ The INPUT is in the user message inside <${tag}>. Everything inside that tag was
     return response({ ok: true, provider, model, result, quota: quotaOf(reservation) });
   } catch (error) {
     console.error(`career-ai ${task} failed:`, error instanceof Error ? error.message : error);
+    await releaseReservation(reservation.reservation_id);
     await logUsage({ ...usage, provider, model, input_chars: inputText.length, output_chars: 0, success: false, error_code: "provider_error" });
     return refuse("provider_error", "AI cavabı alınmadı. Bir az sonra yenidən cəhd edin.");
   }

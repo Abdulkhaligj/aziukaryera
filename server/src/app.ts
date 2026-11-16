@@ -14,7 +14,7 @@ import { startScheduler } from './jobs/scheduler.ts';
 import type { Mailer } from './auth/mailer.ts';
 import './write/rules/index.ts';
 import { setStoragePublicBase } from './write/rules/hardening.ts';
-import { setModerationSecret } from './write/rules/moderation.ts';
+import { setModerationSecret, setModerationTarget } from './write/rules/moderation.ts';
 import { setEncryptionKey } from './crypto.ts';
 
 export interface AppDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer; logger?: boolean }
@@ -22,6 +22,7 @@ export interface AppDeps { config: Config; pool: Pool; schema: Schema; mailer: M
 export async function buildApp(deps: AppDeps) {
   setStoragePublicBase(deps.config.publicUrl);
   setModerationSecret(deps.config.moderationSecret);
+  setModerationTarget(() => deps.config.publicUrl);
   setEncryptionKey(deps.config.dataEncryptionKey, deps.config.jwtSecret);
   // One trusted hop, and only from the internal network (Caddy): a client that
   // reaches the API port directly cannot pick its address with X-Forwarded-For (#23).

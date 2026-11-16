@@ -83,10 +83,12 @@ test('subscription-lifecycle: a reminder with an invoice a week before, then Fre
 test('a job already running elsewhere is skipped (named lock)', async () => {
   const other = await h.pool.getConnection();
   try {
-    await other.query(`SELECT GET_LOCK('asoiu_job:subscription-lifecycle', 0)`);
+    const [[{ db }]] = await other.query('SELECT DATABASE() AS db') as unknown as [[{ db: string }]];
+    const key = `asoiu_job:${db}:subscription-lifecycle`.slice(0, 64);
+    await other.query('SELECT GET_LOCK(?, 0)', [key]);
     assert.deepEqual(await runJob(h.pool, schema, 'subscription-lifecycle'), { skipped: 'already running' });
   } finally {
-    await other.query(`SELECT RELEASE_LOCK('asoiu_job:subscription-lifecycle')`);
+    await other.query('SELECT RELEASE_ALL_LOCKS()');
     other.release();
   }
 });

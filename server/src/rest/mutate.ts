@@ -121,9 +121,16 @@ export async function insertRows(tx: Tx, schema: Schema, ctx: Context, tableName
   return keys;
 }
 
+/** At most this many rows change in one PATCH or DELETE (M20). */
+const MAX_WRITE_ROWS = 1000;
+
 async function targets(tx: Tx, t: Table, ctx: Context, cmd: 'UPDATE' | 'DELETE', where: Where): Promise<Row[]> {
   const clause = [usingSql(t.name, ctx, cmd), usingSql(t.name, ctx, 'SELECT'), ...where.sql].map(s => `(${s})`).join(' AND ');
-  return queryRows(tx, `SELECT * FROM ${q(t.name)} WHERE ${clause} ORDER BY ${t.primaryKey.map(q).join(', ')} FOR UPDATE`, where.params);
+  // READ COMMITTED (db.ts) locks the matching rows only, not gaps; and a filter
+  // that matches too many rows is refused instead of locking them all (M20).
+  const found = await queryRows(tx, `SELECT * FROM ${q(t.name)} WHERE ${clause} ORDER BY ${t.primaryKey.map(q).join(', ')} LIMIT ${MAX_WRITE_ROWS + 1} FOR UPDATE`, where.params);
+  if (found.length > MAX_WRITE_ROWS) throw new PgError(400, '54000', `the filter matches more than ${MAX_WRITE_ROWS} rows; narrow it`);
+  return found;
 }
 
 export async function updateRows(tx: Tx, schema: Schema, ctx: Context, tableName: string, changes: Row, where: Where): Promise<Row[]> {

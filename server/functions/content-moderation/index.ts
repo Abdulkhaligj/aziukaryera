@@ -40,6 +40,18 @@ const db = createClient(Deno.env.get("API_URL") ?? "", Deno.env.get("SERVICE_ROL
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+/** Gives a reservation back after a provider failure (M27); a failure here is logged only. */
+async function releaseReservation(reservationId: string) {
+  const { error } = await db.rpc("ai_release_reservation", { p_reservation_id: reservationId });
+  if (error) console.error("reservation release failed:", error.message);
+}
+/** Usage rows are checked: a failed insert is logged, not ignored (M26). */
+async function recordUsage(row: Record<string, unknown>) {
+  const { error } = await db.from("ai_usage").insert(row);
+  if (error) console.error("ai_usage insert failed:", error.message);
+}
+
+
 type Verdict = { allow: boolean; categories: string[]; reason: string; model: string; outputChars: number };
 
 function response(body: unknown, status = 200) {
@@ -204,11 +216,12 @@ async function moderateAvatar(id: string, row: ClaimedRow, claimId: string, rese
       const { error: removeError } = await db.storage.from("avatars").remove([result.previous_path]);
       if (removeError) console.error("old avatar remove failed");
     }
-    await db.from("ai_usage").insert({ profile_id: null, company_id: null, task: "avatar_moderation", provider: "gemini", model: verdict.model,
+    await recordUsage({ profile_id: null, company_id: null, task: "avatar_moderation", provider: "gemini", model: verdict.model,
       input_chars: bytes.length, output_chars: verdict.outputChars, success: true, error_code: null });
     return response({ ok: true, status: result.status, categories: verdict.categories, model: verdict.model });
   } catch {
     try { await finishClaim(claimId, null); } catch { /* Lease expires; pending content stays hidden. */ }
+    await releaseReservation(reservationId);
     console.error("avatar moderation failed");
     return response({ ok: false, code: "provider_error" }, 502);
   }
@@ -263,11 +276,12 @@ Deno.serve(async (req: Request) => {
     const { tag, block } = fence("user_text", text);
     const verdict = await classify(claim.reservation_id, key, `${POLICY}\nThis time the tag is <${tag}>.`, [{ text: `TEXT:\n${block}` }]);
     const result = await finishClaim(claim.claim_id, verdict);
-    await db.from("ai_usage").insert({ profile_id: null, company_id: null, task: "content_moderation", provider: "gemini", model: verdict.model,
+    await recordUsage({ profile_id: null, company_id: null, task: "content_moderation", provider: "gemini", model: verdict.model,
       input_chars: text.length, output_chars: verdict.outputChars, success: true, error_code: null });
     return response({ ok: true, status: result.status, categories: verdict.categories, model: verdict.model });
   } catch {
     try { await finishClaim(claim.claim_id, null); } catch { /* Lease expires; pending content stays hidden. */ }
+    await releaseReservation(claim.reservation_id);
     console.error("content moderation failed");
     return response({ ok: false, code: "provider_error" }, 502);
   }

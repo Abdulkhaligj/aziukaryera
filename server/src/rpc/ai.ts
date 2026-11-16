@@ -110,7 +110,7 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
       // One lock for every guest: the shared guest cap does not depend on client headers.
       await one(env.tx, `SELECT value FROM private_sequences WHERE name = 'ai_reservation_lock' FOR UPDATE`);
       const used = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
-          WHERE task = 'aida_chat' AND profile_id IS NULL AND created_at >= ?`, [toMysqlDatetime(since)]))!.n);
+          WHERE task = 'aida_chat' AND profile_id IS NULL AND created_at >= ? AND released_at IS NULL`, [toMysqlDatetime(since)]))!.n);
       if (used >= 2000) return { allowed: false, reason: 'quota_exceeded', limit: 2000, used };
       budget = `aida:anonymous:${clientHash}`; limit = 20;
     } else { budget = `aida:profile:${profileId}`; limit = 80; }
@@ -123,7 +123,7 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
     if (author != null) {
       await lockBudget(env, `moderation:author:${author}`);
       const mine = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
-          WHERE task IN ('content_moderation', 'avatar_moderation') AND profile_id = ? AND created_at >= ?`, [author, toMysqlDatetime(since)]))!.n);
+          WHERE task IN ('content_moderation', 'avatar_moderation') AND profile_id = ? AND created_at >= ? AND released_at IS NULL`, [author, toMysqlDatetime(since)]))!.n);
       if (mine >= MODERATION_PER_AUTHOR) return { allowed: false, reason: 'author_quota_exceeded', used: mine, limit: MODERATION_PER_AUTHOR };
     }
   } else if (task != null && CAREER_TASKS.includes(task)) {
@@ -140,7 +140,7 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
     } else { budget = `career:profile:${profileId}`; limit = 25; }
   } else throw new DbRuleError('Unsupported AI task', '22023');
   await lockBudget(env, budget);
-  const used = Number((await one<{ n: number }>(env.tx, 'SELECT COUNT(*) AS n FROM private_ai_reservations WHERE budget = ? AND created_at >= ?',
+  const used = Number((await one<{ n: number }>(env.tx, 'SELECT COUNT(*) AS n FROM private_ai_reservations WHERE budget = ? AND created_at >= ? AND released_at IS NULL',
     [budget, toMysqlDatetime(since)]))!.n);
   if (used >= limit) return { ...ctx, allowed: false, reason: 'quota_exceeded', used, limit };
   const reservation = await insertRow(env, 'private_ai_reservations', { profile_id: profileId ?? author, company_id: company, client_hash: clientHash, task, budget });
@@ -150,6 +150,18 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
 rpc({
   name: 'ai_reserve_request', args: { p_profile_id: 'uuid', p_task: 'text', p_job_id: 'uuid', p_client_hash: 'text' }, roles: [], security: 'definer', returns: 'value',
   run: (env, a) => aiReserveRequest(env, a.p_profile_id, a.p_task, a.p_job_id, a.p_client_hash)
+});
+
+/** A reservation whose provider call failed (timeout, 5xx, no budget) no longer
+ *  counts against the person's limit. Not for a refused or blocked answer: those
+ *  cost a provider call that the person caused (audit 2026-11-16, M27). */
+rpc({
+  name: 'ai_release_reservation', args: { p_reservation_id: 'uuid' }, roles: [], security: 'definer', returns: 'value',
+  async run(env, a) {
+    const result = await exec(env.tx, 'UPDATE private_ai_reservations SET released_at = CURRENT_TIMESTAMP(6) WHERE id = ? AND released_at IS NULL',
+      [a.p_reservation_id]);
+    return result.affectedRows === 1;
+  }
 });
 
 rpc({

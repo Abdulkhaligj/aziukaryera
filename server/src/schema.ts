@@ -89,7 +89,10 @@ export async function loadSchema(pool: Pool): Promise<Schema> {
     try {
       const value = (await rows<{ v: unknown }>(pool, `SELECT (${sql}) AS v`))[0]?.v;
       for (const column of columns) column.defaultSpec = { kind: 'value', value: canonical(column, value) };
-    } catch { /* left to MySQL */ }
+    } catch (error) {
+      // Left to MySQL; the BEFORE triggers then see NULL for it, so it is logged (L30).
+      console.warn(`default ${sql} of ${columns.map(c => c.name).join(', ')} not evaluated:`, error instanceof Error ? error.message : error);
+    }
   }
   // CHECK (col IN ('a', 'b')): the allowed values. MySQL compares them without
   // regard to case, so the write pipeline maps 'APPROVED' to 'approved' before
