@@ -2,7 +2,7 @@
 // SECURITY DEFINER code did. Decides the role from the email domain (the
 // requested role in user metadata is only a wish) and creates the profile,
 // education, company, free subscription and owner membership.
-import { one, type Row } from '../db.ts';
+import { exec, one, type Row } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
 import { insertRow, type WriteEnv } from '../write/pipeline.ts';
 
@@ -11,7 +11,8 @@ const text = (meta: Row, key: string) => (meta[key] == null ? null : String(meta
 const nonEmpty = (meta: Row, key: string) => { const v = text(meta, key); return v === null || v === '' ? null : v; };
 const int = (meta: Row, key: string) => { const v = nonEmpty(meta, key); return v === null ? null : Number.parseInt(v, 10); };
 
-export async function handleNewUser(env: WriteEnv, user: { id: string; email: string; raw_app_meta_data: Row; raw_user_meta_data: Row }, universityDomain: string) {
+export async function handleNewUser(env: WriteEnv, user: { id: string; email: string; raw_app_meta_data: Row; raw_user_meta_data: Row }, universityDomain: string,
+  confirmed = true) {
   const meta = user.raw_user_meta_data || {};
   const requested = (text(meta, 'role') ?? 'student').toLowerCase();
   let requestedStatus = (text(meta, 'account_status') ?? 'student').toLowerCase();
@@ -27,7 +28,13 @@ export async function handleNewUser(env: WriteEnv, user: { id: string; email: st
   }
   if (role === 'student' && !isUni) throw new DbRuleError(`Tələbə qeydiyyatı üçün @${universityDomain} e-poçtu tələb olunur`);
 
-  const status = role === 'company' || (role === 'graduate' && !isUni) ? 'pending' : 'active';
+  const reviewed = role === 'company' || (role === 'graduate' && !isUni);
+  // Audit v4 (L-6): an account that has not confirmed its email yet waits; the
+  // first confirmation makes the profile active (auth routes, verify).
+  const status = reviewed || !confirmed ? 'pending' : 'active';
+  if (!reviewed && !confirmed) {
+    await exec(env.tx, `UPDATE auth_users SET raw_app_meta_data = JSON_SET(COALESCE(raw_app_meta_data, JSON_OBJECT()), '$.activate_on_confirm', TRUE) WHERE id = ?`, [user.id]);
+  }
   const display = text(meta, 'full_name')?.trim() || user.email.split('@')[0];
   const university = nonEmpty(meta, 'university') ?? DEFAULT_UNIVERSITY;
 

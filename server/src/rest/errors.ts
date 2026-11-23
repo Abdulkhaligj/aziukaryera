@@ -51,6 +51,7 @@ function statusFor(sqlState: string, ctx: Context | null): number {
   // P0001 is a plain RAISE (400); other PL/pgSQL codes such as no_data_found are 500.
   if (sqlState.startsWith('P0') && sqlState !== 'P0001') return 500;
   if (sqlState === '25006') return 405;
+  if (sqlState === '54000') return 429; // a limit of this server: try again later
   if (/^(25|57)/.test(sqlState)) return 500;
   return 400;
 }
@@ -59,6 +60,9 @@ function statusFor(sqlState: string, ctx: Context | null): number {
 export function fromDatabase(error: unknown, table: string, ctx: Context | null = null): PgError | null {
   if (error instanceof PgError) return error;
   if (error instanceof DbRuleError) return new PgError(statusFor(error.sqlState, ctx), error.sqlState, error.message);
+  // Every database connection busy and the queue full: a moment's wait, not a
+  // server fault (audit v4, M-05).
+  if ((error as Error)?.message === 'Queue limit reached.') return new PgError(503, '57014', 'The server is busy; try again in a moment');
   const e = error as MysqlError;
   if (!e || typeof e.errno !== 'number') return null;
   const msg = e.sqlMessage || '';

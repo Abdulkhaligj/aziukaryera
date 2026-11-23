@@ -127,7 +127,17 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
   - API öz təhlükəsizlik başlıqlarını göndərir; `/rest` və `/storage` üçün ümumi limit var.
   - Sayt: çıxışda offline keş silinir; demo hesablar universitet domenində deyil; Referrer-Policy hər yerdə `no-referrer`, HSTS Nginx-də də var.
 
+- **23.11.2026 auditi (Aziu-Karyer-3: H-01, M-01–M-05, 10 aşağı) üzrə əlavələr:**
+  - Təsdiqin yenidən göndərilməsi və ya magic link ilə ilk təsdiqdə qeydiyyatda qoyulmuş parol silinir; sayt hesab sahibindən yeni şifrə istəyir.
+  - E-poçtu təsdiqlənməmiş qeydiyyatın profili təsdiqə qədər gözləyir (pending).
+  - Platforma sıfırlanmasında 3 səhv şifrədən sonra 15 dəqiqə bloklanır.
+  - Qonaq AIDA: bir şəbəkəyə gündə 100, bütün qonaqlara saatda 300 sorğu.
+  - Fayl siyahısı: bir hesab eyni anda 2, server 8 siyahı; baza növbəsi dolanda 503.
+  - Gündəlik şərh/paylaşım limiti sayğacla aparılır (silmək yer açmır, paralel sorğular keçmir); şərhin vaxtını server qoyur.
+  - Editor şirkəti sahibindən ayıra bilmir; e-poçt dəyişməsinin cavabı ünvanın mövcudluğunu göstərmir; sahibin əvvəl daxil olduğu IP-dən link sorğusu limitə düşmür.
+
 ## 5. Testlər (13.11.2026)
+- **23.11.2026:** MySQL API 144/144 (16 yeni audit testi), saytlar və admin panel 96/96; H-01 axını brauzerdə yoxlanılıb.
 - **16.11.2026 (audit v3-dən sonra):** saytlar və admin panel 96/96, MySQL API 127/127 (18 yeni audit testi və PKCE testi), TypeScript yoxlaması və `next build` uğurludur. Kod axını ilə şifrə bərpası lokal serverdə brauzerdə yoxlanılıb.
 - **Saytlar və admin panel:** 95/95 test keçir, TypeScript yoxlaması və `next build` uğurludur.
 - **MySQL API:** 108/108 inteqrasiya testi keçir (lokal və GitHub CI-da MySQL 8.4 ilə).

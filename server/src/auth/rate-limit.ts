@@ -4,6 +4,7 @@
 // Audit 2026-11-16, M10: the map has a fixed size. A key that is used moves to
 // the end, so the oldest keys are dropped first when it is full, and a sweep
 // of expired keys runs at most once per window instead of on every request.
+import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
 
 const MAX_KEYS = 100_000;
@@ -20,8 +21,15 @@ export class RateLimiter {
     this.maxKeys = maxKeys;
   }
 
+  /** A long key (one that carries request text) is kept as its hash, so the map's
+   *  memory does not grow with what clients send (audit v4, M-02). */
+  private static key(key: string) {
+    return key.length > 128 ? 'sha256:' + createHash('sha256').update(key).digest('base64url') : key;
+  }
+
   /** Records a hit; false when the key is over its limit. */
-  take(key: string, now = Date.now()): boolean {
+  take(rawKey: string, now = Date.now()): boolean {
+    const key = RateLimiter.key(rawKey);
     const recent = this.recent(key, now);
     this.hits.delete(key);
     if (recent.length >= this.limit) { this.hits.set(key, recent); return false; }
@@ -33,12 +41,12 @@ export class RateLimiter {
 
   /** Failures so far in the window, without recording one. */
   count(key: string, now = Date.now()): number {
-    return this.recent(key, now).length;
+    return this.recent(RateLimiter.key(key), now).length;
   }
 
   /** Seconds until the key may be used again. */
   retryAfter(key: string, now = Date.now()): number {
-    const recent = this.recent(key, now);
+    const recent = this.recent(RateLimiter.key(key), now);
     return recent.length < this.limit ? 0 : Math.ceil((this.windowMs - (now - recent[0])) / 1000);
   }
 

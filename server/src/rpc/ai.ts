@@ -86,7 +86,7 @@ async function lockBudget(env: WriteEnv, budget: string) {
 const MODERATION_PER_AUTHOR = 150;
 
 export async function aiReserveRequest(env: WriteEnv, profileId: string | null, task: string | null, jobId: string | null, clientHash: string | null,
-  author: string | null = null): Promise<Row> {
+  author: string | null = null, subnetHash: string | null = null): Promise<Row> {
   let ctx: Row = {};
   let role: string | null = null;
   if (profileId != null) {
@@ -112,6 +112,18 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
       const used = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
           WHERE task = 'aida_chat' AND profile_id IS NULL AND created_at >= ? AND released_at IS NULL`, [toMysqlDatetime(since)]))!.n);
       if (used >= 2000) return { allowed: false, reason: 'quota_exceeded', limit: 2000, used };
+      // Audit v4 (M-04): one network (IPv4 /24, IPv6 /48) gets at most 100 a day,
+      // and all guests together at most 300 an hour, so many addresses cannot use
+      // up the day's guest pool at once.
+      const lastHour = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
+          WHERE task = 'aida_chat' AND profile_id IS NULL AND created_at >= ? AND released_at IS NULL`, [toMysqlDatetime(new Date(clock.getTime() - 3_600_000))]))!.n);
+      if (lastHour >= 300) return { allowed: false, reason: 'quota_busy', limit: 300, used: lastHour };
+      if (subnetHash != null) {
+        if (!/^[0-9a-f]{40}$/.test(subnetHash)) throw new DbRuleError('Invalid anonymous network', '22023');
+        const network = Number((await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM private_ai_reservations
+            WHERE task = 'aida_chat' AND profile_id IS NULL AND subnet_hash = ? AND created_at >= ? AND released_at IS NULL`, [subnetHash, toMysqlDatetime(since)]))!.n);
+        if (network >= 100) return { allowed: false, reason: 'quota_exceeded', limit: 100, used: network };
+      }
       budget = `aida:anonymous:${clientHash}`; limit = 20;
     } else { budget = `aida:profile:${profileId}`; limit = 80; }
   } else if (task === 'admin_assistant') {
@@ -143,13 +155,14 @@ export async function aiReserveRequest(env: WriteEnv, profileId: string | null, 
   const used = Number((await one<{ n: number }>(env.tx, 'SELECT COUNT(*) AS n FROM private_ai_reservations WHERE budget = ? AND created_at >= ? AND released_at IS NULL',
     [budget, toMysqlDatetime(since)]))!.n);
   if (used >= limit) return { ...ctx, allowed: false, reason: 'quota_exceeded', used, limit };
-  const reservation = await insertRow(env, 'private_ai_reservations', { profile_id: profileId ?? author, company_id: company, client_hash: clientHash, task, budget });
+  const reservation = await insertRow(env, 'private_ai_reservations', { profile_id: profileId ?? author, company_id: company, client_hash: clientHash,
+    subnet_hash: profileId == null && task === 'aida_chat' ? subnetHash : null, task, budget });
   return { ...ctx, allowed: true, reservation_id: reservation.id, used: used + 1, limit };
 }
 
 rpc({
-  name: 'ai_reserve_request', args: { p_profile_id: 'uuid', p_task: 'text', p_job_id: 'uuid', p_client_hash: 'text' }, roles: [], security: 'definer', returns: 'value',
-  run: (env, a) => aiReserveRequest(env, a.p_profile_id, a.p_task, a.p_job_id, a.p_client_hash)
+  name: 'ai_reserve_request', args: { p_profile_id: 'uuid', p_task: 'text', p_job_id: 'uuid', p_client_hash: 'text', p_subnet_hash: 'text' }, roles: [], security: 'definer', returns: 'value',
+  run: (env, a) => aiReserveRequest(env, a.p_profile_id, a.p_task, a.p_job_id, a.p_client_hash, null, a.p_subnet_hash)
 });
 
 /** A reservation whose provider call failed (timeout, 5xx, no budget) no longer

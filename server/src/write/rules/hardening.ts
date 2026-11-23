@@ -2,7 +2,8 @@
 // finding. They run in the write pipeline like the trigger ports, so every
 // caller (data API, RPC, functions) gets them. Names start with "001_" so
 // they run before the older triggers of the same table and event.
-import { one, rows, toMysqlDatetime, type Row } from '../../db.ts';
+import { exec, one, rows, toMysqlDatetime, type Row } from '../../db.ts';
+import { bakuDate } from '../../rpc/util.ts';
 import { DbRuleError } from '../../errors.ts';
 import { before, nowText, type WriteEnv } from '../pipeline.ts';
 import { distinct } from '../../values.ts';
@@ -92,7 +93,9 @@ before('companies', '001_security_company_fields', ['insert', 'update'], async (
   }
   // #54: when the owner's profile is deleted (ON DELETE SET NULL) the company
   // stays, without an owner, and waits for the Career Centre again.
-  const ownerRemoved = old && old.owner_id != null && row.owner_id == null && env.definer;
+  // Only the ON DELETE SET NULL of the owner's profile: a definer rule sees
+  // env.definer for every caller, so that is not the test (audit v4, L-3).
+  const ownerRemoved = old && old.owner_id != null && row.owner_id == null && env.fkAction === true;
   if (ownerRemoved) row.status = 'pending';
   if (old && changed(row, old, 'owner_id') && !ownerRemoved && !(isTrusted(env) && !env.ctx.uid) && !SENIOR.includes((await role(env)) ?? '')) {
     deny('Şirkəti başqa hesaba yalnız Super Admin və ya Menecer keçirə bilər');
@@ -295,6 +298,15 @@ for (const [tableName, columns] of Object.entries(PUBLIC_TEXT)) {
   });
 }
 
+// The owner's membership of a company goes with the company or the owner's
+// profile, or by a super admin or manager; not by an editor (audit v4, L-3).
+before('company_members', '001_security_owner_member', ['delete', 'update'], async (env, row, old) => {
+  const before = old ?? row;
+  if (before.member_role !== 'owner' || env.fkAction || (isTrusted(env) && !env.ctx.uid)) return;
+  if (old && row && row.member_role === 'owner' && !changed(row, old, 'company_id', 'profile_id', 'member_role')) return;
+  if (!SENIOR.includes((await role(env)) ?? '')) deny('Şirkət sahibini yalnız Super Admin və ya Menecer dəyişə bilər');
+}, null, 'invoker');
+
 // ---- daily content limits (H-12) ----------------------------------------
 
 // One account cannot use up the shared moderation budget: posts and comments
@@ -303,9 +315,23 @@ const DAILY: Record<string, number> = { posts: 20, post_comments: 100 };
 for (const [tableName, cap] of Object.entries(DAILY)) {
   before(tableName, '001_security_daily_limit', ['insert'], async (env, row) => {
     if (await privileged(env)) return;
-    const used = await one<{ n: number }>(env.tx, `SELECT COUNT(*) AS n FROM ${tableName} WHERE author_id = ? AND created_at >= ?`,
-      [row.author_id, since(env, DAY)]);
-    if ((used?.n ?? 0) >= cap) {
+    // The time is the server's, so a back-dated row does not escape today's
+    // count; the count is a counter row per author and day, so a deleted row
+    // does not give its place back and parallel writes wait for one another
+    // (audit v4, L-4).
+    // Posts have their own guard for this (posts_guard); comments did not.
+    if (tableName === 'post_comments') {
+      if (row.created_at != null && Math.abs(new Date(String(row.created_at)).getTime() - env.now.getTime()) > 60_000) {
+        deny('Comment author and creation time are server-owned');
+      }
+      row.created_at = nowText(env);
+    }
+    const day = bakuDate(env.now);
+    await exec(env.tx, `INSERT INTO private_daily_counters (profile_id, kind, day, n) VALUES (?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE n = n + 1`, [row.author_id, tableName, day]);
+    const used = await one<{ n: number }>(env.tx, 'SELECT n FROM private_daily_counters WHERE profile_id = ? AND kind = ? AND day = ?',
+      [row.author_id, tableName, day]);
+    if ((used?.n ?? 0) > cap) {
       throw new DbRuleError(tableName === 'posts' ? 'Gündəlik paylaşım limiti dolub. Sabah yenidən cəhd edin.' : 'Gündəlik şərh limiti dolub. Sabah yenidən cəhd edin.', 'P0001');
     }
   });
