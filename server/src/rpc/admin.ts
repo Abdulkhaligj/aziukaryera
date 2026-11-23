@@ -2,6 +2,7 @@
 // admin empties the platform but keeps every administrator account.
 // H-09 (audit 2026-11-13): the confirmation word is required, the super admin
 // re-enters their password, and the audit log is never emptied.
+import { RateLimiter } from '../auth/rate-limit.ts';
 import bcrypt from 'bcryptjs';
 import { exec, one, rows } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
@@ -16,6 +17,8 @@ const TABLES = ['broadcast_notification_reads', 'moderation_logs', 'notification
   'interview_sessions', 'cv_documents', 'education', 'company_members', 'subscriptions', 'jobs', 'events', 'benefits',
   'benefit_partners', 'posts', 'broadcast_notifications', 'companies', 'site_content', 'content'];
 
+const resetFailures = new RateLimiter(3, 15 * 60_000);
+
 rpc({
   name: 'admin_reset_platform_data', args: { p_confirmation: 'text', p_password: 'text' }, roles: ['authenticated'], security: 'invoker', returns: 'value',
   async run(invoker, a) {
@@ -25,8 +28,15 @@ rpc({
     if (await currentAdminRole(env.tx, env.ctx) !== 'super_admin') {
       throw new DbRuleError('Bu əməliyyatı yalnız aktiv Super Admin icra edə bilər', 'P0001');
     }
+    // Three wrong passwords stop the reset for 15 minutes, the right one included
+    // (audit v4, M-03): a stolen session cannot guess its way to deleting everything.
+    const tries = String(env.ctx.uid);
+    if (resetFailures.count(tries) >= 3) {
+      throw new DbRuleError(`Çox səhv cəhd. ${Math.max(1, Math.ceil(resetFailures.retryAfter(tries) / 60))} dəqiqə sonra yenidən cəhd edin.`, '54000');
+    }
     const account = await one<{ encrypted_password: string | null }>(env.tx, 'SELECT encrypted_password FROM auth_users WHERE id = ?', [env.ctx.uid]);
     if (typeof a.p_password !== 'string' || !account?.encrypted_password || !await bcrypt.compare(a.p_password, account.encrypted_password)) {
+      resetFailures.take(tries);
       throw new DbRuleError('Şifrə yanlışdır', '28P01');
     }
     // set_config('lock_timeout', '5s', true) and set_config('statement_timeout', '30s', true).

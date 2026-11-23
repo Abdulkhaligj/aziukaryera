@@ -30,6 +30,8 @@ export interface WriteEnv {
   now: Date;
   /** Inside SECURITY DEFINER code: current_user is the owner, not anon/authenticated. */
   definer?: boolean;
+  /** Set for writes made by ON DELETE CASCADE / SET NULL, not by a caller (audit v4, L-3). */
+  fkAction?: boolean;
 }
 
 export type Op = 'insert' | 'update' | 'delete';
@@ -255,7 +257,7 @@ export async function deleteRow(env: WriteEnv, tableName: string, key: Row, opti
  *  pipeline so their triggers fire (MySQL's own cascade would skip them). The
  *  referential actions run with RI-trigger privileges, i.e. as owner. */
 async function referentialActions(env: WriteEnv, parentTable: Table, parent: Row) {
-  const ri: WriteEnv = env.definer ? env : { ...env, definer: true };
+  const ri: WriteEnv = { ...(env.definer ? env : { ...env, definer: true }), fkAction: true };
   for (const fk of parentTable.referencedBy) {
     if (fk.onDelete !== 'CASCADE' && fk.onDelete !== 'SET NULL') continue;
     const child = table(env.schema, fk.table);

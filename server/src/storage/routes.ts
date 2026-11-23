@@ -390,6 +390,23 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
   });
 
   const listings = new RateLimiter(300, 60_000); // per address, shared on campus
+  // Audit v4 (M-05): one account (or address) lists at most two at a time and
+  // the server at most eight, so parallel listings cannot hold every database
+  // connection while other requests wait.
+  const listingNow = new Map<string, number>();
+  let listingAll = 0;
+  async function listingSlot<T>(who: string, run: () => Promise<T>): Promise<T> {
+    if ((listingNow.get(who) ?? 0) >= 2) throw new StorageError(429, 'Too many requests', 'Wait until your other listings finish');
+    if (listingAll >= 8) throw new StorageError(503, 'Service unavailable', 'Listings are busy; try again in a moment');
+    listingNow.set(who, (listingNow.get(who) ?? 0) + 1);
+    listingAll++;
+    try { return await run(); } finally {
+      listingAll--;
+      const left = (listingNow.get(who) ?? 1) - 1;
+      if (left > 0) listingNow.set(who, left); else listingNow.delete(who);
+    }
+  }
+
   app.post('/object/list/:bucket', async (req, reply) => {
     const bucket = (req.params as { bucket: string }).bucket;
     const ctx = await context(req);
@@ -405,12 +422,12 @@ export async function storageRoutes(app: FastifyInstance, deps: StorageDeps) {
     const descending = String(body.sortBy?.order ?? 'asc').toLowerCase() === 'desc';
     // The SELECT policies run in the query (M15); one row more than the scan limit
     // tells that the listing was cut, which the answer says in a header (L29).
-    const found = await transaction(pool, async tx => {
+    const found = await listingSlot(ctx.uid ? `u:${ctx.uid}` : `ip:${clientKey(req.ip)}`, () => transaction(pool, async tx => {
       const filter = await selectFilter(tx, ctx);
       return rows<Row & { bucket_id: string; name: string }>(tx, `SELECT so.* FROM storage_objects so
          WHERE so.bucket_id = ? AND LEFT(so.name, ?) = ? AND (${filter.sql}) ORDER BY so.name LIMIT ${MAX_LIST_SCAN + 1}`,
         [bucket, [...prefix].length, prefix, ...filter.params]);
-    });
+    }));
     const visible = found.slice(0, MAX_LIST_SCAN);
     if (found.length > MAX_LIST_SCAN) {
       reply.header('x-list-truncated', 'true');

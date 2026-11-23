@@ -36,6 +36,8 @@
     const token = claims(session);
     if (recovery || token.restricted === true) return 'recovery';
     if (invitedSession(token)) return 'invite';
+    // The server marks an account that has no password yet (audit v4, H-01).
+    if (session.user?.app_metadata?.needs_password === true) return 'set';
     if (session.user?.app_metadata?.must_change_password === true) return 'temporary';
     return null;
   }
@@ -60,6 +62,8 @@
         ? 'Bərpa linki ilə daxil oldunuz. Davam etmək üçün yeni şifrə qurun.'
         : mode === 'invite'
           ? 'Dəvət linki ilə daxil oldunuz. Növbəti girişlər üçün hesabınıza şifrə qurun.'
+          : mode === 'set'
+          ? 'Hesabınız üçün hələ şifrə qurulmayıb. Növbəti girişlər üçün şifrə qurun.'
           : 'Hesabınıza müvəqqəti şifrə ilə daxil oldunuz. Davam etmək üçün yalnız sizin bildiyiniz yeni şifrə qurun.'}</p>
       ${mode === 'temporary' ? field('pw-req-current', 'Müvəqqəti şifrə', 'current-password') : ''}
       ${field('pw-req-new', 'Yeni şifrə', 'new-password')}

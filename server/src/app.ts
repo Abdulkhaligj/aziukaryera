@@ -87,6 +87,9 @@ export async function buildApp(deps: AppDeps) {
 
   app.setErrorHandler((error, req, reply) => {
     if (error instanceof AuthError) return reply.code(error.status).send(error.body());
+    if ((error as Error).message === 'Queue limit reached.') {
+      return reply.code(503).header('retry-after', '2').send({ code: 503, error_code: 'over_capacity', msg: 'The server is busy; try again in a moment' });
+    }
     const status = (error as { statusCode?: number }).statusCode;
     if (status && status >= 400 && status < 500) {
       return reply.code(status).send({ code: status, error_code: 'validation_failed', msg: (error as Error).message });

@@ -85,6 +85,16 @@ async function clientHash(req: Request, day: string) {
   return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
 }
 
+/** The guest's network (IPv4 /24, IPv6 /48), hashed like the address: one
+ *  network cannot use up the guest pool (audit v4, M-04). The gateway sets
+ *  x-real-ip itself (an IPv6 address as its /64). */
+async function subnetHash(req: Request, day: string) {
+  const ip = req.headers.get("x-real-ip") || "unknown";
+  const net = ip.includes(":") ? ip.split(":").slice(0, 3).join(":") : ip.split(".").slice(0, 3).join(".");
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${day}|net|${net}|${SERVICE_KEY.slice(-24)}`));
+  return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
+}
+
 async function providerFetch(reservationId: string, input: string, init: RequestInit) {
   const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
   if (error || data !== true) throw new Error("provider_budget_unavailable");
@@ -268,7 +278,7 @@ Deno.serve(async (req: Request) => {
   const today = bakuToday();
   const hash = userId ? null : await clientHash(req, today);
   const { data: reservation, error: reserveError } = await db.rpc("ai_reserve_request", {
-    p_profile_id: userId, p_task: TASK, p_client_hash: hash,
+    p_profile_id: userId, p_task: TASK, p_client_hash: hash, p_subnet_hash: userId ? null : await subnetHash(req, today),
   });
   if (reserveError || !reservation) return json({ ok: false, error: "AIDA limiti yoxlanılmadı." }, 503);
   if (!reservation.allowed || !reservation.reservation_id) return json({ ok: false, error: "Bugünkü AIDA limiti dolub və ya hesab aktiv deyil. Sabah yenidən yazın.", limit: userId ? "user" : "guest" }, 429);
