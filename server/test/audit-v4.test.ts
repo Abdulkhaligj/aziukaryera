@@ -241,3 +241,22 @@ test('M-03: wrong passwords for the platform reset are stopped after three tries
   assert.ok(right.error, 'locked for a while, the right password included');
   assert.ok(await one(h.pool, 'SELECT id FROM jobs WHERE id = ?', [openJob]), 'nothing was deleted');
 });
+
+test('L48 (rest): an invitation link brings a one-time link code, never a session token', async () => {
+  const invited = await fetch(`${h.url}/auth/v1/invite?redirect_to=${encodeURIComponent('https://asoiu-career.vercel.app/')}`, { method: 'POST',
+    headers: { apikey: h.config.serviceRoleKey, authorization: `Bearer ${h.config.serviceRoleKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'v4.devet@asoiu.edu.az', data: { role: 'student', full_name: 'Dəvət' } }) });
+  assert.equal(invited.status, 200);
+  const res = await openLink(h, lastMail(h, 'v4.devet@asoiu.edu.az').link);
+  const fragment = new URLSearchParams(new URL(res.headers.get('location')!).hash.slice(1));
+  assert.equal(fragment.get('access_token'), null);
+  assert.equal(fragment.get('type'), 'invite');
+  const code = fragment.get('link_code')!;
+  const trade = (grant: string, body: unknown) => fetch(`${h.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST',
+    headers: { apikey: h.config.anonKey, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await trade('pkce', { auth_code: code, code_verifier: '-' })).status, 400, 'not a PKCE code');
+  const first = await trade('link_code', { link_code: code });
+  assert.equal(first.status, 200);
+  assert.ok((await first.json()).access_token);
+  assert.equal((await trade('link_code', { link_code: code })).status, 400, 'once');
+});

@@ -7,6 +7,10 @@ import assert from 'node:assert/strict';
 import type { ApiClient } from './helpers.ts';
 import { exec, one, rows } from '../src/db.ts';
 import { fileBytes, startHarness, type Harness } from './helpers.ts';
+import { createRequire } from 'node:module';
+
+// The site's solver for the AIDA guest challenge (audit v4, M-04).
+const aidaPow = createRequire(import.meta.url)('../../student-web/assets/js/aida-pow.js') as { solve(salt: string, bits: number): Promise<number> };
 
 const SECRET = 'm'.repeat(40);
 let h: Harness;
@@ -99,7 +103,10 @@ test('the gateway sets the client IP itself: forged IP headers do not open a new
   // Caddy (the one trusted hop) appends the real address last; whatever the
   // client wrote before it, or in cf-connecting-ip / x-real-ip, is ignored.
   for (const ip of ['198.51.100.1', '198.51.100.2']) {
-    await call('aida-chat', { message: 'Salam' }, { 'cf-connecting-ip': ip, 'x-real-ip': ip, 'x-forwarded-for': `${ip}, 203.0.113.9` });
+    const forged = { 'cf-connecting-ip': ip, 'x-real-ip': ip, 'x-forwarded-for': `${ip}, 203.0.113.9` };
+    const { challenge } = await (await call('aida-chat', { action: 'challenge' }, forged)).json();
+    const pow = { ...challenge, nonce: String(await aidaPow.solve(challenge.salt, challenge.bits)) };
+    await call('aida-chat', { message: 'Salam', pow }, forged);
   }
   const hashes = await rows<{ client_hash: string }>(h.pool, 'SELECT DISTINCT client_hash FROM private_ai_reservations WHERE profile_id IS NULL');
   assert.equal(hashes.length, 1, 'both guest calls count against the same address');

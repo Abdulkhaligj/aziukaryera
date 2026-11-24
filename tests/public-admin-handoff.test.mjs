@@ -49,5 +49,6 @@ test('student and employer scripts stay loaded with previous patch versions', ()
   const index = read('student-web/index.html');
   assert.match(index, /app\.js\?v=[0-9a-z]+/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
-  assert.match(index, /aida-widget\.js\?v=20261102b/);
+  assert.match(index, /aida-pow\.js\?v=20261124a/);
+  assert.match(index, /aida-widget\.js\?v=20261124a/);
 });

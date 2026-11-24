@@ -150,8 +150,12 @@
       const timer = setTimeout(() => controller.abort(), 24000);
       let response;
       try {
+        // A guest solves a small challenge first (audit v4, M-04).
+        const { data: sessionData } = await Backend.sb.auth.getSession();
+        const pow = sessionData && sessionData.session ? null : await guestProof(controller.signal);
+        if (!current()) return;
         response = await Backend.sb.functions.invoke('aida-chat', {
-          body: {message:text,history},
+          body: pow ? {message:text,history,pow} : {message:text,history},
           signal:controller.signal
         });
       } finally { clearTimeout(timer); }
@@ -178,6 +182,14 @@
       log.scrollTop=log.scrollHeight;
       if (!panel.hidden) input.focus();
     }
+  }
+  async function guestProof(signal) {
+    if (!window.AidaPow) throw new Error('challenge unavailable');
+    const res = await Backend.sb.functions.invoke('aida-chat', { body: { action: 'challenge' }, signal });
+    const challenge = res && res.data && res.data.challenge;
+    if (res.error || !challenge) throw new Error('challenge unavailable');
+    const nonce = await window.AidaPow.solve(challenge.salt, challenge.bits);
+    return { salt: challenge.salt, ts: challenge.ts, bits: challenge.bits, sig: challenge.sig, nonce: String(nonce) };
   }
   form.addEventListener('submit', event => {event.preventDefault();send(input.value);});
   input.addEventListener('keydown', event => {

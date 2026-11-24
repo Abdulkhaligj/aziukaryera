@@ -69,6 +69,16 @@ export async function startHarness(env: Record<string, string> = {}): Promise<Ha
   };
 }
 
+/** The session an email link's redirect leads to: the site trades the link
+ *  code in the fragment for it (L48). */
+export async function linkSession(harness: Harness, location: string): Promise<{ access_token: string; refresh_token: string; type: string | null }> {
+  const fragment = new URLSearchParams(new URL(location).hash.slice(1));
+  const res = await fetch(`${harness.url}/auth/v1/token?grant_type=link_code`, { method: 'POST',
+    headers: { apikey: harness.config.anonKey, 'content-type': 'application/json' }, body: JSON.stringify({ link_code: fragment.get('link_code') }) });
+  if (!res.ok) throw new Error(`link_code: ${res.status}`);
+  return { ...(await res.json()), type: fragment.get('type') };
+}
+
 /** A browser-like client in the code (PKCE) flow, as the portal uses it, with its own storage. */
 export function codeFlowClient(url: string, key: string, storage: { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }): ApiClient {
   return createClient(url, key, { auth: { flowType: 'pkce', storage, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false } });

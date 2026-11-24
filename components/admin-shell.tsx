@@ -296,6 +296,9 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
   const [resetOpen, setResetOpen] = useState(false);
   const [resetPhrase, setResetPhrase] = useState('');
   const [platformPassword, setPlatformPassword] = useState('');
+  // The code from the super admin's email (audit v4, M-03).
+  const [resetCode, setResetCode] = useState('');
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState<ApprovalNote[]>([]);
   const [approvalNoteOpen, setApprovalNoteOpen] = useState(false);
   const [approvalNoteText, setApprovalNoteText] = useState('');
@@ -490,14 +493,25 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
     }
   }
 
-  async function resetPlatform() {
-    if (resetPhrase !== 'SIFIRLA' || !platformPassword) return;
+  async function sendResetCode() {
     setBusy(true); setFormError('');
     try {
-      const response = await fetch('/api/admin/system/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: resetPhrase, password: platformPassword }) });
+      const response = await fetch('/api/admin/system/reset/code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const result = await readJson(response);
+      if (!response.ok) throw new Error(result.error || 'Kod göndərilmədi');
+      setResetCodeSent(true);
+    } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Kod göndərilmədi'); }
+    finally { setBusy(false); }
+  }
+
+  async function resetPlatform() {
+    if (resetPhrase !== 'SIFIRLA' || !platformPassword || !/^\d{6}$/.test(resetCode)) return;
+    setBusy(true); setFormError('');
+    try {
+      const response = await fetch('/api/admin/system/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: resetPhrase, password: platformPassword, code: resetCode }) });
       const result = await readJson(response);
       if (!response.ok) throw new Error(result.error || 'Sıfırlama alınmadı');
-      setResetOpen(false); setResetPhrase(''); setPlatformPassword('');
+      setResetOpen(false); setResetPhrase(''); setPlatformPassword(''); setResetCode(''); setResetCodeSent(false);
       window.location.reload();
     } catch (caught) { setFormError(caught instanceof Error ? caught.message : 'Sıfırlama alınmadı'); }
     finally { setBusy(false); }
@@ -682,9 +696,12 @@ export default function AdminShell({ initialData, initialErrors, lookups, notice
         <div className="noticeBox">Admin hesabları, audit tarixçəsi, fakültə və ixtisas siyahıları, həmçinin paketlər saxlanılır.</div>
         <label className="field">Təsdiq üçün <b>SIFIRLA</b> yazın<input value={resetPhrase} onChange={event => setResetPhrase(event.target.value)} autoComplete="off"/></label>
         <label className="field">Şifrəniz (təsdiq üçün)<input type="password" value={platformPassword} onChange={event => setPlatformPassword(event.target.value)} autoComplete="current-password"/></label>
+        <label className="field">E-poçtunuza göndərilən 6 rəqəmli kod<input inputMode="numeric" maxLength={6} value={resetCode} onChange={event => setResetCode(event.target.value.replace(/\D/g, '').slice(0, 6))} autoComplete="one-time-code"/></label>
+        <button type="button" className="secondaryButton" onClick={sendResetCode} disabled={busy}>{resetCodeSent ? 'Kodu yenidən göndər' : 'Kodu e-poçtuma göndər'}</button>
+        {resetCodeSent && <div className="noticeBox">Kod e-poçtunuza göndərildi; 10 dəqiqə etibarlıdır.</div>}
         {formError && <div className="errorBox">{formError}</div>}
       </div>
-      <div className="modalActions"><span className="spacer"/><button type="button" className="secondaryButton" onClick={() => setResetOpen(false)} disabled={busy}>Ləğv et</button><button type="button" className="dangerButton solid" onClick={resetPlatform} disabled={busy || resetPhrase !== 'SIFIRLA' || !platformPassword}><RotateCcw size={17}/>{busy ? 'Sıfırlanır…' : 'Hər şeyi sıfırla'}</button></div>
+      <div className="modalActions"><span className="spacer"/><button type="button" className="secondaryButton" onClick={() => setResetOpen(false)} disabled={busy}>Ləğv et</button><button type="button" className="dangerButton solid" onClick={resetPlatform} disabled={busy || resetPhrase !== 'SIFIRLA' || !platformPassword || !/^\d{6}$/.test(resetCode)}><RotateCcw size={17}/>{busy ? 'Sıfırlanır…' : 'Hər şeyi sıfırla'}</button></div>
     </div></div>}
 
     <Assistant open={assistantOpen} onClose={() => setAssistantOpen(false)} role={currentRole} userId={currentUserId}

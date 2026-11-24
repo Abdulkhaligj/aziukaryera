@@ -9,11 +9,11 @@ import { contextFromHeaders, forgetSessions, systemContext, verifyJwt, type Clai
 import { exec, one, rows, toMysqlDatetime, transaction, type Tx } from '../db.ts';
 import { AuthError, authErrors, DbRuleError } from '../errors.ts';
 import type { Schema } from '../schema.ts';
-import { composeMail, type Mailer, type MailKind } from './mailer.ts';
+import { composeMail, type Mailer, type MailKind, composeCodeMail } from './mailer.ts';
 import { handleNewUser } from './new-user.ts';
 import { deleteRow, updateRow } from '../write/pipeline.ts';
 import { clientKey, RateLimiter } from './rate-limit.ts';
-import { consumeFlowCode, consumeOneTimeToken, createFlowCode, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession, type CodeChallenge } from './tokens.ts';
+import { consumeFlowCode, consumeLinkCode, consumeOneTimeToken, createReauthCode, createFlowCode, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession, type CodeChallenge } from './tokens.ts';
 import { findUserByEmail, findUserById, isBanned, mergeMetadata, normalizeEmail, toGoTrueUser, validEmail, type AuthUser } from './users.ts';
 
 export interface AuthDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer }
@@ -237,6 +237,19 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       if ('replayed' in result) throw authErrors.refreshUsed();
       return result;
     }
+    if (req.query.grant_type === 'link_code') {
+      // The code an email link without a verifier brings to the site (L48).
+      limit(signIns, ipKey(req));
+      if (typeof body.link_code !== 'string') throw authErrors.validation('link_code is required');
+      const flow = await transaction(pool, tx => consumeLinkCode(tx, body.link_code));
+      if (!flow) throw new AuthError(400, 'flow_state_not_found', 'invalid flow state, no valid flow state found');
+      return transaction(pool, async tx => {
+        const user = await findUserById(tx, flow.user_id);
+        if (!user) throw new AuthError(400, 'flow_state_not_found', 'invalid flow state, no valid flow state found');
+        if (isBanned(user)) throw authErrors.banned();
+        return startSession(tx, config, user, AMR[flow.purpose] || 'otp', meta(req), flow.purpose === 'recovery');
+      });
+    }
     if (req.query.grant_type === 'pkce') {
       // The code from an email link and the verifier kept by the browser that
       // asked for the link (L48). A code works once, for five minutes.
@@ -291,6 +304,21 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   });
 
   app.get('/user', async (req: FastifyRequest) => toGoTrueUser((await bearerUser(req)).user));
+
+  // GoTrue's reauthentication: a six-digit code by email before a dangerous
+  // step, here the platform reset (audit v4, M-03: a second factor besides the password).
+  const reauthCooldown = new RateLimiter(1, 60_000);
+  const reauthHourly = new RateLimiter(5, 60 * 60_000);
+  app.get('/reauthenticate', async (req: FastifyRequest) => {
+    const { user, restricted, mustChange } = await bearerUser(req);
+    if (restricted || mustChange) throw new AuthError(403, 'password_change_required', 'Set a new password first');
+    if (!user.email) throw authErrors.validation('The account has no email address');
+    if (!reauthCooldown.take(user.id)) throw authErrors.tooFrequent(reauthCooldown.retryAfter(user.id) || 60);
+    if (!reauthHourly.take(user.id)) throw authErrors.rateLimited();
+    const code = await transaction(pool, tx => createReauthCode(tx, user.id));
+    deliver(composeCodeMail(user.email, code));
+    return {};
+  });
 
   app.put('/user', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     const { user, claims, restricted, mustChange } = await bearerUser(req);
@@ -443,7 +471,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   /** Consumes an email token, confirms the address and opens a session. For an
    *  email change confirmed on one of two addresses, returns the GoTrue message. */
-  async function verify(token: string, type: string, req: FastifyRequest): Promise<Awaited<ReturnType<typeof startSession>> | { msg: string } | { code: string }> {
+  async function verify(token: string, type: string, _req: FastifyRequest): Promise<{ msg: string } | { code: string } | { linkCode: string }> {
     // Own keys only: type=constructor is not a purpose (#75).
     const purposes = Object.hasOwn(PURPOSE, type) ? PURPOSE[type] : null;
     if (!purposes || !token) throw authErrors.otpExpired();
@@ -486,7 +514,10 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
       if (used.code_challenge && used.code_challenge_method) {
         return { code: await createFlowCode(tx, user.id, used.purpose, { challenge: used.code_challenge, method: used.code_challenge_method as CodeChallenge['method'] }) };
       }
-      return startSession(tx, config, user, AMR[used.purpose] || 'otp', meta(req), used.purpose === 'recovery');
+      // A link without a verifier (an invitation, a resent confirmation, an email
+      // change) gets a one-time link code too: the site trades it for the session,
+      // so no session token is ever in an address (L48).
+      return { linkCode: await createFlowCode(tx, user.id, used.purpose, { challenge: '-', method: 'link' }) };
     });
   }
 
@@ -500,11 +531,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         const [base, fragment] = redirect.split('#');
         return reply.redirect(`${base}${base.includes('?') ? '&' : '?'}code=${encodeURIComponent(session.code)}${fragment !== undefined ? `#${fragment}` : ''}`, 303);
       }
-      const hash = new URLSearchParams({
-        access_token: session.access_token, expires_at: String(session.expires_at), expires_in: String(session.expires_in),
-        refresh_token: session.refresh_token, token_type: 'bearer', type: String(type)
-      });
-      return reply.redirect(`${redirect}#${hash}`, 303);
+      return reply.redirect(`${redirect}#${new URLSearchParams({ link_code: session.linkCode, type: String(type) })}`, 303);
     } catch (error) {
       if (!(error instanceof AuthError)) throw error;
       const hash = new URLSearchParams({ error: 'access_denied', error_code: error.errorCode, error_description: 'Email link is invalid or has expired' });

@@ -1,6 +1,6 @@
 // Access tokens (HS256 JWT, same claims as before the move) and refresh-token
 // sessions. Only SHA-256 hashes of refresh and one-time tokens are stored.
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual, randomInt } from 'node:crypto';
 import { SignJWT } from 'jose';
 import type { Pool } from 'mysql2/promise';
 import type { Config } from '../config.ts';
@@ -109,7 +109,9 @@ export async function sessionIsActive(db: Tx | Pool, sessionId: string | undefin
  *  sent, so someone asking in another's name cannot void it (audit 2026-11-16, M8);
  *  using any of them voids the others. */
 /** A PKCE challenge sent with the request that asked for the link (L48). */
-export interface CodeChallenge { challenge: string; method: 's256' | 'plain' }
+/** 'link': a code for a link the server made without a browser verifier (an
+ *  invitation, a resent confirmation, an email change); see consumeLinkCode. */
+export interface CodeChallenge { challenge: string; method: 's256' | 'plain' | 'link' }
 
 export async function createOneTimeToken(tx: Tx, userId: string, purpose: string, ttlMinutes = 60, relatesTo: string | null = null, keepEarlier = false,
   pkce: CodeChallenge | null = null) {
@@ -146,11 +148,46 @@ export async function createFlowCode(tx: Tx, userId: string, purpose: string, pk
   return code;
 }
 
+/** A six-digit code by email that confirms a dangerous step (GoTrue's
+ *  reauthentication nonce; here the platform reset, audit v4 M-03). It lives ten
+ *  minutes, a new one voids the earlier, and it is stored as a salted hash. */
+export async function createReauthCode(tx: Tx, userId: string): Promise<string> {
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const salt = newSecret();
+  await exec(tx, `UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE user_id = ? AND purpose = 'reauthentication' AND used_at IS NULL`, [userId]);
+  await exec(tx, `INSERT INTO auth_one_time_tokens (id, user_id, purpose, token_hash, expires_at, relates_to) VALUES (UUID(), ?, 'reauthentication', ?, ?, ?)`,
+    [userId, sha256(`${salt}:${code}`), toMysqlDatetime(new Date(Date.now() + 10 * 60_000)), salt]);
+  return code;
+}
+
+/** True once for the right, unexpired code of this user; the code is then used. */
+export async function consumeReauthCode(tx: Tx, userId: string, code: unknown): Promise<boolean> {
+  if (typeof code !== 'string' || !/^\d{6}$/.test(code)) return false;
+  const row = await one<{ id: string; token_hash: string; relates_to: string }>(tx, `SELECT id, token_hash, relates_to FROM auth_one_time_tokens
+      WHERE user_id = ? AND purpose = 'reauthentication' AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP(6) ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, [userId]);
+  if (!row) return false;
+  const a = Buffer.from(sha256(`${row.relates_to}:${code}`)), b = Buffer.from(row.token_hash);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+  await exec(tx, 'UPDATE auth_one_time_tokens SET used_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [row.id]);
+  return true;
+}
+
+/** Trades a link code (no verifier: the link was made by the server) for the
+ *  user and the link's purpose, once and within five minutes. The site gets
+ *  this code in the address instead of the session tokens (audit 2026-11-16, L48). */
+export async function consumeLinkCode(tx: Tx, code: string): Promise<{ user_id: string; purpose: string } | null> {
+  const row = await one<{ user_id: string; purpose: string }>(tx, `SELECT user_id, purpose FROM auth_flow_codes
+      WHERE code_hash = ? AND code_challenge_method = 'link' AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP(6) FOR UPDATE`, [sha256(code)]);
+  if (!row) return null;
+  await exec(tx, 'UPDATE auth_flow_codes SET used_at = CURRENT_TIMESTAMP(6) WHERE code_hash = ?', [sha256(code)]);
+  return row;
+}
+
 /** Trades a code and its verifier for the user and the link's purpose (L48). */
 export async function consumeFlowCode(tx: Tx, code: string, verifier: string): Promise<{ user_id: string; purpose: string } | null> {
   const row = await one<{ user_id: string; purpose: string; code_challenge: string; code_challenge_method: string }>(tx,
     `SELECT user_id, purpose, code_challenge, code_challenge_method FROM auth_flow_codes
-      WHERE code_hash = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP(6) FOR UPDATE`, [sha256(code)]);
+      WHERE code_hash = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP(6) AND code_challenge_method IN ('s256', 'plain') FOR UPDATE`, [sha256(code)]);
   if (!row) return null;
   // Used up either way: a wrong verifier does not leave the code open to guessing.
   await exec(tx, 'UPDATE auth_flow_codes SET used_at = CURRENT_TIMESTAMP(6) WHERE code_hash = ?', [sha256(code)]);

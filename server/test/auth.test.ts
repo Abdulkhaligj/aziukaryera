@@ -4,7 +4,7 @@ import { decodeJwt } from 'jose';
 import { exec, one, rows } from '../src/db.ts';
 import { currentAdminRole } from '../src/write/rules/core.ts';
 import { loadConfig } from '../src/config.ts';
-import { codeFlowClient, startHarness, type Harness } from './helpers.ts';
+import { codeFlowClient, linkSession, startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
 before(async () => { h = await startHarness(); });
@@ -177,9 +177,10 @@ test('password recovery emails a link that signs the user in through the portal 
   assert.equal(res.status, 303);
   const location = new URL(res.headers.get('location')!);
   assert.equal(location.origin + location.pathname, 'https://asoiu-career.vercel.app/');
-  const hash = new URLSearchParams(location.hash.slice(1));
-  assert.equal(hash.get('type'), 'recovery');
-  const recoveryAuth = { apikey: h.config.anonKey, authorization: `Bearer ${hash.get('access_token')}` };
+  assert.ok(!location.hash.includes('access_token'), 'no session token in the address (L48)');
+  const link = await linkSession(h, location.href);
+  assert.equal(link.type, 'recovery');
+  const recoveryAuth = { apikey: h.config.anonKey, authorization: `Bearer ${link.access_token}` };
   const user = await fetch(`${h.url}/auth/v1/user`, { headers: recoveryAuth });
   assert.equal(user.status, 200);
   // The recovery session only sets a new password (#15).
@@ -260,7 +261,7 @@ test('email change: links to the current and the new address, both must confirm'
   const first = await openLink(mails[0].link);
   assert.match(first.headers.get('location')!, /#message=Confirmation\+link\+accepted/);
   const second = await openLink(mails[1].link);
-  assert.match(second.headers.get('location')!, /#access_token=/);
+  assert.match(second.headers.get('location')!, /#link_code=/);
   const user = await h.service().auth.admin.getUserById(data.user!.id);
   assert.equal(user.data.user!.email, 'yeni@asoiu.edu.az');
   assert.equal(user.data.user!.new_email, undefined);
