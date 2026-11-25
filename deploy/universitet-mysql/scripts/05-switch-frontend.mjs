@@ -56,7 +56,8 @@ for (const file of ['index.html', 'cv-builder.html']) {
 // With --site the Vercel copy of the student site forwards to the new address.
 edit(`${web}/vercel.json`, text => {
   const config = JSON.parse(text);
-  if (site) config.redirects = [{ source: '/:path*', destination: `${site}/:path*`, permanent: true }];
+  // "/(.*)" also matches the home page ("/:path*" does not on Vercel).
+  if (site) config.redirects = [{ source: '/(.*)', destination: `${site}/$1`, permanent: true }];
   else delete config.redirects;
   return JSON.stringify(config, null, 2) + '\n';
 });

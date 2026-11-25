@@ -3,8 +3,8 @@
   "trailingSlash": false,
   "redirects": [
     {
-      "source": "/:path*",
-      "destination": "https://career.asoiu.edu.az/:path*",
+      "source": "/(.*)",
+      "destination": "https://career.asoiu.edu.az/$1",
       "permanent": true
     }
   ],
