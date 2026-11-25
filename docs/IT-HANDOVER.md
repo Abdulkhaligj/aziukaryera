@@ -136,6 +136,13 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
   - Gündəlik şərh/paylaşım limiti sayğacla aparılır (silmək yer açmır, paralel sorğular keçmir); şərhin vaxtını server qoyur.
   - Editor şirkəti sahibindən ayıra bilmir; e-poçt dəyişməsinin cavabı ünvanın mövcudluğunu göstərmir; sahibin əvvəl daxil olduğu IP-dən link sorğusu limitə düşmür.
 
+- **24.11.2026 (qalan problemlər):**
+  - E-poçt linkləri ünvana heç vaxt sessiya tokeni qoymur: dəvət, yenidən göndərilən təsdiq və e-poçt dəyişməsi də birdəfəlik 5 dəqiqəlik "link kodu" gətirir, sayt onu sessiyaya dəyişir.
+  - Platformanın sıfırlanması şifrədən əlavə Super Admin-in e-poçtuna göndərilən 6 rəqəmli kodu (10 dəqiqə) tələb edir.
+  - Qonaq AIDA hər sual üçün brauzerdə kiçik hesablama (proof-of-work) tələb edir; kənar CAPTCHA xidməti lazım deyil.
+  - Ehtiyat nüsxədən köçürmə lokal Postgres 17 ilə real data üzərində sınandı (58 cədvəl, 963 sətir, 15 fayl); köçürmə alətindəki say yoxlaması xətası düzəldildi.
+  - Next.js 16.4.6-ya yeniləndi (npm audit: 0 zəiflik).
+
 ## 5. Testlər (13.11.2026)
 - **23.11.2026:** MySQL API 144/144 (16 yeni audit testi), saytlar və admin panel 96/96; H-01 axını brauzerdə yoxlanılıb.
 - **16.11.2026 (audit v3-dən sonra):** saytlar və admin panel 96/96, MySQL API 127/127 (18 yeni audit testi və PKCE testi), TypeScript yoxlaması və `next build` uğurludur. Kod axını ilə şifrə bərpası lokal serverdə brauzerdə yoxlanılıb.

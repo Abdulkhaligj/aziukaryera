@@ -95,6 +95,50 @@ async function subnetHash(req: Request, day: string) {
   return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
 }
 
+// ---- Guest challenge (audit v4, M-04) -----------------------------------
+// A guest proves a little work before each question: the browser finds a nonce
+// whose SHA-256 with a signed, single-use, five-minute salt starts with
+// POW_BITS zero bits. Thousands of questions from many addresses then cost
+// real computing time, without a third-party CAPTCHA.
+const POW_BITS = 18;
+const POW_TTL_MS = 5 * 60_000;
+const usedChallenges = new Map<string, number>();
+const powKey = crypto.subtle.importKey("raw", new TextEncoder().encode(`aida-pow|${SERVICE_KEY}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+const toHex = (bytes: Uint8Array) => Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+async function newChallenge() {
+  const salt = toHex(crypto.getRandomValues(new Uint8Array(16)));
+  const ts = Date.now();
+  const sig = toHex(new Uint8Array(await crypto.subtle.sign("HMAC", await powKey, new TextEncoder().encode(`${salt}.${ts}.${POW_BITS}`))));
+  return { salt, ts, bits: POW_BITS, sig };
+}
+
+function zeroBits(hash: Uint8Array) {
+  let bits = 0;
+  for (const byte of hash) {
+    if (byte === 0) { bits += 8; continue; }
+    return bits + Math.clz32(byte) - 24;
+  }
+  return bits;
+}
+
+async function validProof(proof: unknown) {
+  if (!proof || typeof proof !== "object") return false;
+  const { salt, ts, bits, sig, nonce } = proof as Record<string, unknown>;
+  if (typeof salt !== "string" || !/^[0-9a-f]{32}$/.test(salt) || typeof ts !== "number" || bits !== POW_BITS
+    || typeof sig !== "string" || !/^[0-9a-f]{64}$/.test(sig) || typeof nonce !== "string" || !/^\d{1,10}$/.test(nonce)) return false;
+  const now = Date.now();
+  if (now - ts > POW_TTL_MS || ts - now > 60_000) return false;
+  const signature = new Uint8Array(sig.match(/../g)!.map((h) => parseInt(h, 16)));
+  if (!await crypto.subtle.verify("HMAC", await powKey, signature, new TextEncoder().encode(`${salt}.${ts}.${bits}`))) return false;
+  for (const [key, expires] of usedChallenges) if (expires < now) usedChallenges.delete(key);
+  if (usedChallenges.has(salt) || usedChallenges.size >= 100_000) return false;
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${salt}:${nonce}`)));
+  if (zeroBits(hash) < POW_BITS) return false;
+  usedChallenges.set(salt, ts + POW_TTL_MS);
+  return true;
+}
+
 async function providerFetch(reservationId: string, input: string, init: RequestInit) {
   const { data, error } = await db.rpc("ai_consume_provider_attempt", { p_reservation_id: reservationId });
   if (error || data !== true) throw new Error("provider_budget_unavailable");
@@ -259,8 +303,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
-  let body: { message?: string; history?: Array<{ role?: string; text?: string }> };
+  let body: { message?: string; history?: Array<{ role?: string; text?: string }>; action?: string; pow?: unknown };
   try { body = await readLimitedJson(req); } catch { return json({ ok: false, error: "Yanlış sorğu" }, 400); }
+  if (body.action === "challenge") return json({ ok: true, challenge: await newChallenge() });
   const message = String(body.message || "").trim().slice(0, 800);
   if (!message) return json({ ok: false, error: "Sualınızı yazın" }, 400);
 
@@ -274,6 +319,9 @@ Deno.serve(async (req: Request) => {
     const { data } = await db.auth.getUser(token);
     userId = data?.user?.id ?? null;
   }
+
+  // A guest's question carries a solved challenge (M-04).
+  if (!userId && !await validProof(body.pow)) return json({ ok: false, error: "challenge_required" }, 428);
 
   const today = bakuToday();
   const hash = userId ? null : await clientHash(req, today);

@@ -3,6 +3,7 @@
 // H-09 (audit 2026-11-13): the confirmation word is required, the super admin
 // re-enters their password, and the audit log is never emptied.
 import { RateLimiter } from '../auth/rate-limit.ts';
+import { consumeReauthCode } from '../auth/tokens.ts';
 import bcrypt from 'bcryptjs';
 import { exec, one, rows } from '../db.ts';
 import { DbRuleError } from '../errors.ts';
@@ -20,7 +21,7 @@ const TABLES = ['broadcast_notification_reads', 'moderation_logs', 'notification
 const resetFailures = new RateLimiter(3, 15 * 60_000);
 
 rpc({
-  name: 'admin_reset_platform_data', args: { p_confirmation: 'text', p_password: 'text' }, roles: ['authenticated'], security: 'invoker', returns: 'value',
+  name: 'admin_reset_platform_data', args: { p_confirmation: 'text', p_password: 'text', p_nonce: 'text' }, roles: ['authenticated'], security: 'invoker', returns: 'value',
   async run(invoker, a) {
     // The private function is SECURITY DEFINER.
     const env = { ...invoker, definer: true };
@@ -38,6 +39,12 @@ rpc({
     if (typeof a.p_password !== 'string' || !account?.encrypted_password || !await bcrypt.compare(a.p_password, account.encrypted_password)) {
       resetFailures.take(tries);
       throw new DbRuleError('Şifrə yanlışdır', '28P01');
+    }
+    // And the code just sent to the super admin's email (GET /auth/v1/reauthenticate):
+    // a stolen session and password alone do not empty the platform (audit v4, M-03).
+    if (!await consumeReauthCode(env.tx, tries, a.p_nonce)) {
+      resetFailures.take(tries);
+      throw new DbRuleError('E-poçta göndərilən təsdiq kodu yanlışdır və ya vaxtı keçib', '28P01');
     }
     // set_config('lock_timeout', '5s', true) and set_config('statement_timeout', '30s', true).
     const [[previous]] = await env.tx.query('SELECT @@SESSION.innodb_lock_wait_timeout AS t') as unknown as [[{ t: number }]];

@@ -52,7 +52,8 @@ async function verify() {
   let problems = 0;
   for (const r of report) {
     const [[{ n }]] = await db.query(`SELECT COUNT(*) AS n FROM \`${r.table}\``);
-    if (n !== r.source) { problems++; console.error(`COUNT ${r.table}: source ${r.source}, mysql ${n}`); }
+    // Counts arrive as strings on this connection (big numbers stay exact, M37).
+    if (Number(n) !== Number(r.source)) { problems++; console.error(`COUNT ${r.table}: source ${r.source}, mysql ${n}`); }
     if (r.ids) {
       const [ids] = await db.query(`SELECT id FROM \`${r.table}\``);
       if (digest(ids.map(x => String(x.id))) !== r.ids) { problems++; console.error(`IDS ${r.table}: the set of ids differs`); }
@@ -67,7 +68,7 @@ async function verify() {
     const join = cols.map((c, i) => `p.\`${rcols[i]}\` = c.\`${c}\``).join(' AND ');
     const [[{ n }]] = await db.query(`SELECT COUNT(*) AS n FROM \`${fk.t}\` c LEFT JOIN \`${fk.rt}\` p ON ${join}
       WHERE ${cols.map(c => `c.\`${c}\` IS NOT NULL`).join(' AND ')} AND p.\`${rcols[0]}\` IS NULL`);
-    if (n) { problems++; console.error(`FK ${fk.name}: ${n} orphan row(s) in ${fk.t}`); }
+    if (Number(n)) { problems++; console.error(`FK ${fk.name}: ${n} orphan row(s) in ${fk.t}`); }
   }
   return problems;
 }
@@ -119,7 +120,7 @@ const DROPPED = new Set([]);
 for (const job of jobs) {
   if (!types.has(job.to)) throw new Error(`target table ${job.to} is missing; run db/setup.mjs first.`);
   const [[{ n }]] = await db.query(`SELECT COUNT(*) AS n FROM \`${job.to}\``);
-  if (n) throw new Error(`target table ${job.to} already has ${n} rows; import into an empty database.`);
+  if (Number(n)) throw new Error(`target table ${job.to} already has ${n} rows; import into an empty database.`);
 }
 
 const src = await pgSource();

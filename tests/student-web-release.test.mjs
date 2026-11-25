@@ -76,11 +76,12 @@ test('AIDA chat and polished icons load on all public/authenticated screens', ()
   // Compile real browser scripts so that malformed quotes do not reach production.
   new Script(chat);
   new Script(icons);
-  assert.match(index, /aida-widget\.js\?v=20261102b/);
+  assert.match(index, /aida-widget\.js\?v=20261124a/);
   assert.match(index, /ui-icons\.js\?v=20261028a/);
   assert.match(index, /ux-polish\.css\?v=20261028d/);
   assert.match(chat, /functions\.invoke\('aida-chat'/);
-  assert.match(chat, /body: \{message:text,history\}/);
+  // A guest adds a solved challenge (audit v4, M-04); a signed-in user does not.
+  assert.match(chat, /body: pow \? \{message:text,history,pow\} : \{message:text,history\}/);
   assert.match(chat, /bubble\.textContent = value/);
   assert.match(chat, /messages\.slice\(-10\)/);
   assert.doesNotMatch(chat, /localStorage|sessionStorage|service_role|GEMINI_API_KEY/);

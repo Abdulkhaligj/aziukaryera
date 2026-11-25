@@ -12,7 +12,7 @@ import { clientKey } from '../src/auth/rate-limit.ts';
 import { parseCron, parseField } from '../src/jobs/scheduler.ts';
 import { FileStore } from '../src/storage/files.ts';
 import { meetingUrlAllowed } from '../src/write/rules/interviews.ts';
-import { startHarness, type ApiClient, type Harness } from './helpers.ts';
+import { linkSession, startHarness, type ApiClient, type Harness } from './helpers.ts';
 
 let h: Harness;
 let student: ApiClient, company: ApiClient;
@@ -172,7 +172,7 @@ test('L7: a password-recovery session calls no function', async () => {
   const before = h.mailer.outbox!.length;
   assert.equal((await h.anon().auth.resetPasswordForEmail('v3.telebe@asoiu.edu.az', { redirectTo: 'https://asoiu-career.vercel.app/' })).error, null);
   const res = await openLink(h.mailer.outbox![before].link);
-  const token = new URLSearchParams(new URL(res.headers.get('location')!).hash.slice(1)).get('access_token')!;
+  const token = (await linkSession(h, res.headers.get('location')!)).access_token;
   assert.ok(token);
   const fn = await raw('/functions/v1/career-ai', { method: 'POST', token, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ task: 'cv_review' }) });
   assert.equal(fn.status, 403);

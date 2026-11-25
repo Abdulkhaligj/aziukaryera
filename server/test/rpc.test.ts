@@ -257,7 +257,12 @@ test('admin_reset_platform_data empties the platform but keeps the admins', asyn
   assert.equal((await admin.rpc('admin_reset_platform_data', { p_password: 'Sifre2026!' })).error?.message, 'Sıfırlama təsdiqi yanlışdır');
   assert.equal((await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA', p_password: 'wrong' })).error?.message, 'Şifrə yanlışdır');
   const auditBefore = Number((await one<{ n: number }>(h.pool, 'SELECT COUNT(*) AS n FROM admin_audit_logs'))!.n);
-  const reset = await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA', p_password: 'Sifre2026!' });
+  // M-03 (audit v4): without the emailed code the reset does not run.
+  assert.equal((await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA', p_password: 'Sifre2026!', p_nonce: '000000' })).error?.code, '28P01');
+  const adminEmail = (await admin.auth.getUser()).data.user!.email!;
+  assert.equal((await admin.auth.reauthenticate()).error, null);
+  const nonce = /\b(\d{6})\b/.exec([...h.mailer.outbox!].reverse().find(m => m.to === adminEmail && m.kind === 'reauthentication')!.text)![1];
+  const reset = await admin.rpc('admin_reset_platform_data', { p_confirmation: 'SIFIRLA', p_password: 'Sifre2026!', p_nonce: nonce });
   assert.equal(reset.error, null);
   assert.deepEqual(reset.data, { ok: true, removed_users: 2, kept_admins: 2 });
   for (const table of ['jobs', 'applications', 'companies', 'posts', 'interview_requests', 'benefits', 'ads']) {

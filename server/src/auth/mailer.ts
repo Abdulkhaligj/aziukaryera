@@ -4,11 +4,12 @@ import nodemailer from 'nodemailer';
 import type { Config } from '../config.ts';
 
 export interface Mail { to: string; subject: string; text: string; html: string; link: string; kind: MailKind }
-export type MailKind = 'confirmation' | 'recovery' | 'invite' | 'magic_link' | 'email_change' | 'email_change_current' | 'already_registered';
+export type MailKind = 'confirmation' | 'recovery' | 'invite' | 'magic_link' | 'email_change' | 'email_change_current' | 'already_registered' | 'reauthentication';
 export interface Mailer { send(mail: Mail): Promise<void>; outbox?: Mail[] }
 
 const templates: Record<MailKind, { subject: string; intro: string; action: string }> = {
   confirmation: { subject: 'E-poçt ünvanınızı təsdiqləyin', intro: 'ADNSU Karyera Mərkəzində qeydiyyatı tamamlamaq üçün e-poçt ünvanınızı təsdiqləyin.', action: 'E-poçtu təsdiqlə' },
+  reauthentication: { subject: 'Təsdiq kodu', intro: 'Hesabınızda təsdiq tələb edən əməliyyat üçün kod.', action: '' },
   recovery: { subject: 'Şifrənin bərpası', intro: 'Hesabınız üçün şifrə bərpası istənilib. Bunu siz etməmisinizsə, bu məktubu nəzərə almayın.', action: 'Yeni şifrə təyin et' },
   invite: { subject: 'ADNSU Karyera Mərkəzinə dəvət', intro: 'Sizi ADNSU Karyera Mərkəzinin platformasına dəvət ediblər.', action: 'Dəvəti qəbul et' },
   magic_link: { subject: 'Giriş linkiniz', intro: 'ADNSU Karyera Mərkəzinə daxil olmaq üçün aşağıdakı linkə klikləyin.', action: 'Daxil ol' },
@@ -21,6 +22,15 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<
 
 /** "bir saat", "24 saat": how long the link works, as the token really lives (#76). */
 const lifetime = (minutes: number) => minutes % 60 === 0 ? (minutes === 60 ? 'bir saat' : `${minutes / 60} saat`) : `${minutes} dəqiqə`;
+
+/** A code, not a link: confirms a dangerous step such as the platform reset (audit v4, M-03). */
+export function composeCodeMail(to: string, code: string, ttlMinutes = 10): Mail {
+  const intro = 'Hesabınızda təsdiq tələb edən əməliyyat (məsələn, platformanın sıfırlanması) üçün kod:';
+  const warn = `Kod ${ttlMinutes} dəqiqə etibarlıdır. Bunu siz istəməmisinizsə, dərhal şifrənizi dəyişin və Karyera Mərkəzinə xəbər verin.`;
+  const text = `${intro} ${code}\n\n${warn}\n\nADNSU Karyera Mərkəzi`;
+  const html = `<p>${escapeHtml(intro)}</p><p style="font-size:24px;letter-spacing:4px"><b>${escapeHtml(code)}</b></p><p style="color:#666;font-size:12px">${escapeHtml(warn)}</p><p>ADNSU Karyera Mərkəzi</p>`;
+  return { to, subject: 'Təsdiq kodu', text, html, link: '', kind: 'reauthentication' };
+}
 
 export function composeMail(kind: MailKind, to: string, link: string, ttlMinutes: number | null = 60): Mail {
   const t = templates[kind];

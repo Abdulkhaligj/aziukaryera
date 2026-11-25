@@ -219,6 +219,23 @@ const Backend = {
     try {
       const url = new URL(window.location.href);
       const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+      // Since audit v5 such a link brings a one-time link code, not the tokens:
+      // it is traded for the session here (L48).
+      const linkCode = fragment.get('link_code');
+      if (linkCode) {
+        this.linkType = fragment.get('type') || null;
+        history.replaceState(history.state, '', url.pathname + url.search);
+        this.linkSession = fetch(`${API_URL}/auth/v1/token?grant_type=link_code`, {
+          method: 'POST', headers: { apikey: API_KEY, 'content-type': 'application/json' }, body: JSON.stringify({ link_code: linkCode })
+        }).then(async res => {
+          const session = await res.json().catch(() => ({}));
+          if (!res.ok || !session.access_token) return new Error(session.msg || 'link_code');
+          const { error } = await this.sb.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+          return error || null;
+        }, error => error);
+        return;
+      }
+      // Links sent before then still carry the tokens.
       const accessToken = fragment.get('access_token'), refreshToken = fragment.get('refresh_token');
       if (!accessToken || !refreshToken) return;
       this.linkType = fragment.get('type') || null;
