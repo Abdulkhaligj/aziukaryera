@@ -65,8 +65,8 @@ const policy = [
   "script-src 'self' " + [...new Set([...external, ...inline])].map(value => "'" + value + "'").join(' '),
   // Fonts are served by the site itself (audit 2026-11-16, L52).
   "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:", "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  "font-src 'self' data:", "img-src 'self' data: blob: https://career.asoiu.edu.az",
+  "connect-src 'self' https://career.asoiu.edu.az wss://career.asoiu.edu.az",
   "frame-src 'self'", "worker-src 'self'", "form-action 'self'"
 ].join('; ');
 for (const name of pages) {

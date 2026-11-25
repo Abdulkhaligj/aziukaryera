@@ -22,7 +22,7 @@ const noStore = [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }
 // gone. While this is true every page shows /maintenance. Set it to false
 // once the MySQL API is live (see deploy/universitet-mysql/README.md).
 // ADMIN_MAINTENANCE=false at build time turns it off for a local check.
-const MAINTENANCE = process.env.ADMIN_MAINTENANCE !== 'false';
+const MAINTENANCE = false;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
