@@ -3,3 +3,4 @@ kit.env
 api.env
 backups/
 backup.key
+site-config/

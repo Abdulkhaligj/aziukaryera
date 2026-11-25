@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Checks the public endpoints through HTTPS, as the sites will use them.
+# Before the firewall forwards the domain, the server itself can be checked:
+#   VERIFY_URL=http://127.0.0.1 scripts/04-verify.sh   (with CADDY_SITE_ADDRESS=:80)
 . "$(dirname "$0")/lib.sh"
 load_env
-base="https://$API_DOMAIN"
+base="${VERIFY_URL:-https://$API_DOMAIN}"
+base="${base%/}"
 anon="$(api_env_get ANON_KEY)"
 fail=0
 check() { # name expected-status curl-args…
@@ -19,6 +22,18 @@ check "Reklamlar RPC (anon)" 200 -X POST "$base/rest/v1/rpc/active_ads" -H "apik
 check "Storage: gizli bucket açıq deyil" 404 "$base/storage/v1/object/public/avatars/x.webp"
 check "Moderasiya funksiyası secret istəyir" 401 -X POST "$base/functions/v1/content-moderation" -H 'Content-Type: application/json' -d '{}'
 check "admin-users JWT istəyir" 401 -X POST "$base/functions/v1/admin-users" -H 'Content-Type: application/json' -d '{}'
+step "Sayt"
+check "Ana səhifə" 200 "$base/"
+check "Saytın daxili yolu (index.html)" 200 "$base/jobs/1"
+check "CV qurucu" 200 "$base/cv-builder.html"
+check "Host faylları gizlidir" 404 "$base/vercel.json"
+site_config="$(curl -s "$base/assets/js/runtime-config.js" || true)"
+if printf '%s' "$site_config" | grep -q "apiUrl: 'https://$API_DOMAIN'" && printf '%s' "$site_config" | grep -q "apiKey: '$anon'"; then
+  echo "  OK   runtime-config.js bu serverə yönəlib"
+else echo "  XƏTA runtime-config.js bu serverin ünvanı və açarı ilə deyil (scripts/03-start.sh)"; fail=1; fi
+page="$(curl -s -D - -o /dev/null "$base/" || true)"
+if printf '%s' "$page" | grep -qi "^content-security-policy:.*frame-ancestors 'self'"; then echo "  OK   frame-ancestors"; else echo "  XƏTA saytda frame-ancestors başlığı yoxdur"; fail=1; fi
+
 step "Təhlükəsizlik başlıqları və CORS"
 headers="$(curl -s -D - -o /dev/null "$base/auth/v1/health" || true)"
 if printf '%s' "$headers" | grep -qi '^strict-transport-security:'; then echo "  OK   HSTS"; else echo "  XƏTA HSTS başlığı yoxdur"; fail=1; fi

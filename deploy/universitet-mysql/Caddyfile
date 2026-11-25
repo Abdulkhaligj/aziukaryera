@@ -1,14 +1,28 @@
-# HTTPS with an automatic Let's Encrypt certificate for API_DOMAIN.
-# Security headers for every answer (audit 2026-11-13, #59).
-{$API_DOMAIN} {
+# One address for the student site and the API (e.g. career.asoiu.edu.az):
+# the API paths go to the API, everything else is the static site (student-web).
+#
+# CADDY_SITE_ADDRESS (kit.env):
+#   empty → API_DOMAIN with an automatic Let's Encrypt certificate
+#           (the server is on the internet directly, ports 80/443 open).
+#   :80   → plain HTTP behind the university's web application firewall, which
+#           holds the HTTPS certificate and forwards to this server.
+# TRUSTED_PROXIES (kit.env): that firewall's address as this server sees it. Only
+# from there is the visitor's address in X-Forwarded-For believed (rate limits).
+{
+	servers {
+		trusted_proxies static {$TRUSTED_PROXIES}
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+{$CADDY_SITE_ADDRESS} {
 	encode zstd gzip
+	# Security headers for every answer (audit 2026-11-13, #59).
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
-		X-Frame-Options "DENY"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		Cross-Origin-Opener-Policy "same-origin"
 		-Server
 		-X-Powered-By
 	}
@@ -16,5 +30,40 @@
 	request_body {
 		max_size 60MB
 	}
-	reverse_proxy api:8000
+
+	@api path /auth/v1/* /rest/v1/* /storage/v1/* /functions/v1/*
+	handle @api {
+		header X-Frame-Options "DENY"
+		header Cross-Origin-Opener-Policy "same-origin"
+		reverse_proxy api:8000 {
+			# One address, the visitor's (resolved through TRUSTED_PROXIES).
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	# This server's public API address and key, written by scripts/03-start.sh.
+	handle /assets/js/runtime-config.js {
+		root * /srv/site-config
+		rewrite * /runtime-config.js
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	# The student site from this checkout (student-web), as Vercel served it:
+	# clean URLs and the app's own paths answered by index.html.
+	handle {
+		root * /srv/site
+		# The pages carry the full policy (scripts and their hashes) in a meta
+		# element; these parts only work as a header.
+		header Content-Security-Policy "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		header X-Frame-Options "SAMEORIGIN"
+		header Cache-Control "private, no-store, max-age=0"
+		@app path /jobs /jobs/* /companies /companies/* /events /events/* /network /network/* /profile /profile/* /cv /cv/* /interview /interview/* /career-ai /career-ai/*
+		rewrite @app /index.html
+		try_files {path} {path}.html
+		# Host configuration and notes in the folder are not part of the site.
+		file_server {
+			hide .* *.md *.conf vercel.json scripts
+		}
+	}
 }
