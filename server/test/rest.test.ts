@@ -2,7 +2,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ApiClient } from './helpers.ts';
 import { exec, one } from '../src/db.ts';
-import { startHarness, type Harness } from './helpers.ts';
+import { bakuToday, startHarness, type Harness } from './helpers.ts';
 
 let h: Harness;
 let student: ApiClient, otherStudent: ApiClient, company: ApiClient, admin: ApiClient, editor: ApiClient;
@@ -36,7 +36,7 @@ before(async () => {
   openJob = '33333333-3333-4333-8333-333333333333';
   pendingJob = '44444444-4444-4444-8444-444444444444';
   // Through the API, so the vacancy quota counts them (raw SQL would skip it).
-  const today = new Date().toISOString().slice(0, 10);
+  const today = bakuToday();
   const later = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
   const jobs = await h.service().from('jobs').insert([
     { id: openJob, company_id: companyId, title: 'Qazma mühəndisi', type: 'is', status: 'approved', deadline: today, location: 'Bakı' },
@@ -151,7 +151,7 @@ test('filters: ilike, in, gte, is, neq and Postgres NULL ordering', async () => 
   assert.equal(like.data!.length, 1);
   const inList = await company.from('jobs').select('id').in('id', [openJob, pendingJob]);
   assert.equal(inList.data!.length, 1, 'the deleted job is gone');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = bakuToday();
   assert.equal((await h.anon().from('jobs').select('id').gte('deadline', today)).data!.length, 1);
   assert.equal((await h.anon().from('jobs').select('id').is('location', null)).data!.length, 0);
   assert.equal((await h.anon().from('jobs').select('id').neq('status', 'approved')).data!.length, 0);

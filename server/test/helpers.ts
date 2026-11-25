@@ -103,6 +103,12 @@ async function seed(pool: ReturnType<typeof createPool>) {
 
 /** Bytes that start like a real file of the type: uploads are checked by
  *  their content, not only their declared type (audit 2026-11-13, #56). */
+/** Today in Baku (UTC+4), the date the access rules compare deadlines with.
+ *  The UTC date is one day behind it from 20:00 to 24:00 UTC. */
+export function bakuToday(): string {
+  return new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
+}
+
 export function fileBytes(size: number, type: string): Uint8Array<ArrayBuffer> {
   const ascii = (s: string) => [...s].map(c => c.charCodeAt(0));
   const head: number[] = {
