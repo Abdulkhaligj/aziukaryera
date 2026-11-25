@@ -169,15 +169,19 @@ const Backend = {
     return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
   },
 
-  /** Microsoft 365 / Entra ID ilə universitet girişi. */
-  async signInWithAzure() {
+  /** Microsoft 365 / Entra ID ilə universitet girişi. `role` — qeydiyyat
+   *  formasında seçilən (student | master_student | graduate); yalnız yeni
+   *  hesab yaradılanda nəzərə alınır, mövcud hesabın rolu dəyişmir. */
+  async signInWithAzure(role) {
     if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
+    const queryParams = { prompt: 'select_account' };
+    if (role === 'student' || role === 'master_student' || role === 'graduate') queryParams.role = role;
     const { error } = await this.sb.auth.signInWithOAuth({
       provider: 'azure',
       options: {
         redirectTo: `${window.location.origin}${window.location.pathname}`,
         scopes: 'email',
-        queryParams: { prompt: 'select_account' }
+        queryParams
       }
     });
     return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
