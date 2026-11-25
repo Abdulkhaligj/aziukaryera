@@ -11,6 +11,16 @@ case "$(api_env_get ENABLE_EMAIL_AUTOCONFIRM)" in
   true) echo "XƏBƏRDARLIQ: ENABLE_EMAIL_AUTOCONFIRM=true — e-poçt təsdiqsiz qeydiyyat. Yalnız sınaq üçün." ;;
   *) die "api.env: ENABLE_EMAIL_AUTOCONFIRM true və ya false olmalıdır." ;;
 esac
+case "${CADDY_SITE_ADDRESS:-}" in
+  ''|:80) ;;
+  *) die "kit.env: CADDY_SITE_ADDRESS boş (Let's Encrypt) və ya :80 (universitetin firewall-u arxasında) olmalıdır." ;;
+esac
+printf '%s' "${TRUSTED_PROXIES:-}" | LC_ALL=C grep -Eq '^[0-9A-Fa-f:./ ]*$' \
+  || die "kit.env: TRUSTED_PROXIES yalnız IP ünvanları və ya şəbəkələr ola bilər (boşluqla)."
+
+step "Saytın konfiqurasiyası"
+write_site_config
+
 step "Servislər"
 dc up -d --build mysql
 for _ in $(seq 1 60); do [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q mysql)" 2>/dev/null)" = healthy ] && break; sleep 2; done

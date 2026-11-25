@@ -26,6 +26,23 @@ env_set() {
   cat "$tmp" > "$file"; rm -f "$tmp"
 }
 random() { LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$1"; }
+# The student site served by Caddy reads this server's address and public key
+# from site-config/runtime-config.js (not from git: the key belongs to this server).
+write_site_config() {
+  local anon; anon="$(api_env_get ANON_KEY)"
+  printf '%s' "$anon" | LC_ALL=C grep -Eq '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$' || die "api.env: ANON_KEY JWT deyil."
+  mkdir -p "$KIT_DIR/site-config"
+  cat > "$KIT_DIR/site-config/runtime-config.js" <<EOF
+/* Written by deploy/universitet-mysql/scripts (write_site_config) for this server.
+ * Public API key only (access rules apply on the server). */
+window.CAREER_CONFIG = {
+  apiUrl: 'https://$API_DOMAIN',
+  apiKey: '$anon',
+  demoMode: false
+};
+EOF
+  chmod 644 "$KIT_DIR/site-config/runtime-config.js"
+}
 # Passwords reach the client through the environment (-e NAME without a
 # value), never as a command-line argument that "ps" would show (#83).
 mysql_app() { ( export MYSQL_PWD="$MYSQL_PASSWORD"; dc exec -T -e MYSQL_PWD mysql mysql -uasoiu asoiu_career "$@" ); }

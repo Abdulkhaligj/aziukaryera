@@ -6,9 +6,9 @@
 |---|---|
 | `mysql` | MySQL 8.4: bütün data, istifadəçilər, fayl qeydləri |
 | `api` | Node.js API (`server/`): giriş, data, RPC, fayllar, Edge Functions (AIDA, Career AI, admin assistent, admin-users, moderasiya), planlı işlər |
-| `caddy` | HTTPS: Let's Encrypt sertifikatını avtomatik alır və yeniləyir |
+| `caddy` | Tələbə saytı (`student-web`) və API eyni ünvanda: API yolları (`/auth/v1`, `/rest/v1`, `/storage/v1`, `/functions/v1`) API-yə, qalanı saytın fayllarına. HTTPS-i ya universitetin firewall-u verir, ya da Caddy özü Let's Encrypt-dən alır |
 
-API saytların artıq istifadə etdiyi HTTP protokolunu verir. Ona görə əsas sayt və admin panel **Vercel-də qalır**, kodları dəyişmir. Keçid günü yalnız ünvan və açar yenilənir. Kənardan yalnız 80/443 portları açıqdır, MySQL və API daxili şəbəkədədir.
+API saytların artıq istifadə etdiyi HTTP protokolunu verir, saytların kodu dəyişmir. **Tələbə saytı da bu serverdən** `https://career.asoiu.edu.az` ünvanında açılır (sayt və API eyni ünvandadır). **Admin panel Vercel-də qalır**, keçid günü yalnız API ünvanı və açarı yenilənir; köhnə `asoiu-career.vercel.app` ünvanı yeni ünvana yönləndirilir. Kənardan yalnız 80/443 portları açıqdır, MySQL və API daxili şəbəkədədir.
 
 > **Köhnə baza 12.11.2026 bağlanıb.** Bütün data (istifadəçilər şifrə hash-ləri ilə, elanlar, müraciətlər) və fayllar həmin gün ehtiyat nüsxəyə alınıb və nüsxə yoxlanılıb: 92 cədvəlin sətir sayları eynidir, MySQL-ə sınaq köçürməsi uğurludur. Köçürmə bu nüsxədən edilir. Server hazır olana qədər hər iki sayt "texniki işlər" səhifəsini göstərir.
 
@@ -18,8 +18,10 @@ API saytların artıq istifadə etdiyi HTTP protokolunu verir. Ona görə əsas 
 
 - [ ] **Server:** Ubuntu 22.04/24.04 (və ya Debian/RHEL), ən azı **2 CPU, 4 GB RAM, 40 GB SSD**, sudo girişi.
 - [ ] **Docker Engine + Compose plugin** (`docker compose version` işləməlidir).
-- [ ] **Domen:** məsələn `api.career.asoiu.edu.az`, DNS A qeydi bu serverə yönəlmiş.
-- [ ] **Firewall:** internetdən yalnız **80 və 443**.
+- [ ] **Domen:** `career.asoiu.edu.az`. İki yol var:
+  - **Universitetin web firewall-u (WAF) arxasında** (indiki vəziyyət: domen WAF-a, 82.194.6.243, yönəlib). WAF HTTPS sertifikatını özü saxlayır və sorğuları serverə **HTTP, port 80** ilə ötürür. Host başlığı saxlanmalı, `X-Forwarded-For` göndərilməli, GET/POST/PUT/PATCH/DELETE/OPTIONS və 60 MB-a qədər sorğulara icazə verilməlidir. API sorğularında `select=`, `eq.`, `order=` kimi parametrlər var: `/rest/v1`, `/auth/v1`, `/storage/v1`, `/functions/v1` yolları üçün imza (SQLi) qaydaları istisna edilməli və ya yalnız log rejimində olmalıdır. `kit.env`: `CADDY_SITE_ADDRESS=:80`, `TRUSTED_PROXIES=<WAF-ın serverə qoşulduğu daxili IP>`.
+  - **Birbaşa internetdə:** DNS A qeydi bu serverə, `CADDY_SITE_ADDRESS` boş: Caddy Let's Encrypt sertifikatını özü alır və yeniləyir.
+- [ ] **Firewall:** internetdən yalnız **80 və 443** (WAF arxasında: yalnız WAF-dan 80).
 - [ ] **Çıxış internet (HTTPS):** Google Gemini API, Let's Encrypt, Docker Hub, npm.
 - [ ] **SMTP (məcburi):** host, port, istifadəçi, şifrə, göndərən ünvan (qeydiyyat təsdiqi, şifrə bərpası, admin dəvətləri). E-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`). API production rejimində `SMTP_HOST`, `DATA_ENCRYPTION_KEY` və ən azı 32 simvolluq `MODERATION_WEBHOOK_SECRET` olmadan başlamır; `03-start.sh` bunları əvvəlcədən yoxlayır və dayanır.
 - [ ] **AI açarı:** `GEMINI_API_KEY`, istəsəniz `GROQ_API_KEY`.
@@ -31,7 +33,7 @@ Repo serverə klonlanır, sonra repo kökündə:
 
 ```bash
 git clone https://github.com/Abdulkhaligj/aziukaryera.git && cd aziukaryera
-deploy/universitet-mysql/scripts/01-init.sh api.career.asoiu.edu.az
+deploy/universitet-mysql/scripts/01-init.sh career.asoiu.edu.az
 ```
 
 `01-init.sh` nə edir:
@@ -73,7 +75,8 @@ deploy/universitet-mysql/scripts/02-import.sh
 
 ```bash
 deploy/universitet-mysql/scripts/03-start.sh     # servislər + moderasiya webhook-u bu serverə
-deploy/universitet-mysql/scripts/04-verify.sh    # HTTPS üzərindən 8 yoxlama
+deploy/universitet-mysql/scripts/04-verify.sh    # HTTPS üzərindən API, sayt və başlıqlar
+# WAF domeni hələ ötürmürsə, serverin özündə: VERIFY_URL=http://127.0.0.1 deploy/universitet-mysql/scripts/04-verify.sh
 ```
 
 ## 5. Keçid günü (saytların yeni serverə yönəldilməsi)
@@ -82,15 +85,15 @@ Saytlar hazırda "texniki işlər" səhifəsini göstərir, yazı artıq dayanı
 
 1. `02-import.sh`, sonra `03-start.sh` və `04-verify.sh` (yuxarıda).
 2. **Admin panel** (Vercel → `asoiu-career-admin` → Settings → Environment Variables, Production), növbəti addımdakı push-dan **əvvəl**:
-   - `NEXT_PUBLIC_API_URL` = `https://api.career.asoiu.edu.az`
+   - `NEXT_PUBLIC_API_URL` = `https://career.asoiu.edu.az`
    - `NEXT_PUBLIC_API_KEY` = `ANON_KEY`
 
    Dəyişənlərin adları köhnədir, dəyərlər yeni MySQL API-nin ünvanı və açarıdır.
 3. **Saytlar:** repo kökündə, `api.env`-dəki `ANON_KEY` ilə:
    ```bash
-   node deploy/universitet-mysql/scripts/05-switch-frontend.mjs --url https://api.career.asoiu.edu.az --key <ANON_KEY>
+   node deploy/universitet-mysql/scripts/05-switch-frontend.mjs --url https://career.asoiu.edu.az --key <ANON_KEY> --site https://career.asoiu.edu.az
    ```
-   Skript əsas saytın `runtime-config.js`-ini və CSP-ni yeni ünvana yönəldir və hər iki saytda texniki işlər səhifəsini söndürür. Sonra testlər, commit və `main`-ə push. Vercel hər iki saytı avtomatik deploy edir. Bildirişlər realtime əvəzinə 30 saniyədən bir yenilənir (avtomatikdir).
+   Skript əsas saytın `runtime-config.js`-ini və CSP-ni yeni ünvana yönəldir, admin paneldə texniki işlər səhifəsini söndürür, `--site` ilə isə Vercel-dəki köhnə tələbə saytı bütün yolları yeni ünvana yönləndirir. Serverdəki sayt öz `runtime-config.js`-ini `03-start.sh`-dən alır (git-də saxlanmır). Sonra testlər, commit və `main`-ə push. Vercel hər iki saytı avtomatik deploy edir. Bildirişlər realtime əvəzinə 30 saniyədən bir yenilənir (avtomatikdir).
 4. Yoxlama: giriş, qeydiyyat, profil şəkli, şəbəkə paylaşımı, vakansiya, admin panel.
 5. Problem olarsa 3-cü addımın commit-i geri qaytarılır (`git revert`), saytlar yenidən texniki işlər səhifəsini göstərir.
 
@@ -102,7 +105,7 @@ Saytlar hazırda "texniki işlər" səhifəsini göstərir, yazı artıq dayanı
 | Loglar | `… logs -f api` |
 | Yeniləmə | `git pull && deploy/universitet-mysql/scripts/03-start.sh` (yeni migration-ları root ilə tətbiq edir, `asoiu` hesabının hüquqlarını yeniləyir, sonra API-ni yenidən qurur; migration-lar təkrar işlədilə bilər) |
 | Backup | `deploy/universitet-mysql/scripts/backup.sh /srv/backups/asoiu`, cron ilə gündəlik: `30 3 * * *`. `BACKUP_REMOTE` boşdursa, skript hər dəfə xəbərdarlıq edir. |
-| Açarların yenilənməsi | `ANON_KEY` və `SERVICE_ROLE_KEY` 2 il yaşayır; `04-verify.sh` və API logu bitməyə 30–60 gün qalmış xəbərdarlıq edir. `deploy/universitet-mysql/scripts/rotate-keys.sh` yeni açarları yazır və API-ni yenidən başladır; API yeni açarlarla cavab verəndən sonra köhnə secret-lərin nüsxəsi (`api.env.before-rotate`) avtomatik silinir. Sonra yeni `ANON_KEY` saytın `runtime-config.js` faylına və Vercel-də `NEXT_PUBLIC_API_KEY`-ə yazılır. |
+| Açarların yenilənməsi | `ANON_KEY` və `SERVICE_ROLE_KEY` 2 il yaşayır; `04-verify.sh` və API logu bitməyə 30–60 gün qalmış xəbərdarlıq edir. `deploy/universitet-mysql/scripts/rotate-keys.sh` yeni açarları yazır və API-ni yenidən başladır; API yeni açarlarla cavab verəndən sonra köhnə secret-lərin nüsxəsi (`api.env.before-rotate`) avtomatik silinir. Serverdəki saytın `runtime-config.js`-i avtomatik yenilənir; yeni `ANON_KEY` yalnız Vercel-də admin panelin `NEXT_PUBLIC_API_KEY`-inə yazılır. |
 | Bərpa | `gunzip -c db-….sql.gz \| docker compose … exec -T mysql mysql -uroot -p asoiu_career` və `storage-….tar.gz` faylının `storage` volume-una açılması. Nüsxələr həmişə şifrələnir; əvvəlcə: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:deploy/universitet-mysql/backup.key -in db-….sql.gz.enc \| gunzip -c \| …` |
 
 Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiya təkrarları (hər dəqiqə), paket müddətləri və bitmiş vakansiyaların bağlanması (hər saat), köhnə sessiya, link, AI rezervasiyası və bildirişlərin silinməsi (hər gün 23:30 UTC).

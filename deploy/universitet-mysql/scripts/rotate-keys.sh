@@ -24,8 +24,10 @@ for _ in $(seq 1 30); do
 done
 if [ $healthy -eq 1 ]; then
   rm -f "$KIT_DIR/api.env.before-rotate"
+  # The site served by this server gets the new public key at once.
+  write_site_config
   echo
-  echo "Hazırdır. API yeni açarlarla işləyir; köhnə secret-lərin nüsxəsi silindi."
+  echo "Hazırdır. API yeni açarlarla işləyir; köhnə secret-lərin nüsxəsi silindi, bu serverdəki saytın runtime-config.js-i yeniləndi."
 else
   echo
   echo "XƏTA: API cavab vermir. Köhnə açarlara qayıtmaq üçün:" >&2
@@ -33,7 +35,6 @@ else
   echo "Problem həll olunanda $KIT_DIR/api.env.before-rotate faylını silin." >&2
   exit 1
 fi
-echo "İndi yeni ANON_KEY (api.env) bu iki yerə yazılmalıdır:"
-echo "  1. student-web/assets/js/runtime-config.js → apiKey, sonra commit və push."
-echo "  2. Vercel → admin panel → NEXT_PUBLIC_API_KEY (Production), sonra redeploy."
-echo "Köhnə açar artıq qəbul edilmir; bu iki addım bitənə qədər saytlar API-yə qoşula bilmir."
+echo "İndi yeni ANON_KEY (api.env) admin panelə yazılmalıdır:"
+echo "  Vercel → admin panel → NEXT_PUBLIC_API_KEY (Production), sonra redeploy."
+echo "Köhnə açar artıq qəbul edilmir; bu addım bitənə qədər admin panel API-yə qoşula bilmir."

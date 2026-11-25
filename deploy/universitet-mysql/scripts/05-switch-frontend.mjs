@@ -2,14 +2,19 @@
 // CSP connect-src and img-src in every place they are declared) and turns the maintenance page
 // off on both sites. Run from the repository root:
 //   node deploy/universitet-mysql/scripts/05-switch-frontend.mjs --url https://api.example.az --key <ANON_KEY>
+// When the university server serves the student site itself (Caddyfile), the
+// Vercel copy sends every path there instead of showing the site:
+//   … --url https://career.asoiu.edu.az --key <ANON_KEY> --site https://career.asoiu.edu.az
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, arg, i, all) =>
   arg.startsWith('--') ? [...pairs, [arg.slice(2), all[i + 1]]] : pairs, []));
 const url = String(args.url || '').replace(/\/$/, '');
 const key = String(args.key || '');
+const site = String(args.site || '').replace(/\/$/, '');
 if (!/^https:\/\/[a-z0-9.-]+$/i.test(url)) throw new Error('--url https://domen formatında olmalıdır (yol olmadan).');
 if (key.length < 20) throw new Error('--key: yeni serverin ANON_KEY dəyəri lazımdır.');
+if (site && !/^https:\/\/[a-z0-9.-]+$/i.test(site)) throw new Error('--site https://domen formatında olmalıdır (yol olmadan).');
 const host = new URL(url).host;
 
 function edit(file, change) {
@@ -48,9 +53,11 @@ for (const file of ['index.html', 'cv-builder.html']) {
 }
 
 // The maintenance page (shown while there was no backend) goes away on both sites.
+// With --site the Vercel copy of the student site forwards to the new address.
 edit(`${web}/vercel.json`, text => {
   const config = JSON.parse(text);
-  delete config.redirects;
+  if (site) config.redirects = [{ source: '/:path*', destination: `${site}/:path*`, permanent: true }];
+  else delete config.redirects;
   return JSON.stringify(config, null, 2) + '\n';
 });
 edit('next.config.mjs', text => replaceOnce(text, "const MAINTENANCE = process.env.ADMIN_MAINTENANCE !== 'false';", 'const MAINTENANCE = false;', 'next.config.mjs'));
