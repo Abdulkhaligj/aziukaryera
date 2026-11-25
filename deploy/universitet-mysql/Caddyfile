@@ -11,6 +11,11 @@
 {
 	servers {
 		trusted_proxies static {$TRUSTED_PROXIES}
+		# Read X-Forwarded-For from the right: the first address that is not one
+		# of the proxies is the visitor; anything a visitor wrote further left is
+		# ignored. (The university chain adds 172.17.129.1, then the firewall
+		# connects from 172.17.129.39: both go in TRUSTED_PROXIES.)
+		trusted_proxies_strict
 		client_ip_headers X-Forwarded-For
 	}
 }
