@@ -44,6 +44,7 @@
 	# This server's public API address and key, written by scripts/03-start.sh.
 	handle /assets/js/runtime-config.js {
 		root * /srv/site-config
+		rewrite * /runtime-config.js
 		header Cache-Control "no-cache"
 		file_server
 	}
