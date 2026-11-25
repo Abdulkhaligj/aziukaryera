@@ -119,3 +119,35 @@ Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiy
 - Caddy HSTS, `nosniff`, `Referrer-Policy`, `X-Frame-Options` başlıqlarını əlavə edir və 60 MB-dan böyük sorğuları qəbul etmir. API-nin özü də eyni başlıqları göndərir (Caddy-siz də).
 - `/rest` və `/storage` üçün hər hesaba və ünvana dəqiqəlik limit var; IPv6 ünvanları /64 bloku üzrə sayılır.
 - Docker imicləri digest ilə sabitlənib; hər servisin yaddaş, CPU və proses limiti var. Paketlər quraşdırma skriptləri işlədilmədən (`--ignore-scripts`) qurulur.
+
+## 8. Microsoft (Outlook) ilə giriş
+
+Tələbələr və məzunlar universitetin Microsoft 365 hesabı (`@asoiu.edu.az`) ilə şifrəsiz daxil olurlar. Saytda "Microsoft (Outlook) ilə davam et" düyməsi API-də aşağıdakı üç dəyər dolu olanda görünür.
+
+**İT (Entra ID administratoru) bir dəfə tətbiq qeydiyyatı edir:**
+
+1. [entra.microsoft.com](https://entra.microsoft.com) → **App registrations** → **New registration**.
+   - Ad: `ADNSU Karyera`.
+   - Supported account types: **Accounts in this organizational directory only** (yalnız universitet).
+   - Redirect URI: **Web**, `https://career.asoiu.edu.az/auth/v1/callback`.
+2. **Certificates & secrets** → **New client secret** (məs. 24 ay). Dəyəri dərhal kopyalayın: bir də göstərilmir.
+3. **API permissions**: `openid`, `email`, `profile` (Microsoft Graph, delegated) — adətən hazırdır. İstəsəniz **Grant admin consent** verin ki, istifadəçilər razılıq ekranı görməsin.
+4. **Overview**-dan **Application (client) ID** və **Directory (tenant) ID**.
+
+**Serverdə** `api.env`:
+
+```
+AZURE_CLIENT_ID=<Application (client) ID>
+AZURE_CLIENT_SECRET=<client secret>
+AZURE_TENANT_ID=44774b4d-c635-4fa6-8746-23738dd53e9c
+```
+
+sonra `deploy/universitet-mysql/scripts/03-start.sh`.
+
+**Necə işləyir:**
+
+- Sayt API-yə gedir, API universitetin Microsoft girişinə yönləndirir. Yalnız universitetin kataloqu (tenant), yalnız `@asoiu.edu.az` ünvanları qəbul olunur; qonaq hesablar (`#EXT#`) və başqa domenlər rədd edilir.
+- Microsoft-un kodunu API client secret ilə tokenə dəyişir və ID tokeni yoxlayır: tenant, tətbiq (aud), issuer, nonce, müddət.
+- Bu ünvanla hesab varsa ona daxil olur (rolu dəyişmir). Yoxdursa, yeni hesab yaradılır: qeydiyyat formasında seçilən səviyyəyə görə tələbə, magistr və ya məzun, profil dərhal aktivdir. Təsdiqlənməmiş başqasının qeydiyyatı varsa, onun şifrəsi ləğv olunur.
+- Sayta yalnız brauzerə bağlı birdəfəlik kod qayıdır (PKCE); ünvan sətrində token olmur.
+- Client secret-in müddəti bitəndə İT yenisini yaradır, `api.env`-də `AZURE_CLIENT_SECRET` yenilənir və `03-start.sh` işlədilir.

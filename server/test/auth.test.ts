@@ -243,6 +243,7 @@ test('requests without an API key are refused like the old gateway', async () =>
   assert.equal((await res.json()).msg, 'No API key found in request');
   const settings = await (await fetch(`${h.url}/auth/v1/settings`, { headers: { apikey: h.config.anonKey } })).json();
   assert.equal(settings.external.email, true);
+  assert.equal(settings.external.azure, false, 'Microsoft sign-in is off until AZURE_* are set');
   assert.equal(settings.mailer_autoconfirm, true);
 });
 

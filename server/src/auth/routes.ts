@@ -15,6 +15,7 @@ import { deleteRow, updateRow } from '../write/pipeline.ts';
 import { clientKey, RateLimiter } from './rate-limit.ts';
 import { consumeFlowCode, consumeLinkCode, consumeOneTimeToken, createReauthCode, createFlowCode, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession, type CodeChallenge } from './tokens.ts';
 import { findUserByEmail, findUserById, isBanned, mergeMetadata, normalizeEmail, toGoTrueUser, validEmail, type AuthUser } from './users.ts';
+import { AzureSignInError, azureAuthorizeUrl, azureIdentity, newAzureState, readAzureState, signAzureState, type AzureIdentity, type AzureState } from './azure.ts';
 
 export interface AuthDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer }
 
@@ -26,7 +27,7 @@ const PURPOSE: Record<string, string[]> = {
   signup: ['email_confirmation'], email: ['email_confirmation', 'magic_link'], magiclink: ['magic_link'],
   recovery: ['recovery'], invite: ['invite'], email_change: ['email_change']
 };
-const AMR: Record<string, string> = { email_confirmation: 'otp', magic_link: 'otp', recovery: 'recovery', invite: 'invite', email_change: 'email_change' };
+const AMR: Record<string, string> = { email_confirmation: 'otp', magic_link: 'otp', recovery: 'recovery', invite: 'invite', email_change: 'email_change', azure: 'oauth' };
 const HALF_CONFIRMED = 'Confirmation link accepted. Please proceed to confirm link sent to the other email';
 
 export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
@@ -162,9 +163,11 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     done(null, Object.fromEntries(new URLSearchParams(String(body))));
   });
 
-  // Every route except the email-link target needs the anon or service key.
+  // Every route except the browser navigations (the email-link target and the
+  // two Microsoft sign-in steps) needs the anon or service key.
   app.addHook('preHandler', async (req: FastifyRequest) => {
     if (req.routeOptions.url?.endsWith('/verify') && (req.method === 'GET' || /urlencoded/i.test(String(req.headers['content-type'] ?? '')))) return;
+    if (req.method === 'GET' && (req.routeOptions.url?.endsWith('/authorize') || req.routeOptions.url?.endsWith('/callback'))) return;
     if (req.routeOptions.url?.endsWith('/health')) return;
     const apikey = (req.headers.apikey as string | undefined) ?? (req.query as Body)?.apikey;
     if (!apikey) throw authErrors.missingKey();
@@ -175,7 +178,7 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
   app.get('/health', async () => ({ version: 'asoiu-career-api', name: 'GoTrue', description: 'GoTrue-compatible auth on MySQL' }));
 
   app.get('/settings', async () => ({
-    external: { anonymous_users: false, apple: false, azure: false, bitbucket: false, discord: false, facebook: false, figma: false,
+    external: { anonymous_users: false, apple: false, azure: !!config.azure, bitbucket: false, discord: false, facebook: false, figma: false,
       fly: false, github: false, gitlab: false, google: false, keycloak: false, kakao: false, linkedin: false, linkedin_oidc: false,
       notion: false, spotify: false, slack: false, slack_oidc: false, workos: false, twitch: false, twitter: false, email: true, phone: false, zoom: false },
     disable_signup: config.disableSignup, mailer_autoconfirm: config.mailerAutoconfirm, phone_autoconfirm: false, sms_provider: '', saml_enabled: false
@@ -183,7 +186,83 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   app.get('/.well-known/jwks.json', async () => ({ keys: [] }));
 
-  app.get('/authorize', async () => { throw authErrors.validation('Unsupported provider: provider is not enabled'); });
+  // Microsoft 365 sign-in (azure.ts). Only the university's directory; only a
+  // browser that holds a PKCE verifier can finish it.
+  app.get('/authorize', async (req: FastifyRequest<{ Querystring: Body }>, reply: FastifyReply) => {
+    const query = req.query || {};
+    if (query.provider !== 'azure' || !config.azure) throw authErrors.validation('Unsupported provider: provider is not enabled');
+    const pkce = pkceOf(query);
+    if (!pkce) throw authErrors.validation('code_challenge is required');
+    limit(signIns, ipKey(req));
+    const hint = String(query.role ?? '');
+    const role = hint === 'student' || hint === 'master_student' || hint === 'graduate' ? hint : null;
+    const state = newAzureState({ redirect: redirectTarget(query.redirect_to), pkce, role });
+    const target = azureAuthorizeUrl(config.azure, config.publicUrl, config.universityDomain, state, signAzureState(config.jwtSecret, state), query.prompt === 'select_account');
+    return reply.redirect(target, 302);
+  });
+
+  app.get('/callback', async (req: FastifyRequest<{ Querystring: Body }>, reply: FastifyReply) => {
+    const query = req.query || {};
+    const state = readAzureState(config.jwtSecret, query.state);
+    // Without a valid state the place to return to is not known: the site's home.
+    const back = (target: string, errorCode: string, description: string) =>
+      reply.redirect(`${target}#${new URLSearchParams({ error: 'access_denied', error_code: errorCode, error_description: description })}`, 303);
+    if (!config.azure || !state) return back(config.siteUrl, 'bad_oauth_state', 'OAuth state is invalid or has expired');
+    // Cancelled, or refused by the directory: Microsoft's own text is not passed on.
+    if (query.error || typeof query.code !== 'string' || !query.code) return back(state.redirect, 'access_denied', 'Sign-in was cancelled');
+    limit(signIns, ipKey(req));
+    let identity: AzureIdentity;
+    try {
+      identity = await azureIdentity(config.azure, config.publicUrl, config.universityDomain, query.code, state.nonce);
+    } catch (error) {
+      if (error instanceof AzureSignInError) return back(state.redirect, error.errorCode, error.message);
+      app.log.error({ err: error }, 'Microsoft token exchange failed');
+      return back(state.redirect, 'provider_error', 'Microsoft did not confirm the sign-in');
+    }
+    let code: string;
+    try {
+      code = await transaction(pool, tx => azureSignIn(tx, identity, state));
+    } catch (error) {
+      if (error instanceof AuthError) return back(state.redirect, error.errorCode, error.message);
+      if (isRuleFailure(error)) return back(state.redirect, 'signup_disabled', error instanceof DbRuleError ? error.message : 'Database error saving new user');
+      throw error;
+    }
+    const [base, fragment] = state.redirect.split('#');
+    return reply.redirect(`${base}${base.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}${fragment !== undefined ? `#${fragment}` : ''}`, 303);
+  });
+
+  /** The account of a Microsoft identity: the one with its address, or a new
+   *  one. The directory vouches for the mailbox, as a confirmation link would. */
+  async function azureSignIn(tx: Tx, identity: AzureIdentity, state: AzureState): Promise<string> {
+    let user = await findUserByEmail(tx, identity.email, true);
+    if (!user) {
+      if (config.disableSignup) throw authErrors.signupDisabled();
+      const status = state.role === 'graduate' ? 'alumni' : state.role === 'master_student' ? 'master_student' : 'student';
+      user = await createAuthUser(tx, {
+        email: identity.email, password: null, confirmed: true,
+        appMeta: { provider: 'azure', providers: ['azure'] },
+        userMeta: { full_name: identity.name || undefined, role: state.role === 'graduate' ? 'graduate' : 'student', account_status: status }
+      });
+    } else {
+      if (isBanned(user)) throw authErrors.banned();
+      if (!user.email_confirmed_at) {
+        // A password set at someone else's sign-up with this address stops
+        // working, as with a magic link (audit 2026-11-16, M9).
+        await exec(tx, 'UPDATE auth_users SET encrypted_password = NULL WHERE id = ? AND email_confirmed_at IS NULL', [user.id]);
+        if (user.raw_app_meta_data?.activate_on_confirm === true) {
+          await updateRow({ tx, ctx: systemContext, schema, now: new Date() }, 'profiles', { id: user.id }, { status: 'active' });
+          await exec(tx, `UPDATE auth_users SET raw_app_meta_data = JSON_REMOVE(raw_app_meta_data, '$.activate_on_confirm') WHERE id = ?`, [user.id]);
+        }
+        await exec(tx, 'UPDATE auth_users SET email_confirmed_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [user.id]);
+      }
+      const providers = Array.isArray(user.raw_app_meta_data?.providers) ? user.raw_app_meta_data.providers as unknown[] : [];
+      if (!providers.includes('azure')) {
+        await exec(tx, `UPDATE auth_users SET raw_app_meta_data = JSON_SET(COALESCE(raw_app_meta_data, JSON_OBJECT()), '$.providers', CAST(? AS JSON)) WHERE id = ?`,
+          [JSON.stringify([...providers, 'azure']), user.id]);
+      }
+    }
+    return createFlowCode(tx, user.id, 'azure', state.pkce);
+  }
 
   app.post('/signup', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {
     if (config.disableSignup) throw authErrors.signupDisabled();

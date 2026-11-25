@@ -50,6 +50,17 @@ export interface Config {
   /** Requests per minute to /rest and /storage: per account, and per address
    *  for calls without a signed-in person (audit 2026-11-16, I10). */
   requestsPerMinute: { user: number; address: number };
+  /** Sign-in with the university's Microsoft 365 accounts (Entra ID); null = off. */
+  azure: AzureConfig | null;
+}
+
+export interface AzureConfig {
+  clientId: string;
+  clientSecret: string;
+  /** The university's directory (tenant) ID; only its accounts get in. */
+  tenantId: string;
+  /** https://login.microsoftonline.com (another base only in tests). */
+  authority: string;
 }
 
 import { fileURLToPath } from 'node:url';
@@ -66,7 +77,22 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
  *  (the functions) cannot read them there (audit 2026-11-16, L19). The functions
  *  get their own allow-listed environment through the Deno shim. */
 export const PROCESS_SECRETS = ['JWT_SECRET', 'MYSQL_URL', 'DATA_ENCRYPTION_KEY', 'SMTP_PASS', 'STORAGE_SIGNING_KEY', 'MODERATION_WEBHOOK_SECRET',
-  'SERVICE_ROLE_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY'];
+  'SERVICE_ROLE_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'AZURE_CLIENT_SECRET'];
+
+/** Microsoft sign-in is on when all three values are set; a half-filled set
+ *  stops the start instead of silently leaving the button off. */
+function azureConfig(env: NodeJS.ProcessEnv): AzureConfig | null {
+  const clientId = env.AZURE_CLIENT_ID || '', clientSecret = env.AZURE_CLIENT_SECRET || '', tenantId = (env.AZURE_TENANT_ID || '').toLowerCase();
+  if (!clientId && !clientSecret && !tenantId) return null;
+  if (!clientId || !clientSecret || !tenantId) throw new Error('AZURE_CLIENT_ID, AZURE_CLIENT_SECRET and AZURE_TENANT_ID go together');
+  const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  // The tenant is compared with the token's tid claim, which is always the ID.
+  if (!guid.test(tenantId)) throw new Error('AZURE_TENANT_ID must be the directory (tenant) ID, a GUID');
+  if (!guid.test(clientId.toLowerCase())) throw new Error('AZURE_CLIENT_ID must be the application (client) ID, a GUID');
+  const authority = (env.AZURE_AUTHORITY || 'https://login.microsoftonline.com').replace(/\/$/, '');
+  if (env.NODE_ENV === 'production' && authority !== 'https://login.microsoftonline.com') throw new Error('AZURE_AUTHORITY can be changed only outside production');
+  return { clientId: clientId.toLowerCase(), clientSecret, tenantId, authority };
+}
 export function scrubProcessSecrets(env: NodeJS.ProcessEnv = process.env) {
   for (const name of PROCESS_SECRETS) delete env[name];
 }
@@ -128,6 +154,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       address: intEnv(env, 'API_REQUESTS_PER_MINUTE_ADDRESS', 6000, 60, 100_000)
     },
     corsOrigins: [...new Set([siteUrl, ...(env.CORS_ORIGINS || '').split(','), ...(env.ADDITIONAL_REDIRECT_URLS || '').split(',')]
-      .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))]
+      .map(s => s.trim()).filter(Boolean).map(s => { try { return new URL(s.replace(/\/\*\*$/, '')).origin; } catch { return ''; } }).filter(Boolean))],
+    azure: azureConfig(env)
   };
 }

@@ -3454,8 +3454,11 @@ document.addEventListener('click', e => {
       break;
     }
     case 'azure': {
+      /* Qeydiyyatda seçilən təhsil səviyyəsi yeni hesabın roluna keçir. */
+      const azureRole = UI.auth.tab === 'register'
+        ? ({ student: 'student', master_student: 'master_student', alumni: 'graduate' })[UI.auth.role] : undefined;
       UI.auth.busy = true; UI.auth.error = ''; rerender();
-      Backend.signInWithAzure().then(res => { if (res?.stale) return;
+      Backend.signInWithAzure(azureRole).then(res => { if (res?.stale) return;
         if (!res.ok) { UI.auth.busy = false; UI.auth.error = res.error; rerender(); }
       });
       break;
