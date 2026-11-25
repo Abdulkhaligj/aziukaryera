@@ -36,6 +36,11 @@
 		max_size 60MB
 	}
 
+	# The admin panel (Next.js) stays on Vercel; /admin here is its short
+	# address and keeps the path (/admin/compliance …). 302: the target may move.
+	@admin path /admin /admin/*
+	redir @admin {$ADMIN_URL}{uri} 302
+
 	@api path /auth/v1/* /rest/v1/* /storage/v1/* /functions/v1/*
 	handle @api {
 		header X-Frame-Options "DENY"

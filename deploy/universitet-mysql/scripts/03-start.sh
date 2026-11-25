@@ -15,6 +15,8 @@ case "${CADDY_SITE_ADDRESS:-}" in
   ''|:80) ;;
   *) die "kit.env: CADDY_SITE_ADDRESS boş (Let's Encrypt) və ya :80 (universitetin firewall-u arxasında) olmalıdır." ;;
 esac
+printf '%s' "${ADMIN_URL:-}" | LC_ALL=C grep -Eq '^(https://[a-z0-9.-]+)?$' \
+  || die "kit.env: ADMIN_URL https://domen olmalıdır (yol olmadan) və ya boş."
 printf '%s' "${TRUSTED_PROXIES:-}" | LC_ALL=C grep -Eq '^[0-9A-Fa-f:./ ]*$' \
   || die "kit.env: TRUSTED_PROXIES yalnız IP ünvanları və ya şəbəkələr ola bilər (boşluqla)."
 

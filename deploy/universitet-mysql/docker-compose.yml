@@ -66,6 +66,8 @@ services:
       # Empty: API_DOMAIN with Let's Encrypt; ":80" behind the university firewall (Caddyfile).
       CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-${API_DOMAIN}}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32}
+      # /admin on the site's address forwards to the admin panel.
+      ADMIN_URL: ${ADMIN_URL:-https://asoiu-career-admin.vercel.app}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # The student site is served from this checkout; its runtime-config.js
