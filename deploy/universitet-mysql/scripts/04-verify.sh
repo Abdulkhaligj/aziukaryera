@@ -27,9 +27,13 @@ check "Ana səhifə" 200 "$base/"
 check "Saytın daxili yolu (index.html)" 200 "$base/jobs/1"
 check "CV qurucu" 200 "$base/cv-builder.html"
 check "Host faylları gizlidir" 404 "$base/vercel.json"
-admin_target="${ADMIN_URL:-https://asoiu-career-admin.vercel.app}"
+# /admin is served here (Caddy passes it to the panel); without a session the
+# panel sends the visitor to its sign-in page on this same address.
 admin_loc="$(curl -s -o /dev/null -w '%{redirect_url}' "$base/admin" || true)"
-if [ "$admin_loc" = "$admin_target/admin" ]; then echo "  OK   /admin → admin panel"; else echo "  XƏTA /admin yönlənmir ($admin_loc)"; fail=1; fi
+admin_login="$(curl -s "$base/login" || true)"
+if [ "$admin_loc" = "$base/login" ] && printf '%s' "$admin_login" | grep -q 'İdarəetmə'; then
+  echo "  OK   /admin → admin panel bu ünvanda"
+else echo "  XƏTA /admin bu ünvanda açılmır (yönləndirmə: $admin_loc)"; fail=1; fi
 site_config="$(curl -s "$base/assets/js/runtime-config.js" || true)"
 if printf '%s' "$site_config" | grep -q "apiUrl: 'https://$API_DOMAIN'" && printf '%s' "$site_config" | grep -q "apiKey: '$anon'"; then
   echo "  OK   runtime-config.js bu serverə yönəlib"

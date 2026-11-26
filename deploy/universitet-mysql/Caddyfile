@@ -22,12 +22,14 @@
 
 {$CADDY_SITE_ADDRESS} {
 	encode zstd gzip
-	# Security headers for every answer (audit 2026-11-13, #59).
+	# Security headers for every answer (audit 2026-11-13, #59). "?" sets a
+	# header only when the answer has none, so the admin panel keeps its own
+	# (it needs microphone=(self) for the voice assistant) and none is sent twice.
 	header {
-		Strict-Transport-Security "max-age=63072000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "no-referrer"
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		?Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "no-referrer"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
 		-X-Powered-By
 	}
@@ -36,10 +38,21 @@
 		max_size 60MB
 	}
 
-	# The admin panel (Next.js) stays on Vercel; /admin here is its short
-	# address and keeps the path (/admin/compliance …). 302: the target may move.
-	@admin path /admin /admin/*
-	redir @admin {$ADMIN_URL}{uri} 302
+	# The admin panel (Next.js) runs on Vercel ({$ADMIN_URL}) but is served
+	# here, under this address: the browser stays on career.asoiu.edu.az/admin.
+	# Its own paths are passed through; the student site uses none of them.
+	# The panel accepts this origin (next.config.mjs allowedOrigins and
+	# lib/admin-input.ts crossSite). A redirect it sends to its Vercel address
+	# becomes a path on this address.
+	@admin path /admin /admin/* /login /login/* /account /account/* /api/admin/* /_next/* /icons/*
+	handle @admin {
+		# Caddy sends the panel's own host name upstream and this one as
+		# X-Forwarded-Host; the visitor came over HTTPS (the WAF holds TLS).
+		reverse_proxy {$ADMIN_URL} {
+			header_up X-Forwarded-Proto https
+			header_down Location ^https://[^/]+\.vercel\.app/ /
+		}
+	}
 
 	@api path /auth/v1/* /rest/v1/* /storage/v1/* /functions/v1/*
 	handle @api {
