@@ -103,7 +103,10 @@ const Landing = {
     bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7"/></svg>',
     cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
     ppl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 11.5a3 3 0 1 0-1.6-5.5M18 20a5.6 5.6 0 0 0-2-4"/></svg>',
-    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>'
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
+    cap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5L2 9Z"/><path d="M6 11v5c3 2 9 2 12 0v-5M22 9v6"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/></svg>',
+    building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg>'
   },
 
   detailView() {
@@ -160,16 +163,18 @@ const Landing = {
 
     const cities = [...new Set(d.jobs.map(j => j.location.split(' ')[0].replace(/[(),]/g, '')))].filter(Boolean).sort();
 
-    const companyLogos = d.companies.map(company => ({
-      name: company.name,
-      src: /^https:\/\//i.test(String(company.logoUrl || ''))
-        ? company.logoUrl
-        : (typeof companyLogoPath === 'function' ? companyLogoPath(company.name) : '')
-    })).filter(item => item.src);
-    const logoTiles = companyLogos.map(item => `<span class="lp-lgo" role="img" aria-label="${esc(item.name)}">
-      <img src="${esc(item.src)}" alt="${esc(item.name)}" loading="lazy" decoding="async"></span>`).join('');
-    const logoTilesCopy = companyLogos.map(item => `<span class="lp-lgo" aria-hidden="true">
-      <img src="${esc(item.src)}" alt="" loading="lazy" decoding="async"></span>`).join('');
+    /* Header links: sections with no content (no event, no award yet) are left out. */
+    const navItems = [
+      ['lp-jobs', 'Vakansiyalar'],
+      ['lp-how', 'Necə işləyir'],
+      ['lp-tools', 'Karyera alətləri'],
+      ['lp-mentor', 'Mentor'],
+      ['lp-companies', 'Şirkətlər üçün'],
+      ...(d.events.length ? [['lp-events', 'Tədbirlər']] : []),
+      ...((d.awards || []).length ? [['lp-awards', 'Awards']] : []),
+      ['lp-faq', 'Suallar']
+    ];
+    const navButtons = navItems.map(([to, label]) => `<button data-lp="scroll" data-to="${to}">${label}</button>`).join('\n      ');
 
     return `<div class="lp">
 
@@ -181,14 +186,7 @@ const Landing = {
   <header class="lp-head"><div class="wrap row">
     ${logoLockup()}
     <nav class="lp-nav" aria-label="Əsas menyu">
-      <button data-lp="scroll" data-to="lp-jobs">Vakansiyalar</button>
-      <button data-lp="scroll" data-to="lp-companies">Şirkətlər</button>
-      <button data-lp="scroll" data-to="lp-events">Tədbirlər</button>
-      <button data-lp="scroll" data-to="lp-perks">Güzəştlər</button>
-      <button data-lp="scroll" data-to="lp-how">Necə işləyir</button>
-      <button data-lp="scroll" data-to="lp-faq">Suallar</button>
-      <button data-lp="scroll" data-to="lp-mentor">Mentor</button>
-      <button data-lp="scroll" data-to="lp-awards">Awards</button>
+      ${navButtons}
     </nav>
     <div class="right">
       ${window.I18n ? I18n.switcher('lang-switch-lp') : ''}
@@ -202,13 +200,7 @@ const Landing = {
   </div>
 
   <div class="lp-mob ${this.menuOpen ? 'open' : ''}"><div class="wrap">
-    <button data-lp="scroll" data-to="lp-jobs">Vakansiyalar</button>
-    <button data-lp="scroll" data-to="lp-companies">Şirkətlər</button>
-    <button data-lp="scroll" data-to="lp-events">Tədbirlər</button>
-    <button data-lp="scroll" data-to="lp-perks">Güzəştlər</button>
-    <button data-lp="scroll" data-to="lp-how">Necə işləyir</button>
-    <button data-lp="scroll" data-to="lp-mentor">Mentor dəstəyi</button>
-    <button data-lp="scroll" data-to="lp-awards">Career Awards</button>
+    ${navButtons}
     ${window.I18n ? I18n.switcher('lang-switch-menu') : ''}
     <div style="display:flex;gap:10px;margin-top:10px">
       ${signedIn
@@ -243,7 +235,7 @@ const Landing = {
 
       <div class="lp-cta">
         <button class="b b-primary b-lg" data-lp="auth-register">Pulsuz başla</button>
-        <button class="b b-outline b-lg" data-lp="scroll" data-to="lp-companies">Şirkətləri kəşf et</button>
+        <button class="b b-outline b-lg" data-lp="scroll" data-to="lp-companies">Şirkətlər üçün</button>
       </div>
     </div>
 
@@ -255,15 +247,62 @@ const Landing = {
     </div>
   </div></section>
 
-  ${companyLogos.length ? `<section class="lp-sec" style="padding-bottom:0"><div class="wrap">
-    <div class="center" style="max-width:620px">
-      <h2>Səni gözləyən şirkətlər</h2>
-      <p class="lede center" style="margin-top:12px">ADNSU tələbələrinə elan verən tərəfdaşlar.</p>
+  <section class="lp-sec" id="lp-who"><div class="wrap">
+    <div class="center" style="max-width:720px;margin-bottom:28px">
+      <p class="kicker">Kimlər üçündür</p>
+      <h2>Tələbə, məzun və işəgötürən üçün bir platforma</h2>
     </div>
-    <div class="lp-logos" aria-label="Tərəfdaş şirkətlərin loqoları"><div class="lp-track">
-      ${logoTiles}${logoTilesCopy}
-    </div></div>
-  </div></section>` : ''}
+    <div class="lp-who">
+      <article class="lp-who-card">
+        <span class="ico" aria-hidden="true">${this.icon.cap}</span>
+        <h3>Tələbələr</h3>
+        <p>Bakalavr və magistr tələbələri universitet e-poçtu ilə daxil olur və ixtisasına uyğun iş, təcrübə və könüllülük elanlarını uyğunluq faizi ilə görür.</p>
+        <button class="b b-primary" data-lp="auth-register">Tələbə kimi başla</button>
+      </article>
+      <article class="lp-who-card">
+        <span class="ico" aria-hidden="true">${this.icon.star}</span>
+        <h3>Məzunlar</h3>
+        <p>Məzunlar şəxsi e-poçtla qeydiyyatdan keçir. Karyera Mərkəzi təsdiqindən sonra vakansiyalara müraciət edə və graduate proqramlarını izləyə bilərsən.</p>
+        <button class="b b-outline" data-lp="auth-register">Məzun kimi qoşul</button>
+      </article>
+      <article class="lp-who-card">
+        <span class="ico" aria-hidden="true">${this.icon.building}</span>
+        <h3>İşəgötürənlər</h3>
+        <p>Şirkətlər elanlarını uyğun fakültə və ixtisaslara yönəldir, müraciətləri uyğunluq faizinə görə sıralanmış görür.</p>
+        <button class="b b-outline" data-lp="scroll" data-to="lp-companies">Şirkətlər üçün</button>
+      </article>
+    </div>
+  </div></section>
+
+  <section class="lp-sec tint" id="lp-how"><div class="wrap">
+    <div class="center" style="max-width:720px;margin-bottom:30px">
+      <p class="kicker">Necə işləyir</p>
+      <h2>Üç addımda uyğun imkana</h2>
+      <p class="lede center" style="margin-top:14px">Uyğunluq təsadüfi deyil: hər elan üçün fakültən,
+        ixtisasın və bacarıqların ayrıca qiymətləndirilir və faizin haradan gəldiyini görürsən.</p>
+    </div>
+    <div class="lp-how">
+      <ol class="lp-steps">
+        <li class="lp-step"><span class="lp-step-n">1</span><div><h3>Hesab yarat</h3>
+          <p>Universitet e-poçtunla bir neçə dəqiqəyə qeydiyyatdan keç.</p></div></li>
+        <li class="lp-step"><span class="lp-step-n">2</span><div><h3>Profilini doldur</h3>
+          <p>Fakültəni, ixtisasını, kursunu və bacarıqlarını qeyd et. CV də bu məlumatlardan avtomatik qurulur.</p></div></li>
+        <li class="lp-step"><span class="lp-step-n">3</span><div><h3>Uyğun elana müraciət et</h3>
+          <p>Hər elanda sənin üçün hesablanmış faizi gör və ən uyğun imkanlara bir kliklə müraciət et.</p></div></li>
+      </ol>
+      <div class="lp-f dark">
+        <p class="kicker">40 / 40 / 20</p>
+        <h3>Uyğunluq formulası</h3>
+        <div class="lp-mrow"><span class="n">Fakültə uyğunluğu</span>
+          <span class="lp-mbar"><i style="width:100%;background:#fff"></i></span><span class="lp-mpct">40</span></div>
+        <div class="lp-mrow"><span class="n">İxtisas uyğunluğu</span>
+          <span class="lp-mbar"><i style="width:100%;background:#C9D3F7"></i></span><span class="lp-mpct">40</span></div>
+        <div class="lp-mrow"><span class="n">Bacarıqların örtülməsi</span>
+          <span class="lp-mbar"><i style="width:50%;background:#DCAB5E"></i></span><span class="lp-mpct">20</span></div>
+        <p style="margin-top:12px">Eyni fakültədən fərqli ixtisas 15 bal alır — qohum sahələr sıfır sayılmır.</p>
+      </div>
+    </div>
+  </div></section>
 
   <section class="lp-sec" id="lp-jobs"><div class="wrap">
     <div class="lp-sec-top">
@@ -305,58 +344,12 @@ const Landing = {
     </div>` : ''}
   </div></section>
 
-  <section class="lp-sec" style="padding-block:0"><div class="wrap">
-    <div class="lp-banner">
-      <div>
-        <h3>Uyğunluq faizini öz profilində gör</h3>
-        <p>Qeydiyyatdan keç, fakültə və bacarıqlarını qeyd et — hər elan sənin üçün
-          ayrıca hesablanmış faizlə görünsün.</p>
-      </div>
-      <button class="b b-white b-lg" data-lp="auth-register">Pulsuz hesab yarat</button>
-    </div>
-  </div></section>
-
-  <section class="lp-sec" id="lp-companies"><div class="wrap">
-    <div class="lp-sec-top">
-      <div><p class="kicker">Şirkətlər</p><h2>Tərəfdaş şirkətlər</h2></div>
-    </div>
-    <div class="lp-grid lp-g4">
-      ${d.companies.slice(0, 8).map(c => `<article class="lp-co">
-        <div class="lp-cover" style="background:${this.grad(c.name)}"></div>
-        <div class="lp-cobody">
-          <span class="lp-cologo${companyLogoClass(c.name)}" style="background:${this.grad(c.sector)}">${companyMark(c.name)}</span>
-          <div class="lp-coname">${esc(c.name)}</div>
-          <p class="lp-desc">${esc(c.about)}</p>
-          <div class="lp-pills"><span class="lp-pill">${esc(c.sector)}</span></div>
-          <div class="lp-cofoot">
-            <span class="fl">${d.jobs.filter(j => j.companyId === c.id).length} açıq elan</span>
-            <button class="b b-outline b-sm" data-lp="company" data-id="${esc(c.id)}">Profilə bax</button>
-          </div>
-        </div>
-      </article>`).join('') || `<div class="lp-empty"><b>Tərəfdaş şirkətlər tezliklə burada olacaq</b>Şirkətiniz ADNSU tələbə və məzunlarını işə götürmək istəyirsə, şirkət hesabı yaradın — profil Karyera Mərkəzi təsdiqindən sonra burada görünəcək.
-        <div><button class="b b-primary" data-lp="auth-register">Şirkət hesabı yarat</button></div></div>`}
-    </div>
-  </div></section>
-
-  <section class="lp-sec tint" id="lp-how"><div class="wrap">
+  <section class="lp-sec tint" id="lp-tools"><div class="wrap">
     <div class="center" style="max-width:720px;margin-bottom:30px">
-      <p class="kicker">Necə işləyir</p>
-      <h2>Uyğunluq təsadüfi deyil — hesablanır</h2>
-      <p class="lede center" style="margin-top:14px">Hər elan üçün fakültən, ixtisasın və
-        bacarıqların ayrıca qiymətləndirilir. Faizin haradan gəldiyini həmişə görürsən.</p>
+      <p class="kicker">Karyera alətləri</p>
+      <h2>Karyerana hazırlaşmaq üçün hər şey bir yerdə</h2>
     </div>
     <div class="lp-feat">
-      <div class="lp-f dark">
-        <p class="kicker">40 / 40 / 20</p>
-        <h3>Uyğunluq formulası</h3>
-        <div class="lp-mrow"><span class="n">Fakültə uyğunluğu</span>
-          <span class="lp-mbar"><i style="width:100%;background:#fff"></i></span><span class="lp-mpct">40</span></div>
-        <div class="lp-mrow"><span class="n">İxtisas uyğunluğu</span>
-          <span class="lp-mbar"><i style="width:100%;background:#C9D3F7"></i></span><span class="lp-mpct">40</span></div>
-        <div class="lp-mrow"><span class="n">Bacarıqların örtülməsi</span>
-          <span class="lp-mbar"><i style="width:50%;background:#DCAB5E"></i></span><span class="lp-mpct">20</span></div>
-        <p style="margin-top:12px">Eyni fakültədən fərqli ixtisas 15 bal alır — qohum sahələr sıfır sayılmır.</p>
-      </div>
       <div class="lp-f">
         <p class="kicker">CV Mərkəzi</p>
         <h3>CV yarat, yoxlat, vakansiya ilə tutuşdur</h3>
@@ -408,24 +401,10 @@ const Landing = {
     </div>
   </div></section>
 
-  <section class="lp-sec lp-awards-sec" id="lp-awards"><div class="wrap">
-    <div class="lp-sec-top"><div><p class="kicker">ADNSU Karyera Mərkəzi</p><h2>Career Awards</h2>
-      <p class="lede" style="margin-top:10px">İşəgötürən tərəfdaşların rəsmi mükafatlandırılması.</p></div></div>
-    <div class="lp-awards-grid">
-      ${(d.awards || []).length ? d.awards.map(award => `<article class="lp-award-card">
-        <div class="lp-award-medal ${['gold','silver','bronze'].includes(award.tier) ? 'tier-'+award.tier : ''}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
-          <path d="m8 3 4 8 4-8M6 3h12"/><circle cx="12" cy="16" r="5"/></svg></div>
-        <div class="lp-award-content"><span class="lp-award-year">${esc(String(award.year))}</span>
-          <h3>${esc(award.nomination)}</h3><strong>${esc(award.company)}</strong>
-          ${award.citation ? `<p>${esc(award.citation)}</p>` : ''}</div>
-        ${/^https:\/\//i.test(award.logoUrl) ? `<img class="lp-award-logo" src="${esc(award.logoUrl)}" alt="${esc(award.company)} loqosu" loading="lazy">` : ''}
-      </article>`).join('') : '<div class="lp-award-empty">Növbəti rəsmi mükafatlandırma məlumatları burada paylaşılacaq.</div>'}
-    </div>
-  </div></section>
-  <section class="lp-sec" id="lp-events"><div class="wrap">
+  ${d.events.length ? `<section class="lp-sec" id="lp-events"><div class="wrap">
     <div class="lp-sec-top"><div><p class="kicker">Tədbirlər</p><h2>Yaxınlaşan tədbirlər</h2></div></div>
     <div class="lp-grid lp-g3">
-      ${d.events.length ? d.events.slice(0, 6).map(e => `<article class="lp-card">
+      ${d.events.slice(0, 6).map(e => `<article class="lp-card">
         <div class="lp-top">
           <span class="lp-logo" style="background:${this.grad(e.title)}">${esc(initials(e.title))}</span>
           <div style="min-width:0">
@@ -438,9 +417,58 @@ const Landing = {
           <span class="i">${this.icon.pin}${esc(e.place)}</span>
           <button class="b b-outline b-sm" style="margin-left:auto" data-lp="auth">Qeydiyyat</button>
         </div>
-      </article>`).join('') : `<div class="lp-empty">${mascot('think')}<b>Hazırda tədbir yoxdur</b>Tezliklə yeniləri elan olunacaq.</div>`}
+      </article>`).join('')}
     </div>
+  </div></section>` : ''}
+
+  <section class="lp-sec tint" id="lp-companies"><div class="wrap">
+    <div class="lp-sec-top"><div><p class="kicker">İşəgötürənlər üçün</p><h2>ADNSU istedadlarını işə götürün</h2>
+      <p class="lede" style="margin-top:10px">Mühəndislik, IT, energetika, iqtisadiyyat və digər ixtisaslar üzrə tələbə və məzunlara birbaşa çıxış.</p></div></div>
+    <div class="lp-grid lp-g4">
+      <div class="lp-f"><h3>Hədəfli elanlar</h3>
+        <p>Elanı fakültə və ixtisas üzrə hədəfləyin: onu ən uyğun tələbələr yüksək faizlə görür.</p></div>
+      <div class="lp-f"><h3>Uyğunluq faizi ilə namizədlər</h3>
+        <p>Hər müraciətçinin vakansiyaya uyğunluğunu faizlə və çatışmayan bacarıqlarla görün.</p></div>
+      <div class="lp-f"><h3>Müsahibə planlaması</h3>
+        <p>Müsahibə dəvətləri göndərin və görüş vaxtlarını platformada idarə edin.</p></div>
+      <div class="lp-f"><h3>Karyera Mərkəzi ilə əməkdaşlıq</h3>
+        <p>Təcrübə proqramları, karyera yarmarkaları və infosessiyalar üçün birbaşa əlaqə.</p></div>
+    </div>
+    <div class="lp-emp-cta">
+      <button class="b b-primary b-lg" data-lp="auth-register">Şirkət hesabı yarat</button>
+      <a href="mailto:career@asoiu.edu.az?subject=ADNSU%20Karyera%20-%20%C5%9Firk%C9%99t">career@asoiu.edu.az</a>
+    </div>
+    ${d.companies.length ? `<h3 class="lp-subhead">Platformadakı şirkətlər</h3>
+    <div class="lp-grid lp-g4">
+      ${d.companies.slice(0, 8).map(c => `<article class="lp-co">
+        <div class="lp-cover" style="background:${this.grad(c.name)}"></div>
+        <div class="lp-cobody">
+          <span class="lp-cologo" style="background:${this.grad(c.sector)}">${esc(initials(c.name))}</span>
+          <div class="lp-coname">${esc(c.name)}</div>
+          <p class="lp-desc">${esc(c.about)}</p>
+          <div class="lp-pills"><span class="lp-pill">${esc(c.sector)}</span></div>
+          <div class="lp-cofoot">
+            <span class="fl">${d.jobs.filter(j => j.companyId === c.id).length} açıq elan</span>
+            <button class="b b-outline b-sm" data-lp="company" data-id="${esc(c.id)}">Profilə bax</button>
+          </div>
+        </div>
+      </article>`).join('')}
+    </div>` : ''}
   </div></section>
+
+  ${(d.awards || []).length ? `<section class="lp-sec lp-awards-sec" id="lp-awards"><div class="wrap">
+    <div class="lp-sec-top"><div><p class="kicker">ADNSU Karyera Mərkəzi</p><h2>Career Awards</h2>
+      <p class="lede" style="margin-top:10px">İşəgötürən tərəfdaşların rəsmi mükafatlandırılması.</p></div></div>
+    <div class="lp-awards-grid">
+      ${d.awards.map(award => `<article class="lp-award-card">
+        <div class="lp-award-medal ${['gold','silver','bronze'].includes(award.tier) ? 'tier-'+award.tier : ''}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+          <path d="m8 3 4 8 4-8M6 3h12"/><circle cx="12" cy="16" r="5"/></svg></div>
+        <div class="lp-award-content"><span class="lp-award-year">${esc(String(award.year))}</span>
+          <h3>${esc(award.nomination)}</h3><strong>${esc(award.company)}</strong>
+          ${award.citation ? `<p>${esc(award.citation)}</p>` : ''}</div>
+      </article>`).join('')}
+    </div>
+  </div></section>` : ''}
 
   ${d.benefits.length ? `<section class="lp-sec tint" id="lp-perks"><div class="wrap">
     <div class="lp-sec-top"><div><p class="kicker">Güzəştlər</p><h2>Tələbə imtiyazları</h2>
@@ -466,20 +494,23 @@ const Landing = {
   </div></section>` : ''}
 
   <section class="lp-sec" id="lp-faq"><div class="wrap">
-    <div class="center" style="max-width:640px;margin-bottom:28px"><h2>Tez-tez verilən suallar</h2></div>
+    <div class="center" style="max-width:640px;margin-bottom:28px"><p class="kicker">Suallar</p><h2>Tez-tez verilən suallar</h2></div>
     <div class="lp-faq">
       <details class="lp-qa" open><summary>ADNSU Karyera nədir?</summary>
         <p class="ans">ADNSU tələbələrini iş, təcrübə, graduate proqramları və könüllülük
           imkanları ilə birləşdirən universitet karyera platformasıdır. Fərqi odur ki, elanlar
           sadəcə siyahılanmır — hər tələbə üçün uyğunluq faizi hesablanır.</p></details>
       <details class="lp-qa"><summary>İstifadə pulsuzdur?</summary>
-        <p class="ans">Bəli, tələbələr üçün tamamilə pulsuzdur. Ödənişli plan yoxdur —
-          platforma universitetin karyera xidmətinin bir hissəsidir.</p></details>
+        <p class="ans">Bəli, tələbə və məzunlar üçün tamamilə pulsuzdur — platforma
+          universitetin karyera xidmətinin bir hissəsidir.</p></details>
       <details class="lp-qa"><summary>Kim qeydiyyatdan keçə bilər?</summary>
         <p class="ans">Bakalavr və magistr tələbələri universitet e-poçtu (@asoiu.edu.az) ilə
           birbaşa daxil olur. Məzunlar şəxsi e-poçtla qeydiyyatdan keçə və Karyera Mərkəzinin
           yoxlamasından sonra tam giriş əldə edə bilər. Şirkətlər korporativ e-poçtla qeydiyyatdan
           keçir və təsdiqdən sonra elan dərc edir.</p></details>
+      <details class="lp-qa"><summary>Şirkət elanı necə yerləşdirir?</summary>
+        <p class="ans">Korporativ e-poçtla şirkət hesabı yaradın. Karyera Mərkəzi hesabı təsdiqlədikdən
+          sonra vakansiya yarada bilərsiniz; hər elan yoxlanılır və təsdiqdən sonra uyğun tələbələrə göstərilir.</p></details>
       <details class="lp-qa"><summary>Uyğunluq faizi necə hesablanır?</summary>
         <p class="ans">Fakültə uyğunluğu 40, ixtisas 40, tələb olunan bacarıqların örtülməsi
           20 bal. Eyni fakültədən fərqli ixtisas 15 bal alır. Profilində faizin hansı hissədən
@@ -490,28 +521,39 @@ const Landing = {
     </div>
   </div></section>
 
+  <section class="lp-sec" style="padding-top:0"><div class="wrap">
+    <div class="lp-banner">
+      <div>
+        <h3>${signedIn ? 'Kabinetində sənə uyğun imkanlar var' : 'Karyerana bu gün başla'}</h3>
+        <p>${signedIn ? 'Uyğunluq faizlərini, müraciətlərini və CV-ni kabinetində izlə.' : 'Qeydiyyat pulsuzdur və bir neçə dəqiqə çəkir.'}</p>
+      </div>
+      <button class="b b-white b-lg" data-lp="${signedIn ? 'dashboard' : 'auth-register'}">${signedIn ? 'Kabinetə qayıt' : 'Pulsuz hesab yarat'}</button>
+    </div>
+  </div></section>
+
   <footer class="lp-foot"><div class="wrap">
     <div class="lp-foot-grid">
       <div class="about">
         ${logoLockup()}
-        <p>ADNSU tələbə və məzunlarını sənaye partnyorları ilə birləşdirən karyera platforması.</p>
+        <p>ADNSU tələbə və məzunlarını işəgötürənlərlə birləşdirən karyera platforması.</p>
       </div>
       <div class="lp-fcol"><h4>Tələbələr</h4><ul>
         <li><button data-lp="auth-register">Pulsuz qeydiyyat</button></li>
         <li><button data-lp="scroll" data-to="lp-jobs">Vakansiyalar</button></li>
-        <li><button data-lp="scroll" data-to="lp-events">Tədbirlər</button></li>
-        <li><button data-lp="scroll" data-to="lp-perks">Güzəştlər</button></li>
+        <li><button data-lp="scroll" data-to="lp-tools">Karyera alətləri</button></li>
         <li><button data-lp="scroll" data-to="lp-mentor">Mentor dəstəyi</button></li>
-        <li><button data-lp="scroll" data-to="lp-awards">Career Awards</button></li>
+        ${d.events.length ? '<li><button data-lp="scroll" data-to="lp-events">Tədbirlər</button></li>' : ''}
+        ${d.benefits.length ? '<li><button data-lp="scroll" data-to="lp-perks">Güzəştlər</button></li>' : ''}
+        ${(d.awards || []).length ? '<li><button data-lp="scroll" data-to="lp-awards">Career Awards</button></li>' : ''}
       </ul></div>
       <div class="lp-fcol"><h4>Şirkətlər</h4><ul>
         <li><button data-lp="auth-register">Şirkət hesabı aç</button></li>
-        <li><button data-lp="scroll" data-to="lp-companies">Tərəfdaşlar</button></li>
+        <li><button data-lp="scroll" data-to="lp-companies">İşəgötürənlər üçün</button></li>
         <li><button data-lp="scroll" data-to="lp-how">Necə işləyir</button></li>
       </ul></div>
       <div class="lp-fcol"><h4>Əlaqə</h4><ul>
-        <li><button data-lp="noop">career@asoiu.edu.az</button></li>
-        <li><button data-lp="noop">Bakı, Azadlıq pr. 20</button></li>
+        <li><a href="mailto:career@asoiu.edu.az">career@asoiu.edu.az</a></li>
+        <li><span>Bakı, Azadlıq pr. 20</span></li>
         <li><button data-lp="scroll" data-to="lp-faq">Suallar</button></li>
       </ul></div>
     </div>

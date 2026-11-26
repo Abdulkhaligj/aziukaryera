@@ -26,47 +26,14 @@ function initials(name) {
   return String(name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
 
-const COMPANY_LOGOS = Object.freeze({
-  'abb': 'assets/logos/abb.png',
-  'abb bank': 'assets/logos/abb.png',
-  'azerconnect group': 'assets/logos/azerconnect.png',
-  'azercosmos': 'assets/logos/azercosmos.png',
-  'azərenerji': 'assets/logos/azerenerji.png',
-  'azərişıq': 'assets/logos/azerishiq.png',
-  'bakcell': 'assets/logos/bakcell.png',
-  'baku steel company': 'assets/logos/baku-steel-company.png',
-  'bp': 'assets/logos/bp.png',
-  'bp azerbaijan': 'assets/logos/bp.png',
-  'bos shelf': 'assets/logos/bos-shelf.png',
-  'ey': 'assets/logos/ey-azerbaijan.png',
-  'ey azerbaijan': 'assets/logos/ey-azerbaijan.png',
-  'halliburton': 'assets/logos/halliburton.svg',
-  'kapital bank': 'assets/logos/kapital-bank.png',
-  'pasha technology': 'assets/logos/pasha-technology.png',
-  'paşa technology': 'assets/logos/pasha-technology.png',
-  'pwc': 'assets/logos/pwc-azerbaijan.png',
-  'pwc azerbaijan': 'assets/logos/pwc-azerbaijan.png',
-  'slb': 'assets/logos/slb.png',
-  'socar': 'assets/logos/socar.png',
-  'socar polymer': 'assets/logos/socar-polymer.png',
-  'totalenergies': 'assets/logos/totalenergies.png',
-  'total energies': 'assets/logos/totalenergies.png'
-});
-
-function companyLogoPath(name) {
-  const key = String(name || '').trim().toLocaleLowerCase('az-AZ');
-  return COMPANY_LOGOS[key] || '';
-}
-
+/* Companies are shown by their initials. Real brand logos are not bundled
+ * with the site: a logo would suggest a partnership that may not exist. */
 function companyMark(name) {
-  const src = companyLogoPath(name);
-  if (!src) return esc(initials(name));
-  return `<img class="company-logo-img" src="${esc(src)}" alt="" aria-hidden="true"
-    loading="lazy" decoding="async">`;
+  return esc(initials(name));
 }
 
-function companyLogoClass(name) {
-  return companyLogoPath(name) ? ' has-company-logo' : '';
+function companyLogoClass() {
+  return '';
 }
 function typeClass(t) {
   return { 'İş': 't-is', 'Təcrübə': 't-tecrube', 'Graduate': 't-graduate', 'Könüllülük': 't-konullu' }[t] || 't-is';

@@ -209,39 +209,6 @@
   gap: 24px; margin-bottom: 24px; flex-wrap: wrap;
 }
 
-/* loqo lenti */
-.lp-logos { display: flex; gap: 12px; overflow: hidden; position: relative; margin-top: 24px; }
-.lp-logos::before, .lp-logos::after {
-  content: ""; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none;
-}
-.lp-logos::before { left: 0; background: linear-gradient(90deg, var(--ground), transparent); }
-.lp-logos::after { right: 0; background: linear-gradient(270deg, var(--ground), transparent); }
-.lp-track { display: flex; gap: 12px; width: max-content; animation: lpRoll 46s linear infinite; }
-@keyframes lpRoll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.lp-logos:hover .lp-track { animation-play-state: paused; }
-@media (prefers-reduced-motion: reduce) {
-  .lp-track { animation: none; } .lp-logos { overflow-x: auto; }
-}
-.lp-lgo {
-  width: 236px; height: 72px; box-sizing: border-box;
-  display: flex; align-items: center; gap: 12px; background: var(--surface);
-  border: 1px solid var(--line); border-radius: var(--r);
-  padding: 10px 14px; white-space: nowrap; box-shadow: var(--shadow-1);
-}
-.lp-lgo .m {
-  width: 76px; height: 48px; flex: 0 0 76px; box-sizing: border-box;
-  border-radius: 11px; display: grid; place-items: center;
-  color: #fff; font-size: 12px; font-weight: 800; background: var(--brand);
-}
-.lp-lgo .m.has-company-logo {
-  width: 76px; height: 48px; padding: 6px; background: #fff !important;
-  border: 1px solid var(--line); overflow: hidden;
-}
-.lp-lgo > span:last-child {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  font-size: 13.5px; font-weight: 700; color: var(--ink-2);
-}
-
 /* filtr tabları */
 .lp-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .lp-tabs::-webkit-scrollbar { display: none; }
@@ -276,10 +243,6 @@
   width: 54px; height: 54px; border-radius: 16px; margin-top: -27px;
   border: 3px solid var(--surface); color: #fff; display: grid; place-items: center;
   font-size: 15px; font-weight: 800; box-shadow: var(--shadow-1);
-}
-.lp-cologo.has-company-logo {
-  width: 82px; height: 58px; margin-top: -29px; box-sizing: border-box;
-  padding: 7px; background: #fff !important; overflow: hidden;
 }
 .lp-coname { display: flex; align-items: center; gap: 7px; font-size: 16.5px; font-weight: 800; }
 .lp-desc {
@@ -322,11 +285,6 @@
 .lp-logo {
   width: 46px; height: 46px; border-radius: 14px; flex-shrink: 0; color: #fff;
   display: grid; place-items: center; font-size: 13px; font-weight: 800;
-}
-.lp-logo.has-company-logo {
-  width: 60px; height: 48px; box-sizing: border-box;
-  padding: 6px; background: #fff !important;
-  border: 1px solid var(--line); overflow: hidden;
 }
 .lp-org { font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .lp-title { font-size: 16.5px; font-weight: 800; line-height: 1.25; margin-top: 2px; }
@@ -442,21 +400,11 @@
   font-size: 12.5px; color: rgba(255,255,255,.64);
 }
 
-/* Public-only refinements: genuine partner logos, mentorship and awards */
+/* Public-only refinements: mentorship and awards */
 @media (max-width: 1350px) {
   .lp-nav { display: none; }
   .lp-burger { display: grid; }
 }
-.lp-logos { min-height: 112px; align-items: center; }
-.lp-track { align-items: center; gap: 16px; }
-.lp-lgo {
-  width: 184px; height: 92px; flex: 0 0 184px;
-  display: grid; place-items: center; padding: 14px 20px;
-  border-radius: 16px; background: var(--surface);
-  border: 1px solid var(--line); box-shadow: var(--shadow-1);
-}
-.lp-lgo img { width: 100%; height: 60px; object-fit: contain; display: block; }
-.lp-lgo > span { display: none; }
 .lp-mentor-sec { background: var(--surface); }
 .lp-mentor-panel {
   display: flex; align-items: center; gap: 23px;
@@ -496,7 +444,6 @@
 .lp-award-content strong { font-size: 14px; color: var(--brand); }
 .lp-award-content p { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .lp-award-year { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--muted); }
-.lp-award-logo { width: 95px; max-height: 58px; object-fit: contain; }
 .lp-award-empty {
   grid-column: 1 / -1; padding: 35px 24px; border: 1px dashed var(--line);
   border-radius: 18px; color: var(--muted); text-align: center;
@@ -507,13 +454,56 @@
   .lp-awards-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
-  .lp-lgo { width: 154px; flex-basis: 154px; height: 80px; padding: 10px; }
-  .lp-lgo img { height: 53px; }
   .lp-mentor-panel { gap: 14px; border-radius: 18px; }
   .lp-mentor-symbol { width: 54px; height: 54px; border-radius: 15px; }
   .lp-mentor-symbol svg { width: 28px; height: 28px; }
   .lp-award-card { padding: 16px; gap: 12px; min-height: 130px; }
   .lp-award-medal { flex-basis: 48px; width: 48px; height: 48px; }
-  .lp-award-logo { width: 62px; }
 }
 .lp-mentor-mail { margin-left: 12px; font-size: 13.5px; color: var(--brand, #001c80); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- kimlər üçün / necə işləyir / işəgötürənlər ---------- */
+.lp-who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.lp-who-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 24px; display: flex; flex-direction: column; gap: 10px;
+}
+.lp-who-card .ico {
+  width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand);
+}
+.lp-who-card .ico svg { width: 23px; height: 23px; }
+.lp-who-card h3 { font-size: 19px; }
+.lp-who-card p { font-size: 14px; color: var(--ink-2); flex: 1; }
+.lp-who-card .b { align-self: flex-start; margin-top: 6px; }
+
+.lp-how { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.lp-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.lp-step {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px 22px;
+}
+.lp-step-n {
+  flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--brand); color: #fff; font-weight: 800; font-size: 15px;
+}
+.lp-step h3 { font-size: 17px; margin-bottom: 4px; }
+.lp-step p { font-size: 14px; color: var(--ink-2); }
+.lp-how .lp-f.dark { justify-content: center; }
+
+#lp-companies .lp-f h3 { font-size: 16.5px; }
+.lp-emp-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-top: 24px; }
+.lp-emp-cta a { font-weight: 700; color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.lp .lp-subhead { font-size: 20px; margin: 44px 0 16px; }
+.lp-fcol a, .lp-fcol span { font-size: 13.5px; color: rgba(255,255,255,.84); font-weight: 500; }
+.lp-fcol a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 900px) {
+  .lp-who { grid-template-columns: 1fr; }
+  .lp-how { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .lp-who-card, .lp-step { padding: 18px; }
+  .lp-who-card .b, .lp-emp-cta .b { width: 100%; align-self: stretch; }
+  .lp-emp-cta { justify-content: center; }
+}
