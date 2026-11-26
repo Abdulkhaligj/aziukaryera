@@ -92,6 +92,10 @@ test('streamed JSON is bounded and malformed/array bodies return controlled erro
   // CSRF: another site's form or fetch, and non-JSON (simple form) bodies, are refused.
   assert.equal((await readAdminJson(request('{}', { ...json, origin: 'https://evil.invalid' }))).status, 403);
   assert.equal((await readAdminJson(request('{}', { ...json, 'sec-fetch-site': 'cross-site' }))).status, 403);
+  // The panel is also served under the university address (Caddy passes it through).
+  assert.equal((await readAdminJson(request('{"title":"Uni"}', { ...json, origin: 'https://career.asoiu.edu.az' }))).body.title, 'Uni');
+  assert.equal((await readAdminJson(request('{}', { ...json, origin: 'http://career.asoiu.edu.az' }))).status, 403);
+  assert.equal((await readAdminJson(request('{}', { ...json, origin: 'https://career.asoiu.edu.az.evil.invalid' }))).status, 403);
   assert.equal((await readAdminJson(request('{}', { 'content-type': 'text/plain' }))).status, 415);
   assert.equal((await readAdminJson(request('title=x', { 'content-type': 'application/x-www-form-urlencoded' }))).status, 415);
 });

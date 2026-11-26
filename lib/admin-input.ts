@@ -38,12 +38,22 @@ export function publicError(error: DbError, fallback = 'Əməliyyat alınmadı')
   return fallback;
 }
 
+/** The university address the panel is also served under (Caddy passes it
+ *  through); see next.config.mjs. */
+const PUBLIC_HOSTS = (globalThis.process?.env?.ADMIN_PUBLIC_HOSTS || 'career.asoiu.edu.az')
+  .split(',').map(host => host.trim().toLowerCase()).filter(Boolean);
+
 /** State-changing admin requests must come from the panel itself: same
- *  origin (a browser always sends Origin on cross-site POST/PATCH/DELETE). */
+ *  origin, or the university address it is served under (a browser always
+ *  sends Origin on cross-site POST/PATCH/DELETE). */
 export function crossSite(request: Request): boolean {
   const origin = request.headers.get('origin');
   if (!origin) return request.headers.get('sec-fetch-site') === 'cross-site';
-  try { return new URL(origin).host !== new URL(request.url).host; } catch { return true; }
+  try {
+    const url = new URL(origin);
+    if (url.host === new URL(request.url).host) return false;
+    return !(url.protocol === 'https:' && PUBLIC_HOSTS.includes(url.host.toLowerCase()));
+  } catch { return true; }
 }
 
 /** The message of a refused Edge Function call: db-js returns no data

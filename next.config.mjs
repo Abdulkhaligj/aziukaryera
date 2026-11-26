@@ -24,9 +24,18 @@ const noStore = [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }
 // ADMIN_MAINTENANCE=false at build time turns it off for a local check.
 const MAINTENANCE = false;
 
+// The panel is also served under the university address (career.asoiu.edu.az/admin),
+// passed through by the university server's Caddy. Its forms are accepted from
+// there too; ADMIN_PUBLIC_HOSTS (comma separated) can change the list.
+export const ADMIN_PUBLIC_HOSTS = (process.env.ADMIN_PUBLIC_HOSTS || 'career.asoiu.edu.az')
+  .split(',').map(host => host.trim()).filter(Boolean);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  experimental: {
+    serverActions: { allowedOrigins: ADMIN_PUBLIC_HOSTS }
+  },
   async redirects() {
     if (!MAINTENANCE) return [];
     return [{
