@@ -53,9 +53,12 @@ const COMPANY_LOGOS = Object.freeze({
   'total energies': 'assets/logos/totalenergies.png'
 });
 
+/* Bump when the files in assets/logos change, so browsers fetch them again. */
+const COMPANY_LOGOS_VERSION = '20261126f';
+
 function companyLogoPath(name) {
   const key = String(name || '').trim().toLocaleLowerCase('az-AZ');
-  return COMPANY_LOGOS[key] || '';
+  return COMPANY_LOGOS[key] ? `${COMPANY_LOGOS[key]}?v=${COMPANY_LOGOS_VERSION}` : '';
 }
 
 function companyMark(name) {
