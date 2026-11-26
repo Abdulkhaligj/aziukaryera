@@ -273,7 +273,7 @@ function viewEmployerCalendar() {
     '<div class="em-calendar-layout"><section class="card em-panel"><div class="em-calendar-toolbar">'+
       '<h2>'+esc(title)+'</h2><div class="row tight"><button class="btn sm" data-em-month="-1" aria-label="Əvvəlki ay">←</button>'+
       '<button class="btn sm" data-em-month="1" aria-label="Sonrakı ay">→</button></div></div>'+
-      '<div class="em-calendar-week">'+['B.e','Ç.a','Ç','C.a','C','Ş','B'].map(d=>'<b>'+d+'</b>').join('')+'</div>'+
+      '<div class="em-calendar-week">'+['B.e','Ç.a','Ç.','C.a','C.','Ş.','B.'].map(d=>'<b>'+d+'</b>').join('')+'</div>'+
       '<div class="em-calendar-days">'+cells+'</div></section>'+
     '<section class="card em-panel"><h2>Yeni müsahibə</h2><p class="em-muted">Bütün vaxtlar Bakı saatı (UTC+4) ilə göstərilir.</p>'+
     (!options?'<div class="em-empty">Vaxt təyin etmək üçün əvvəlcə vakansiyanıza müraciət daxil olmalıdır.</div>':

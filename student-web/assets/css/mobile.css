@@ -1,0 +1,58 @@
+/* Phones (checked on a 375px screen, 2026-11-26). Loaded last; each rule
+   fixes one thing that was broken on a phone. */
+
+/* 1. iOS Safari zooms into any field whose text is smaller than 16px when it
+      gets focus, and the page stays zoomed. Fields on touch screens are 16px. */
+@media (max-width: 900px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select, textarea { font-size: 16px !important; }
+}
+
+/* 2. Landing: the mobile menu opens under the sticky header, wherever the
+      page is scrolled (it used to open at the top of the page, out of view). */
+@media (max-width: 1080px) {
+  .lp-head .lp-mob {
+    position: absolute; left: 0; right: 0; top: 100%;
+    max-height: calc(100dvh - 64px); overflow-y: auto; overscroll-behavior: contain;
+    box-shadow: 0 18px 40px rgba(15, 30, 67, .16);
+  }
+  .lp-mob button { min-height: 44px; }
+}
+
+/* 3. AIDA never covers a dialog, the open menu or the last buttons of a page. */
+body:has(.modal-back:not([hidden])) .aida-widget,
+body:has(.lp-mob.open) .aida-widget { display: none; }
+@media (max-width: 900px) {
+  .main { padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
+  .lp { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+}
+
+/* 4. While a dialog is open the page behind it does not scroll. */
+html:has(.modal-back:not([hidden])), html:has(.modal-back:not([hidden])) body { overflow: hidden; }
+.modal { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+/* 5. AIDA's chat fills the phone screen; the input stays above the keyboard. */
+@media (max-width: 600px) {
+  .aida-launch { min-height: 48px; padding: 8px 18px; }
+  .aida-widget:has(.aida-panel:not([hidden])) { inset: 0; }
+  .aida-widget:has(.aida-panel:not([hidden])) .aida-launch { display: none; }
+  .aida-panel {
+    position: fixed; inset: 0; width: 100%; height: 100dvh; max-height: none;
+    border: 0; border-radius: 0; bottom: auto;
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+  }
+  .aida-close { min-width: 44px; min-height: 44px; }
+}
+
+/* 6. The notification list and the account menu open above the section tabs
+      (the tabs are sticky with z-index 35; the top bar's dropdowns were under them). */
+@media (max-width: 900px) {
+  .topbar { z-index: 40; }
+}
+
+/* 7. Small controls get a finger-sized target. */
+@media (pointer: coarse) {
+  .taglist .tag button { min-width: 30px; min-height: 30px; display: inline-grid; place-items: center; margin: -7px -8px -7px -2px; font-size: 18px; }
+  .skillpick button { min-height: 36px; }
+  .notification-bell, .topbar-home { min-width: 44px; min-height: 44px; }
+}

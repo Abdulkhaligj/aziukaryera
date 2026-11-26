@@ -1,0 +1,36 @@
+/* Language switch: AZ · EN · RU (assets/js/i18n.js). */
+.lang-switch {
+  display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0;
+  padding: 3px; border: 1px solid var(--line, #dce4f1); border-radius: 999px;
+  background: var(--surface, #fff);
+}
+.lang-switch button {
+  min-width: 34px; padding: 7px 9px; border: 0; border-radius: 999px; background: none;
+  font: 700 11.5px/1 var(--font-sans, system-ui, sans-serif); letter-spacing: .04em;
+  color: var(--muted, #65748d); cursor: pointer;
+}
+.lang-switch button:hover:not([aria-pressed="true"]) { color: var(--brand, #113d9b); }
+.lang-switch button[aria-pressed="true"] { background: var(--brand, #113d9b); color: #fff; }
+.lang-switch button:focus-visible { outline: 2px solid var(--brand, #113d9b); outline-offset: 2px; }
+
+/* On the dark sign-in panel. */
+.lang-switch-dark { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .22); }
+.lang-switch-dark button { color: rgba(255, 255, 255, .8); }
+.lang-switch-dark button:hover:not([aria-pressed="true"]) { color: #fff; }
+.lang-switch-dark button[aria-pressed="true"] { background: #fff; color: var(--brand, #113d9b); }
+.auth-brand-top { gap: 10px; }
+.auth-brand-top .lang-switch { margin-left: auto; }
+
+/* Landing: in the header on wide screens, in the menu on phones. */
+.lang-switch-menu { align-self: flex-start; margin: 10px 0 2px 8px; }
+@media (min-width: 1081px) { .lang-switch-menu { display: none; } }
+@media (max-width: 600px) { .lp-head .right .lang-switch-lp { display: none; } }
+
+/* The app's top bar. */
+.topbar .lang-switch { margin-right: 6px; }
+@media (max-width: 420px) {
+  .topbar .lang-switch button { min-width: 30px; padding: 7px 6px; }
+}
+@media (pointer: coarse) {
+  .lang-switch button { min-height: 34px; }
+}

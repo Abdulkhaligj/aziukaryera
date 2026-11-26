@@ -191,6 +191,7 @@ const Landing = {
       <button data-lp="scroll" data-to="lp-awards">Awards</button>
     </nav>
     <div class="right">
+      ${window.I18n ? I18n.switcher('lang-switch-lp') : ''}
       ${signedIn
         ? '<button class="b b-primary b-sm" data-lp="dashboard">Kabinetə qayıt</button>'
         : '<button class="b b-outline b-sm" data-lp="auth">Daxil ol</button><button class="b b-primary b-sm" data-lp="auth-register">Qeydiyyat</button>'}
@@ -198,7 +199,7 @@ const Landing = {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
     </div>
-  </div></header>
+  </div>
 
   <div class="lp-mob ${this.menuOpen ? 'open' : ''}"><div class="wrap">
     <button data-lp="scroll" data-to="lp-jobs">Vakansiyalar</button>
@@ -208,12 +209,14 @@ const Landing = {
     <button data-lp="scroll" data-to="lp-how">Necə işləyir</button>
     <button data-lp="scroll" data-to="lp-mentor">Mentor dəstəyi</button>
     <button data-lp="scroll" data-to="lp-awards">Career Awards</button>
+    ${window.I18n ? I18n.switcher('lang-switch-menu') : ''}
     <div style="display:flex;gap:10px;margin-top:10px">
       ${signedIn
         ? '<button class="b b-primary b-block" data-lp="dashboard">Kabinetə qayıt</button>'
         : '<button class="b b-outline b-block" data-lp="auth">Daxil ol</button><button class="b b-primary b-block" data-lp="auth-register">Qeydiyyat</button>'}
     </div>
   </div></div>
+  </header>
 
   <section class="lp-hero"><div class="wrap lp-hero-grid">
     <div>
