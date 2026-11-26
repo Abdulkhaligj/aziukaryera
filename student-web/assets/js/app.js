@@ -2451,6 +2451,7 @@ function authScreen() {
     <aside class="auth-brand">
       <div class="auth-brand-top">
         ${logoLockup()}
+        ${window.I18n ? I18n.switcher('lang-switch-dark') : ''}
         <button type="button" class="auth-back" data-lp="home">← Ana səhifə</button>
       </div>
       <div class="auth-brand-mid">
@@ -3060,6 +3061,7 @@ function render() {
     <header class="topbar">
       ${logoLockup()}
       <div class="topbar-spacer"></div>
+      ${window.I18n ? I18n.switcher('lang-switch-top') : ''}
       <button class="topbar-home" data-act="home" aria-label="Ana səhifəyə keç">
         <span aria-hidden="true">⌂</span><b>Ana səhifə</b>
       </button>
@@ -3865,7 +3867,8 @@ document.addEventListener('click', e => {
       Landing.load().then(render); render(); window.scrollTo(0, 0); break;
     case 'menu': Landing.menuOpen = !Landing.menuOpen; render(); break;
     case 'scroll': {
-      Landing.menuOpen = false;
+      /* The mobile menu sits in the sticky header: it closes before the jump. */
+      if (Landing.menuOpen) { Landing.menuOpen = false; render(); }
       const el = document.getElementById(t.dataset.to);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       else {
