@@ -5,7 +5,7 @@ import { Script } from 'node:vm';
 
 const read = readSource;
 
-test('public landing keeps Awards and Mentor and shows no company logos', () => {
+test('public landing keeps Awards and Mentor and a scrolling logo strip', () => {
   const landing = read('student-web/assets/js/landing.js');
   const app = read('student-web/assets/js/app.js');
   const css = read('student-web/assets/css/landing.css');
@@ -19,12 +19,15 @@ test('public landing keeps Awards and Mentor and shows no company logos', () => 
   assert.match(landing, /awards: \(awards\.data \|\| \[\]\)/);
   assert.match(landing, /\['lp-mentor', 'Mentor'\]/);
   assert.match(landing, /\['lp-awards', 'Awards'\]/);
-  // 2026-11-26: the user asked for the company logos to go. No logo strip,
-  // no bundled brand logos, no award logo; companies show their initials.
-  assert.doesNotMatch(landing, /lp-logos|logoTiles|lp-award-logo|<img/);
-  assert.doesNotMatch(app, /COMPANY_LOGOS|assets\/logos\//);
-  assert.match(app, /function companyMark\(name\) \{\n  return esc\(initials\(name\)\);/);
-  assert.doesNotMatch(css, /\.lp-lgo|\.lp-logos/);
+  // The strip under the hero always shows the bundled industry logos (bp,
+  // SOCAR, EY…), then registered companies that uploaded a logo.
+  const ticker = landing.split('<div class="lp-logos"')[1]?.split('</div></div>')[0] || '';
+  assert.match(ticker, /\$\{logoTiles\}\$\{logoTilesCopy\}/);
+  assert.match(landing, /const tickerNames = \['SOCAR', 'bp'/);
+  assert.match(landing, /'EY Azerbaijan'/);
+  assert.match(landing, /logoUrl: c\.logo_url \|\| ''/);
+  assert.match(app, /'socar': 'assets\/logos\/socar\.png'/);
+  assert.match(css, /\.lp-lgo img\s*\{/);
 });
 
 test('approval note action is private, persistent and separate from saving status', () => {

@@ -1873,7 +1873,10 @@ en: {
   "Uyğunluq faizlərini, müraciətlərini və CV-ni kabinetində izlə.": "Follow your match percentages, applications and CV in your account.",
   "Karyerana bu gün başla": "Start your career today",
   "Qeydiyyat pulsuzdur və bir neçə dəqiqə çəkir.": "Sign-up is free and takes a few minutes.",
-  "ADNSU tələbə və məzunlarını işəgötürənlərlə birləşdirən karyera platforması.": "A career platform connecting ASOIU students and graduates with employers."
+  "ADNSU tələbə və məzunlarını işəgötürənlərlə birləşdirən karyera platforması.": "A career platform connecting ASOIU students and graduates with employers.",
+  "Azərbaycanın aparıcı sənaye şirkətləri": "Leading industrial companies of Azerbaijan",
+  "Neft-qaz, energetika, metallurgiya, telekom, bank və konsaltinq — ADNSU ixtisasları ilə karyera qurulan sahələr.": "Oil and gas, energy, metallurgy, telecom, banking and consulting — the fields where careers are built with ASOIU majors.",
+  "Şirkət loqoları": "Company logos"
 },
 ru: {
   "! Bu kod artıq istifadə olunub": "! Этот код уже использован",
@@ -3746,6 +3749,9 @@ ru: {
   "Uyğunluq faizlərini, müraciətlərini və CV-ni kabinetində izlə.": "Следите за процентами совпадения, откликами и резюме в своём кабинете.",
   "Karyerana bu gün başla": "Начните карьеру сегодня",
   "Qeydiyyat pulsuzdur və bir neçə dəqiqə çəkir.": "Регистрация бесплатна и занимает несколько минут.",
-  "ADNSU tələbə və məzunlarını işəgötürənlərlə birləşdirən karyera platforması.": "Карьерная платформа, соединяющая студентов и выпускников АГУНП с работодателями."
+  "ADNSU tələbə və məzunlarını işəgötürənlərlə birləşdirən karyera platforması.": "Карьерная платформа, соединяющая студентов и выпускников АГУНП с работодателями.",
+  "Azərbaycanın aparıcı sənaye şirkətləri": "Ведущие промышленные компании Азербайджана",
+  "Neft-qaz, energetika, metallurgiya, telekom, bank və konsaltinq — ADNSU ixtisasları ilə karyera qurulan sahələr.": "Нефть и газ, энергетика, металлургия, телеком, банки и консалтинг — сферы, где строят карьеру со специальностями АГУНП.",
+  "Şirkət loqoları": "Логотипы компаний"
 }
 };
