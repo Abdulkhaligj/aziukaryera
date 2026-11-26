@@ -163,6 +163,22 @@ const Landing = {
 
     const cities = [...new Set(d.jobs.map(j => j.location.split(' ')[0].replace(/[(),]/g, '')))].filter(Boolean).sort();
 
+    /* Scrolling logo strip under the hero: leading companies of Azerbaijan's
+       industry (logos in assets/logos), then registered companies that uploaded
+       a logo of their own. */
+    const tickerNames = ['SOCAR', 'bp', 'SLB', 'Halliburton', 'TotalEnergies', 'BOS Shelf', 'SOCAR Polymer',
+      'Azərenerji', 'Azərişıq', 'Baku Steel Company', 'Azercosmos', 'Azerconnect Group', 'Bakcell',
+      'PASHA Technology', 'Kapital Bank', 'ABB', 'EY Azerbaijan', 'PwC Azerbaijan'];
+    const seen = new Set();
+    const companyLogos = [
+      ...tickerNames.map(name => ({ name, src: companyLogoPath(name) })),
+      ...d.companies.map(c => ({ name: c.name, src: /^https:\/\//i.test(String(c.logoUrl || '')) ? c.logoUrl : companyLogoPath(c.name) }))
+    ].filter(item => item.src && !seen.has(item.src) && seen.add(item.src));
+    const logoTiles = companyLogos.map(item => `<span class="lp-lgo" role="img" aria-label="${esc(item.name)}">
+      <img src="${esc(item.src)}" alt="${esc(item.name)}" loading="lazy" decoding="async"></span>`).join('');
+    const logoTilesCopy = companyLogos.map(item => `<span class="lp-lgo" aria-hidden="true">
+      <img src="${esc(item.src)}" alt="" loading="lazy" decoding="async"></span>`).join('');
+
     /* Header links: sections with no content (no event, no award yet) are left out. */
     const navItems = [
       ['lp-jobs', 'Vakansiyalar'],
@@ -246,6 +262,16 @@ const Landing = {
       <div class="lp-badge two"><b>40/40/20</b><span>uyğunluq formulası</span></div>
     </div>
   </div></section>
+
+  ${companyLogos.length ? `<section class="lp-sec" style="padding-bottom:0"><div class="wrap">
+    <div class="center" style="max-width:640px">
+      <h2>Azərbaycanın aparıcı sənaye şirkətləri</h2>
+      <p class="lede center" style="margin-top:12px">Neft-qaz, energetika, metallurgiya, telekom, bank və konsaltinq — ADNSU ixtisasları ilə karyera qurulan sahələr.</p>
+    </div>
+    <div class="lp-logos" aria-label="Şirkət loqoları"><div class="lp-track">
+      ${logoTiles}${logoTilesCopy}
+    </div></div>
+  </div></section>` : ''}
 
   <section class="lp-sec" id="lp-who"><div class="wrap">
     <div class="center" style="max-width:720px;margin-bottom:28px">
@@ -443,7 +469,7 @@ const Landing = {
       ${d.companies.slice(0, 8).map(c => `<article class="lp-co">
         <div class="lp-cover" style="background:${this.grad(c.name)}"></div>
         <div class="lp-cobody">
-          <span class="lp-cologo" style="background:${this.grad(c.sector)}">${esc(initials(c.name))}</span>
+          <span class="lp-cologo${companyLogoClass(c.name)}" style="background:${this.grad(c.sector)}">${companyMark(c.name)}</span>
           <div class="lp-coname">${esc(c.name)}</div>
           <p class="lp-desc">${esc(c.about)}</p>
           <div class="lp-pills"><span class="lp-pill">${esc(c.sector)}</span></div>
@@ -466,6 +492,7 @@ const Landing = {
         <div class="lp-award-content"><span class="lp-award-year">${esc(String(award.year))}</span>
           <h3>${esc(award.nomination)}</h3><strong>${esc(award.company)}</strong>
           ${award.citation ? `<p>${esc(award.citation)}</p>` : ''}</div>
+        ${/^https:\/\//i.test(award.logoUrl) ? `<img class="lp-award-logo" src="${esc(award.logoUrl)}" alt="${esc(award.company)} loqosu" loading="lazy">` : ''}
       </article>`).join('')}
     </div>
   </div></section>` : ''}
