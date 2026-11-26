@@ -104,7 +104,7 @@
       } catch(error) {
         if(!window.CareerSession.matches(scope))return;
         this.error=Backend.translate?.(error.message)||error.message||'Əməliyyat tamamlanmadı.';
-        if(typeof toast==='function') toast(this.error);
+        if(typeof toast==='function') toast(this.error, 'bad');
       } finally { if(window.CareerSession.matches(scope)){this.saving=false;this.repaint();} }
     },
     ownedApplications() {

@@ -64,3 +64,82 @@ html:has(.modal-back:not([hidden])), html:has(.modal-back:not([hidden])) body { 
 .auth-form, .auth-form-head { grid-template-columns: minmax(0, 1fr); }
 .btn.block { white-space: normal; text-align: center; }
 .btn.block > span { min-width: 0; }
+
+/* 9. Landing header. The language switch made the header wider than the page
+      on desktop, and its buttons wrapped onto a second line over the page.
+      Everything stays on one line now; when the links still do not fit
+      (Russian, narrow laptops) responsive.js adds .lp-head-compact and the
+      header uses the ☰ menu. The buttons sit at the right edge on phones. */
+.lp-head .row { flex-wrap: nowrap; gap: 12px; }
+.lp-head .right { margin-left: auto; gap: 6px; }
+.lp-nav { min-width: 0; overflow: hidden; }
+.lp-nav button, .lp-nav a { flex-shrink: 0; white-space: nowrap; padding-inline: 9px; }
+.lp-head .lang-switch-lp button { min-width: 30px; padding: 6px 7px; }
+.lp-head-compact .lp-nav { display: none; }
+.lp-head-compact .lp-burger { display: grid; }
+.lp-head-compact .lp-mob {
+  position: absolute; left: 0; right: 0; top: 100%;
+  max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain;
+  box-shadow: 0 18px 40px rgba(15, 30, 67, .16);
+}
+
+/* 10. Empty lists on the landing page: the robot had no size and filled the
+       whole width of the job list. */
+.lp-empty .mascot { display: block; width: 120px; margin: 0 auto 12px; }
+.lp-empty .b { margin-top: 16px; }
+
+/* 11. Tables on phones: one card per row with the column name beside each
+       value (data-label from responsive.js). The side-scrolling table hid
+       the last columns, e.g. the status of an application. */
+@media (max-width: 620px) {
+  .table-wrap { overflow: visible; border: 0; background: none; }
+  .table-wrap table { min-width: 0; }
+  .table-wrap thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .table-wrap tbody, .table-wrap tr, .table-wrap td { display: block; }
+  .table-wrap tr {
+    border: 1px solid var(--line); border-radius: var(--r); background: var(--surface);
+    padding: 10px 14px; margin-bottom: 10px;
+  }
+  .table-wrap tbody tr:hover { background: var(--surface); }
+  .table-wrap tbody td {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 3px;
+    align-items: center; justify-items: end; text-align: right;
+    padding: 7px 0; border-bottom: 1px dashed var(--line); max-width: none !important;
+  }
+  .table-wrap tbody td:last-child { border-bottom: 0; }
+  .table-wrap tbody td::before {
+    content: attr(data-label); grid-column: 1; grid-row: 1; justify-self: start; text-align: left;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .table-wrap tbody td:not(:first-child) > * { grid-column: 2; }
+  .table-wrap tbody td .chip { white-space: nowrap; }
+  .table-wrap tbody td:first-child { display: block; justify-items: stretch; text-align: left; padding-top: 2px; }
+  .table-wrap tbody td:first-child::before, .table-wrap tbody td[data-label=""]::before { display: none; }
+  .table-wrap tbody td[data-label=""]:not(:first-child) {
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 10px;
+  }
+}
+
+/* 12. Phone details: the match filter showed its whole label, the footer lost
+       its dangling "·", and the account menu has finger-sized items. */
+@media (max-width: 620px) {
+  .card > .row > .field:has(#job-min) { width: auto !important; flex: 1 1 180px; }
+  .meter-key { max-width: 100%; }
+  footer.foot > span:nth-child(2) { display: none; }
+}
+@media (pointer: coarse) {
+  .usermenu-pop button { min-height: 44px; }
+}
+
+/* 13. Messages: an error no longer shows the green ✓ of a success, and on
+       phones the message sits above the AIDA button. */
+.toast[data-tone="bad"] { background: var(--bad); color: #fff; }
+.toast > span:first-child { font-weight: 800; }
+@media (max-width: 620px) {
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+
+/* 14. The logo's small English caption "Career Center" repeated the name
+       once the name itself is shown in English or Russian. */
+html:not([lang="az"]) .logo-text small { display: none; }

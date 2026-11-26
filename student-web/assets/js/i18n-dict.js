@@ -1826,7 +1826,15 @@ en: {
   "⧉ Kopyala": "⧉ Copy",
   "＋ Vakansiya yarat": "＋ Create a job",
   "＋ Yeni elan": "＋ New listing",
-  "＋ Yeni vakansiya": "＋ New job"
+  "＋ Yeni vakansiya": "＋ New job",
+  "Növbəti 3 həftədə son tarixi bitən elan yoxdur.": "No listing has a deadline in the next 3 weeks.",
+  "Müddəti bitib": "Expired",
+  "Bu elanın müraciət müddəti bitib.": "Applications for this listing have closed.",
+  "Hazırda açıq elan yoxdur": "There are no open listings right now",
+  "Yeni elanlar Karyera Mərkəzi təsdiqlədikcə burada görünəcək. Hesab yarat — elan çıxanda uyğunluq faizini öz profilində görəcəksən.": "New listings appear here as the Career Center approves them. Create an account — when a listing comes out, you will see your match percentage in your profile.",
+  "Tərəfdaş şirkətlər tezliklə burada olacaq": "Partner companies will be here soon",
+  "Şirkətiniz ADNSU tələbə və məzunlarını işə götürmək istəyirsə, şirkət hesabı yaradın — profil Karyera Mərkəzi təsdiqindən sonra burada görünəcək.": "If your company wants to hire ASOIU students and graduates, create a company account — the profile appears here after the Career Center approves it.",
+  "Şirkət hesabı yarat": "Create a company account"
 },
 ru: {
   "! Bu kod artıq istifadə olunub": "! Этот код уже использован",
@@ -3652,6 +3660,14 @@ ru: {
   "⧉ Kopyala": "⧉ Копировать",
   "＋ Vakansiya yarat": "＋ Создать вакансию",
   "＋ Yeni elan": "＋ Новое объявление",
-  "＋ Yeni vakansiya": "＋ Новая вакансия"
+  "＋ Yeni vakansiya": "＋ Новая вакансия",
+  "Növbəti 3 həftədə son tarixi bitən elan yoxdur.": "В ближайшие 3 недели сроки объявлений не истекают.",
+  "Müddəti bitib": "Срок истёк",
+  "Bu elanın müraciət müddəti bitib.": "Приём откликов на это объявление закончился.",
+  "Hazırda açıq elan yoxdur": "Сейчас открытых объявлений нет",
+  "Yeni elanlar Karyera Mərkəzi təsdiqlədikcə burada görünəcək. Hesab yarat — elan çıxanda uyğunluq faizini öz profilində görəcəksən.": "Новые объявления появятся здесь после одобрения Карьерным центром. Создайте аккаунт — когда объявление выйдет, вы увидите процент совпадения в своём профиле.",
+  "Tərəfdaş şirkətlər tezliklə burada olacaq": "Компании-партнёры скоро появятся здесь",
+  "Şirkətiniz ADNSU tələbə və məzunlarını işə götürmək istəyirsə, şirkət hesabı yaradın — profil Karyera Mərkəzi təsdiqindən sonra burada görünəcək.": "Если ваша компания хочет нанимать студентов и выпускников АГУНП, создайте аккаунт компании — профиль появится здесь после одобрения Карьерным центром.",
+  "Şirkət hesabı yarat": "Создать аккаунт компании"
 }
 };
