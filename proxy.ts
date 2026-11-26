@@ -68,7 +68,14 @@ export async function proxy(request: NextRequest) {
       }
     }
   });
-  const { data } = await db.auth.getClaims();
+  // A damaged or foreign session cookie made getClaims throw and the page
+  // answer 500; it now ends the session and shows the sign-in page.
+  let data: Awaited<ReturnType<typeof db.auth.getClaims>>['data'];
+  try {
+    ({ data } = await db.auth.getClaims());
+  } catch {
+    return endSession();
+  }
   // The cookie above is only a hint the browser can change. The limit itself is
   // the sign-in time the API signed into the token (amr), which a refresh keeps.
   const signedIn = Number((data?.claims as { amr?: { timestamp?: number }[] } | undefined)?.amr?.[0]?.timestamp) * 1000;

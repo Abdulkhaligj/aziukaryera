@@ -1,5 +1,11 @@
 /* ADNSU Career PWA - network first for executable code, cache v20261102. */
-const CACHE_NAME = 'adnsu-career-shell-20261116-audit-v3';
+const CACHE_NAME = 'adnsu-career-shell-20261126-admin-v1';
+// The admin panel is served under this address too (career.asoiu.edu.az/admin,
+// passed through to its own app). Its pages, scripts and API are never
+// answered or kept by this worker: kept admin pages would hold staff data,
+// and the panel's own navigation broke when this worker sat in between.
+// A new cache name also drops the old cache, which held such pages.
+const ADMIN_PATHS = /^\/(admin|login|account|api\/admin|_next|icons)(\/|$)/;
 const OFFLINE = ['/','/index.html','/manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE)));
@@ -15,6 +21,7 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (ADMIN_PATHS.test(url.pathname)) return;
   // Fresh scripts, CSS and HTML are vital: never reuse a broken old bundle
   // before attempting a live request. Keep offline fallbacks where possible.
   if (request.mode === 'navigate' || ['script','style'].includes(request.destination)) {
