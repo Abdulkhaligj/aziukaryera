@@ -112,12 +112,58 @@ const mediaBase = () => `${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/
 const logoOf = (url: unknown) => typeof url === 'string' && mediaBase().startsWith('https://') && url.startsWith(mediaBase()) && !/[\s"'<>]/.test(url) ? url : undefined;
 const photo = (pics: Record<string, string>, path: unknown) => (typeof path === 'string' && pics[path]) || undefined;
 
+/* The university WAF in front of the API answers 403 to embedded selects such
+ * as `companies(name)` and to `in.(…)` / `or=(…)` filters (checked 2026-11-26),
+ * so every admin list that showed a related name failed, job approval included.
+ * Related rows are read with plain, paged selects and joined here instead:
+ * each table once per request, with the columns any list needs. */
+const RELATED = {
+  profiles: 'full_name,email,avatar_path',
+  companies: 'name',
+  jobs: 'title',
+  plans: 'name,monthly_price',
+  benefit_partners: 'name,logo_url'
+} as const;
+type RelatedTable = keyof typeof RELATED;
+const RELATED_PAGE = 1000; // the API's row limit per request
+const relatedCache = new WeakMap<object, Map<RelatedTable, Promise<Map<string, any>>>>();
+
+async function readRelated(db: AdminContext['db'], table: RelatedTable): Promise<Map<string, any>> {
+  const rows = new Map<string, any>();
+  for (let from = 0; from < 50 * RELATED_PAGE; from += RELATED_PAGE) {
+    const { data, error } = await db.from(table).select(`id,${RELATED[table]}`).order('id').range(from, from + RELATED_PAGE - 1);
+    if (error) throw error;
+    (data || []).forEach((row: any) => rows.set(String(row.id), row));
+    if (!data || data.length < RELATED_PAGE) break;
+  }
+  return rows;
+}
+
+function related(db: AdminContext['db'], table: RelatedTable) {
+  let perDb = relatedCache.get(db);
+  if (!perDb) relatedCache.set(db, perDb = new Map());
+  let rows = perDb.get(table);
+  if (!rows) {
+    rows = readRelated(db, table);
+    perDb.set(table, rows);
+    rows.catch(() => perDb!.delete(table));
+  }
+  return rows;
+}
+
+/** Puts the related row of `row[key]` on `row[as]`, the shape an embedded select gave. */
+async function embed(db: AdminContext['db'], rows: any[], key: string, as: string, table: RelatedTable) {
+  const map = rows.some(row => row[key]) ? await related(db, table) : new Map<string, any>();
+  rows.forEach(row => { row[as] = map.get(String(row[key])) || null; });
+}
+
 export async function loadResource(context: AdminContext, resource: ResourceKey, lookups?: Lookups): Promise<AdminRow[]> {
   const { db } = context;
   const label = labelMaps(lookups);
   if (resource === 'jobs' || resource === 'pending_jobs') {
-    const { data, error } = await db.from('jobs').select('id,title,type,mode,location,deadline,summary,department,duties,requirements,skills,preferred_skills,faculty_ids,major_ids,experience_level,salary_min,salary_max,currency,salary_visible,positions,application_method,application_url,rejection_reason,changes_requested,status,company_id,created_at,companies(name)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('jobs').select('id,title,type,mode,location,deadline,summary,department,duties,requirements,skills,preferred_skills,faculty_ids,major_ids,experience_level,salary_min,salary_max,currency,salary_visible,positions,application_method,application_url,rejection_reason,changes_requested,status,company_id,created_at').order('created_at', { ascending: false });
     if (error) throw error;
+    await embed(db, data || [], 'company_id', 'companies', 'companies');
     const rows = resource === 'pending_jobs' ? (data || []).filter((row: any) => ['pending', 'pending_approval', 'changes_requested'].includes(row.status)) : (data || []);
     return rows.map((row: any) => ({
       id: row.id, title: row.title, subtitle: `${row.companies?.name || 'Şirkət'} · ${jobTypeLabel[row.type] || row.type || 'Elan'}`,
@@ -145,8 +191,9 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'benefits') {
-    const { data, error } = await db.from('benefits').select('id,title,description,discount_label,valid_from,valid_to,active,created_at,partner_id,benefit_partners(name,logo_url)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('benefits').select('id,title,description,discount_label,valid_from,valid_to,active,created_at,partner_id').order('created_at', { ascending: false });
     if (error) throw error;
+    await embed(db, data || [], 'partner_id', 'benefit_partners', 'benefit_partners');
     return (data || []).map((row: any) => ({
       id: row.id, title: row.title, subtitle: row.benefit_partners?.name || 'Tərəfdaş', status: row.active ? 'Aktiv' : 'Bitib',
       avatar: logoOf(row.benefit_partners?.logo_url), avatarKind: 'logo' as const,
@@ -155,8 +202,9 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'applications') {
-    const { data, error } = await db.from('applications').select('id,status,note,created_at,profiles!applications_student_id_fkey(full_name,avatar_path),jobs(title)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('applications').select('id,status,note,created_at,student_id,job_id').order('created_at', { ascending: false });
     if (error) throw error;
+    await Promise.all([embed(db, data || [], 'student_id', 'profiles', 'profiles'), embed(db, data || [], 'job_id', 'jobs', 'jobs')]);
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     return (data || []).map((row: any) => ({
       id: row.id, title: row.profiles?.full_name || 'Tələbə', subtitle: row.jobs?.title || 'Vakansiya', status: applicationStatus(row.status),
@@ -191,14 +239,16 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'network') {
-    const { data, error } = await db.from('posts').select('id,body,kind,tags,moderation_status,created_at,profiles!posts_author_id_fkey(full_name,avatar_path)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('posts').select('id,body,kind,tags,moderation_status,created_at,author_id').order('created_at', { ascending: false });
     if (error) throw error;
+    await embed(db, data || [], 'author_id', 'profiles', 'profiles');
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'İstifadəçi', subtitle: row.body, avatar: photo(pics, row.profiles?.avatar_path), avatarKind: 'photo' as const, status: row.moderation_status === 'visible' ? 'Aktiv' : row.moderation_status === 'hidden' ? 'Bitib' : 'Yoxlamada', meta: `${row.kind || 'general'} · ${(row.tags || []).map((x: string) => `#${x}`).join(' ')}`, updatedAt: dateLabel(row.created_at), fields: { moderation_status: row.moderation_status, kind: row.kind } }));
   }
   if (resource === 'mentor_requests') {
-    const { data, error } = await db.from('mentor_requests').select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at,profiles(full_name,email,avatar_path)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('mentor_requests').select('id,student_id,category,topic,details,format,preferred_time,status,mentor_name,admin_note,created_at,updated_at').order('created_at', { ascending: false });
     if (error) throw error;
+    await embed(db, data || [], 'student_id', 'profiles', 'profiles');
     const pics = await signAvatars(context, (data || []).map((row: any) => row.profiles?.avatar_path));
     const states: Record<string, Status> = { pending: 'Yoxlamada', in_review: 'Yoxlamada', matched: 'Aktiv', completed: 'Bitib', cancelled: 'Bitib' };
     return (data || []).map((row: any) => ({
@@ -209,13 +259,15 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     }));
   }
   if (resource === 'reports') {
-    const { data, error } = await db.from('reports').select('id,target_type,target_id,reason,details,status,created_at,profiles!reports_reporter_id_fkey(full_name)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('reports').select('id,target_type,target_id,reason,details,status,created_at,reporter_id').order('created_at', { ascending: false });
     if (error) throw error;
+    await embed(db, data || [], 'reporter_id', 'profiles', 'profiles');
     return (data || []).map((row: any) => ({ id: row.id, title: row.reason, subtitle: `${row.target_type} · ${row.profiles?.full_name || 'İstifadəçi'}`, status: row.status === 'resolved' || row.status === 'dismissed' ? 'Bitib' : row.status === 'reviewing' ? 'Yoxlamada' : 'Aktiv', meta: row.details || String(row.target_id), updatedAt: dateLabel(row.created_at), fields: { status: row.status } }));
   }
   if (resource === 'subscriptions') {
-    const { data, error } = await db.from('subscriptions').select('id,plan_id,status,requested_at,starts_at,ends_at,companies(name),plans!subscriptions_plan_id_fkey(name,monthly_price)').order('requested_at', { ascending: false });
+    const { data, error } = await db.from('subscriptions').select('id,plan_id,status,requested_at,starts_at,ends_at,company_id').order('requested_at', { ascending: false });
     if (error) throw error;
+    await Promise.all([embed(db, data || [], 'company_id', 'companies', 'companies'), embed(db, data || [], 'plan_id', 'plans', 'plans')]);
     return (data || []).map((row: any) => ({ id: row.id, title: row.companies?.name || 'Şirkət', subtitle: `${row.plans?.name || row.plan_id} · ${row.plans?.monthly_price ?? 0} AZN/ay`, status: row.status === 'active' ? 'Aktiv' : row.status === 'pending' ? 'Yoxlamada' : 'Bitib', meta: row.ends_at ? `Bitmə: ${dateLabel(row.ends_at)}` : 'Aylıq paket', updatedAt: dateLabel(row.requested_at), fields: { plan_id: row.plan_id, status: row.status } }));
   }
   if (resource === 'plans') {
@@ -239,28 +291,33 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     } }));
   }
   if (resource === 'payments') {
-    const { data, error } = await db.from('payments').select('id,amount,currency,status,provider,provider_reference,created_at,paid_at,companies(name)').order('created_at', { ascending: false });
+    const { data, error } = await db.from('payments').select('id,amount,currency,status,provider,provider_reference,created_at,paid_at,company_id').order('created_at', { ascending: false });
     if (error) throw error;
+    await embed(db, data || [], 'company_id', 'companies', 'companies');
     return (data || []).map((row: any) => ({ id: row.id, title: row.companies?.name || 'Şirkət', subtitle: `${row.amount} ${row.currency} · ${row.provider}`, status: row.status === 'paid' ? 'Aktiv' : row.status === 'pending' ? 'Yoxlamada' : 'Bitib', meta: row.provider_reference || 'Manual qeyd', updatedAt: dateLabel(row.paid_at || row.created_at), fields: { status: row.status } }));
   }
   if (resource === 'moderation_logs') {
-    const { data, error } = await db.from('moderation_logs').select('id,target_type,target_id,action,reason,created_at,profiles(full_name)').order('created_at', { ascending: false }).limit(250);
+    const { data, error } = await db.from('moderation_logs').select('id,target_type,target_id,action,reason,created_at,actor_id').order('created_at', { ascending: false }).limit(250);
     if (error) throw error;
+    await embed(db, data || [], 'actor_id', 'profiles', 'profiles');
     return (data || []).map((row: any) => ({ id: row.id, title: row.action, subtitle: `${row.target_type} · ${row.profiles?.full_name || 'Admin'}`, status: 'Aktiv', meta: row.reason || String(row.target_id), updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'notifications') {
-    const { data, error } = await db.from('notifications').select('id,kind,title,body,read_at,created_at,profiles(full_name)').order('created_at', { ascending: false }).limit(250);
+    const { data, error } = await db.from('notifications').select('id,kind,title,body,read_at,created_at,profile_id').order('created_at', { ascending: false }).limit(250);
     if (error) throw error;
+    await embed(db, data || [], 'profile_id', 'profiles', 'profiles');
     return (data || []).map((row: any) => ({ id: row.id, title: row.title, subtitle: `${row.profiles?.full_name || 'İstifadəçi'} · ${row.kind}`, status: row.read_at ? 'Bitib' : 'Aktiv', meta: row.body || 'Bildiriş', updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'cv_analytics') {
-    const { data, error } = await db.from('cv_documents').select('id,title,language,template_id,ats_score,updated_at,profiles(full_name)').order('updated_at', { ascending: false }).limit(200);
+    const { data, error } = await db.from('cv_documents').select('id,title,language,template_id,ats_score,updated_at,profile_id').order('updated_at', { ascending: false }).limit(200);
     if (error) throw error;
+    await embed(db, data || [], 'profile_id', 'profiles', 'profiles');
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || row.title, subtitle: `${row.title} · ${row.language?.toUpperCase() || 'AZ'}`, status: row.ats_score >= 70 ? 'Aktiv' : 'Yoxlamada', meta: `ATS: ${row.ats_score ?? '—'} · ${row.template_id || 'şablonsuz'}`, updatedAt: dateLabel(row.updated_at) }));
   }
   if (resource === 'interview_analytics') {
-    const { data, error } = await db.from('interview_sessions').select('id,target_role,interview_type,major,score,created_at,completed_at,profiles(full_name)').order('created_at', { ascending: false }).limit(200);
+    const { data, error } = await db.from('interview_sessions').select('id,target_role,interview_type,major,score,created_at,completed_at,profile_id').order('created_at', { ascending: false }).limit(200);
     if (error) throw error;
+    await embed(db, data || [], 'profile_id', 'profiles', 'profiles');
     return (data || []).map((row: any) => ({ id: row.id, title: row.profiles?.full_name || 'Namizəd', subtitle: `${row.target_role} · ${row.interview_type}`, status: row.completed_at ? 'Aktiv' : 'Yoxlamada', meta: `${row.major || 'İxtisas yoxdur'} · bal ${row.score ?? '—'}`, updatedAt: dateLabel(row.created_at) }));
   }
   if (resource === 'ai_usage') {

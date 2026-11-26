@@ -60,9 +60,15 @@
         if(Auth.currentUser()?.role==='company') {
           const ids=[...new Set(latestApplications.map(a=>a.student_id).filter(Boolean))];
           if(ids.length) {
-            const profiles=await Backend.sb.from('profiles').select('id,full_name').in('id',ids.slice(0,200));
-            if(profiles.error)throw profiles.error;
-            (profiles.data||[]).forEach(profile=>{names[String(profile.id)]=profile.full_name||'Namizəd';});
+            /* The university WAF answers 403 to `id=in.(…)`, so the visible
+               profiles are read page by page until every name is found. */
+            const wanted=new Set(ids.slice(0,200).map(String));
+            for(let from=0;from<20000&&Object.keys(names).length<wanted.size;from+=1000) {
+              const profiles=await Backend.sb.from('profiles').select('id,full_name').order('id').range(from,from+999);
+              if(profiles.error)throw profiles.error;
+              (profiles.data||[]).forEach(profile=>{if(wanted.has(String(profile.id)))names[String(profile.id)]=profile.full_name||'Namizəd';});
+              if((profiles.data||[]).length<1000)break;
+            }
           }
         }
         if(!window.CareerSession.matches(scope))return;

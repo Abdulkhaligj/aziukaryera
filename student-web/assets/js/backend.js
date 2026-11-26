@@ -407,7 +407,10 @@ const Backend = {
     if (!session) return { ok: false, error: 'Sessiya yoxdur.' };
     const uid = session.user.id;
 
-    const [fac, maj, profile, education, candidates, companies, jobs, apps, saved, invites, events, regs, subscription, notifications, broadcasts, broadcastReads] = await Promise.all([
+    /* The university WAF answers 403 to embedded selects such as
+       `plans!subscriptions_plan_id_fkey(*)`, so the plan is read on its own
+       and joined below (2026-11-26). */
+    const [fac, maj, profile, education, candidates, companies, jobs, apps, saved, invites, events, regs, subscription, plans, notifications, broadcasts, broadcastReads] = await Promise.all([
       this.sb.from('faculties').select('*').order('sort_order'),
       this.sb.from('majors').select('*'),
       this.sb.from('profiles').select('*').eq('id', uid).single(),
@@ -420,7 +423,8 @@ const Backend = {
       this.sb.from('invites').select('*'),
       this.sb.from('events').select('*').order('starts_at'),
       this.sb.from('event_registrations').select('event_id'),
-      this.sb.from('subscriptions').select('*, plans:plans!subscriptions_plan_id_fkey(*)').maybeSingle(),
+      this.sb.from('subscriptions').select('*').maybeSingle(),
+      this.sb.from('plans').select('*'),
       this.sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(100),
       this.sb.from('broadcast_notifications').select('*').order('created_at', { ascending: false }).limit(100),
       this.sb.from('broadcast_notification_reads').select('broadcast_id,read_at')
@@ -446,7 +450,8 @@ const Backend = {
       invites: invites.data,
       events: events.data,
       eventRegistrations: regs.data.map(r => r.event_id),
-      subscription: subscription.error ? null : subscription.data,
+      subscription: subscription.error || !subscription.data ? null
+        : { ...subscription.data, plans: (plans.data || []).find(plan => String(plan.id) === String(subscription.data.plan_id)) || null },
       notifications: notifications.data || [],
       broadcasts: broadcasts.data || [],
       broadcastReads: broadcastReads.data || []
