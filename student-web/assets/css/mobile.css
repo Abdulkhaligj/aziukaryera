@@ -56,3 +56,11 @@ html:has(.modal-back:not([hidden])), html:has(.modal-back:not([hidden])) body { 
   .skillpick button { min-height: 36px; }
   .notification-bell, .topbar-home { min-width: 44px; min-height: 44px; }
 }
+
+/* 8. Translated labels are longer than the Azerbaijani ones. Full-width
+      buttons wrap instead of staying on one line, and the sign-in form's
+      grid column no longer grows to the widest button (in Russian the
+      "send a sign-in link" button made the form 487px on a 375px phone). */
+.auth-form, .auth-form-head { grid-template-columns: minmax(0, 1fr); }
+.btn.block { white-space: normal; text-align: center; }
+.btn.block > span { min-width: 0; }
