@@ -433,13 +433,13 @@ const Store = {
       if (!window.CareerSession.matches(scope)) return;
       if (res && res.ok === false) {
         if (rollback) rollback();
-        if (typeof toast === 'function') toast(res.error || 'Əməliyyat alınmadı');
+        if (typeof toast === 'function') toast(res.error || 'Əməliyyat alınmadı', 'bad');
         if (typeof render === 'function') render();
       }
     }).catch(e => {
       if (!window.CareerSession.matches(scope)) return;
       if (rollback) rollback();
-      if (typeof toast === 'function') toast('Şəbəkə xətası — dəyişiklik saxlanmadı');
+      if (typeof toast === 'function') toast('Şəbəkə xətası — dəyişiklik saxlanmadı', 'bad');
       if (typeof render === 'function') render();
     });
   },

@@ -335,6 +335,7 @@ function jobCard(job, report, opts = {}) {
       <button class="btn sm" data-act="job-detail" data-id="${esc(job.id)}">Ətraflı</button>
       ${applied
         ? `<span class="chip good">✓ Müraciət edilib</span>`
+        : dl < 0 ? '<span class="chip line">Müddəti bitib</span>'
         : `<button class="btn sm primary" data-act="apply" data-id="${esc(job.id)}">Müraciət et</button>`}
       <div class="spacer"></div>
       <button class="btn sm ghost" data-act="save" data-id="${esc(job.id)}">${savedOn ? '★ Seçilmişlərdə' : '☆ Yadda saxla'}</button>
@@ -367,8 +368,6 @@ function viewStudentDashboard() {
   const soon = jobs.filter(j => daysLeft(j.deadline) >= 0 && daysLeft(j.deadline) <= 21 && j.status !== 'pending')
     .sort((a, b) => a.deadline.localeCompare(b.deadline)).slice(0, 4);
 
-  const best = ranked[0] ? ranked[0].report.score : 0;
-
   return `
   <div class="welcome">
     <div class="welcome-text">
@@ -376,12 +375,6 @@ function viewStudentDashboard() {
       <h2>Salam, ${esc(s.name.split(' ')[0])}</h2>
       <p>${s.faculty ? `${esc(s.major)} · ${esc(s.course)}. kurs · ${esc(s.faculty)}`
                      : 'Fakültənizi seçin ki, uyğunluq hesablana bilsin.'}</p>
-      <div class="welcome-stats">
-        <div><b>${best}%</b><span>ən yüksək uyğunluq</span></div>
-        <div><b>${ranked.filter(r => r.report.score >= 65).length}</b><span>güclü imkan</span></div>
-        <div><b>${apps.length}</b><span>müraciət</span></div>
-        <div><b>${comp.percent}%</b><span>profil tamlığı</span></div>
-      </div>
     </div>
     ${mascot('celebrate', { eager: true })}
   </div>
@@ -466,12 +459,12 @@ function viewStudentDashboard() {
       <div class="card">
         <div class="eyebrow">Yaxınlaşan son tarixlər</div>
         <div class="stack tight" style="margin-top:10px">
-          ${soon.map(j => {
+          ${soon.length ? soon.map(j => {
             const d = daysLeft(j.deadline);
             return `<div class="row tight" style="justify-content:space-between;font-size:12.5px">
               <span style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</span>
               <span class="chip ${d <= 7 ? 'bad' : 'line'} mono">${d} gün</span></div>`;
-          }).join('')}
+          }).join('') : '<span style="color:var(--muted);font-size:12.5px">Növbəti 3 həftədə son tarixi bitən elan yoxdur.</span>'}
         </div>
       </div>
     </div>
@@ -1117,8 +1110,9 @@ function cvCompare() {
             : '<span style="color:var(--muted);font-size:12.5px">Yoxdur.</span>'}
         </div>
       </div>
-      ${!Store.isApplied(job.id) ? `<button class="btn primary block" data-act="apply" data-id="${esc(job.id)}">Bu vakansiyaya müraciət et</button>`
-        : '<div class="note good"><span class="m">✓</span><span>Bu vakansiyaya müraciət etmisiniz.</span></div>'}
+      ${Store.isApplied(job.id) ? '<div class="note good"><span class="m">✓</span><span>Bu vakansiyaya müraciət etmisiniz.</span></div>'
+        : daysLeft(job.deadline) < 0 ? '<div class="note warn"><span class="m">!</span><span>Bu elanın müraciət müddəti bitib.</span></div>'
+        : `<button class="btn primary block" data-act="apply" data-id="${esc(job.id)}">Bu vakansiyaya müraciət et</button>`}
     </div>
   </div>`;
 }
@@ -1704,12 +1698,12 @@ function viewCompanyDashboard() {
   </div>
 
   <div class="tiles">
-    <div class="tile"><span class="k">Aktiv elanlar</span><span class="v">${jobs.filter(j => j.status === 'approved').length}</span>
+    <div class="tile"><span class="k">Aktiv elanlar</span><span class="v">${jobs.filter(j => j.status === 'approved' && daysLeft(j.deadline) >= 0).length}</span>
       <span class="s">${jobs.filter(j => j.status === 'pending').length} təsdiq gözləyir</span></div>
     <div class="tile accent"><span class="k">Ən yüksək namizəd uyğunluğu</span>
       <span class="v">${best.length ? Math.max(...best.map(b => b.top.report.score)) + '%' : '—'}</span>
       <span class="s">${pool.length} tələbə bazasından</span></div>
-    <div class="tile"><span class="k">Orta uyğunluq</span><span class="v">${avg}%</span>
+    <div class="tile"><span class="k">Orta uyğunluq</span><span class="v">${best.length ? avg + '%' : '—'}</span>
       <span class="s">elan üzrə ən yaxşı namizəd</span></div>
     <div class="tile"><span class="k">Müraciətlər</span><span class="v">${myApps.length}</span>
       <span class="s">${ownInvites().length} dəvət göndərilib</span></div>
@@ -1763,7 +1757,9 @@ function viewVacancies() {
         <td style="max-width:240px;font-size:12px;color:var(--muted)">${esc(j.faculties.length > 2 ? j.faculties.length + ' fakültə' : j.faculties.join(', '))}</td>
         <td class="num">${strong}</td>
         <td class="num">${fmtDate(j.deadline)}</td>
-        <td>${j.status === 'pending' ? '<span class="chip warn">Təsdiq gözləyir</span>' : '<span class="chip good">Dərc olunub</span>'}</td>
+        <td>${j.status === 'pending' ? '<span class="chip warn">Təsdiq gözləyir</span>'
+          : daysLeft(j.deadline) < 0 ? '<span class="chip line">Müddəti bitib</span>'
+          : '<span class="chip good">Dərc olunub</span>'}</td>
         <td><button class="btn sm" data-act="cand-job" data-id="${esc(j.id)}">Namizədlər</button></td>
       </tr>`;
     }).join('')}</tbody></table></div>`
@@ -3128,10 +3124,13 @@ function render() {
  * Hadisələr
  * ================================================================ */
 let toastTimer;
-function toast(msg) {
+/* tone 'bad' marks an error: it used to show the same green ✓ as a success. */
+function toast(msg, tone = 'good') {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.innerHTML = `<span>✓</span><span>${esc(msg)}</span>`;
+  t.dataset.tone = tone === 'bad' ? 'bad' : 'good';
+  t.setAttribute('role', tone === 'bad' ? 'alert' : 'status');
+  t.innerHTML = `<span aria-hidden="true">${tone === 'bad' ? '!' : '✓'}</span><span>${esc(msg)}</span>`;
   t.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
@@ -3211,6 +3210,7 @@ function jobDetailModal(id) {
 
     <div class="row">
       ${Store.isApplied(job.id) ? '<span class="chip good">✓ Müraciət edilib</span>'
+        : daysLeft(job.deadline) < 0 ? '<span class="chip line">Müddəti bitib</span>'
         : `<button class="btn primary" data-act="apply" data-id="${esc(job.id)}">Müraciət et</button>`}
       <button class="btn" data-act="close-modal">Bağla</button>
     </div>`);
@@ -3219,6 +3219,7 @@ function jobDetailModal(id) {
 function applyModal(id) {
   const job = Store.jobById(id);
   if (!job) return;
+  if (daysLeft(job.deadline) < 0) { toast('Bu elanın müraciət müddəti bitib.', 'bad'); return; }
   const s = Store.state.student;
   const c = companyOf(job.companyId);
   const r = matchReport(job, s);
@@ -3297,7 +3298,7 @@ document.addEventListener('click', e => {
       items.forEach(item => { if (!item.readAt) item.readAt = now; });
       rerender();
       if (Store.mode === 'remote') Backend.markAllNotificationsRead(unreadItems).then(result => { if (result?.stale) return;
-        if (!result.ok) { toast(result.error || 'Bildirişlər yenilənmədi'); refreshNotifications(false); }
+        if (!result.ok) { toast(result.error || 'Bildirişlər yenilənmədi', 'bad'); refreshNotifications(false); }
       });
       break;
     }
@@ -3324,7 +3325,7 @@ document.addEventListener('click', e => {
       };
       UI.postDraft = ''; UI.postLink = ''; UI.postKind = 'general';
       Backend.createPost(post).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Paylaşım alınmadı'); return; }
+        if (!res.ok) { toast(res.error || 'Paylaşım alınmadı', 'bad'); return; }
         toast('Paylaşıldı'); loadFeed();
       });
       rerender();
@@ -3334,7 +3335,7 @@ document.addEventListener('click', e => {
       if (UI.feed) UI.feed = UI.feed.filter(p => p.id !== t.dataset.id);
       rerender();
       Backend.deletePost(t.dataset.id).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Silinmədi'); loadFeed(); } else toast('Paylaşım silindi');
+        if (!res.ok) { toast(res.error || 'Silinmədi', 'bad'); loadFeed(); } else toast('Paylaşım silindi');
       });
       break;
     case 'post-like': {
@@ -3349,14 +3350,14 @@ document.addEventListener('click', e => {
       const p = UI.feed && UI.feed.find(x => x.id === t.dataset.id);
       if (p) { p.savedByMe = on; rerender(); }
       Backend.togglePostSave(t.dataset.id, on).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Saxlanılmadı'); loadFeed(); }
+        if (!res.ok) { toast(res.error || 'Saxlanılmadı', 'bad'); loadFeed(); }
         else toast(on ? 'Paylaşım saxlanıldı' : 'Saxlanılanlardan çıxarıldı');
       });
       break;
     }
     case 'post-report':
       Backend.reportPost(t.dataset.id, 'Uyğunsuz və ya yanlış məzmun').then(res => { if (res?.stale) return;
-        toast(res.ok ? 'Şikayət moderasiyaya göndərildi' : (res.error || 'Şikayət göndərilmədi'));
+        toast(res.ok ? 'Şikayət moderasiyaya göndərildi' : (res.error || 'Şikayət göndərilmədi'), res.ok ? 'good' : 'bad');
       });
       break;
     case 'post-comments':
@@ -3368,7 +3369,7 @@ document.addEventListener('click', e => {
       if (!body) break;
       el.value = '';
       Backend.addComment(t.dataset.id, body).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Şərh əlavə olunmadı'); return; }
+        if (!res.ok) { toast(res.error || 'Şərh əlavə olunmadı', 'bad'); return; }
         loadFeed();
       });
       break;
@@ -3378,7 +3379,7 @@ document.addEventListener('click', e => {
     case 'benefit-cat': UI.benefitCat = t.dataset.cat; rerender(); break;
     case 'benefit-claim':
       Backend.claimBenefit(t.dataset.id).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Güzəşt alınmadı'); return; }
+        if (!res.ok) { toast(res.error || 'Güzəşt alınmadı', 'bad'); return; }
         toast('Güzəşt kodunuz hazırdır'); loadBenefits();
       });
       break;
@@ -3388,9 +3389,9 @@ document.addEventListener('click', e => {
     case 'redeem-go': {
       const el = document.getElementById('redeem-code');
       const code = el ? el.value.trim() : '';
-      if (!code) { toast('Kodu daxil edin'); break; }
+      if (!code) { toast('Kodu daxil edin', 'bad'); break; }
       Backend.redeemCode(code).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Yoxlama alınmadı'); return; }
+        if (!res.ok) { toast(res.error || 'Yoxlama alınmadı', 'bad'); return; }
         UI.redeemResult = res.row;
         rerender();
       });
@@ -3405,7 +3406,7 @@ document.addEventListener('click', e => {
       void (async () => {
         try {
           const result = await Auth.logout();
-          if (!result?.ok) { toast(result?.error || 'Çıxış tamamlanmadı. Yenidən cəhd edin.'); return; }
+          if (!result?.ok) { toast(result?.error || 'Çıxış tamamlanmadı. Yenidən cəhd edin.', 'bad'); return; }
           stopNotificationUpdates();
           clearPrivateSessionUI();
           resetAuthForm(); UI.publicView = 'landing';
@@ -3490,7 +3491,7 @@ document.addEventListener('click', e => {
     case 'resend-confirm': {
       captureAuthForm();
       const em = UI.auth.email;
-      if (!em) { toast('Əvvəlcə e-poçt ünvanınızı yazın'); break; }
+      if (!em) { toast('Əvvəlcə e-poçt ünvanınızı yazın', 'bad'); break; }
       Backend.resendConfirmation(em).then(res => { if (res?.stale) return;
         if (res.ok) { UI.auth.notice = `Təsdiq linki ${em} ünvanına yenidən göndərildi.`; UI.auth.error = ''; }
         else { UI.auth.error = res.error; UI.auth.notice = ''; }
@@ -3509,9 +3510,9 @@ document.addEventListener('click', e => {
       break;
     case 'reset-password': {
       const email = (document.getElementById('reset-email') || {}).value || '';
-      if (!email) { toast('E-poçt ünvanını yazın'); break; }
+      if (!email) { toast('E-poçt ünvanını yazın', 'bad'); break; }
       Backend.resetPassword(email).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Link göndərilmədi'); return; }
+        if (!res.ok) { toast(res.error || 'Link göndərilmədi', 'bad'); return; }
         closeModal(); toast('Şifrə yeniləmə linki göndərildi');
       });
       break;
@@ -3554,7 +3555,7 @@ document.addEventListener('click', e => {
           UI.aiJobResults[String(job.id)] = res.result;
           toast('AI uyğunluq izahı hazırdır');
         } else {
-          toast('AI xidməti əlçatan deyil — şəffaf 40/40/20 hesabatı göstərilir');
+          toast('AI xidməti əlçatan deyil — şəffaf 40/40/20 hesabatı göstərilir', 'bad');
         }
         jobDetailModal(job.id);
       });
@@ -3595,7 +3596,7 @@ document.addEventListener('click', e => {
         startYear: Number(g('edu-start')) || null, graduationYear: Number(g('edu-grad')) || null,
         isCurrent: !!document.getElementById('edu-current')?.checked, verified: false
       };
-      if (!entry.university || !entry.specialty) { toast('Universitet və ixtisası yazın'); break; }
+      if (!entry.university || !entry.specialty) { toast('Universitet və ixtisası yazın', 'bad'); break; }
       const finish = row => {
         if (row?.id) entry.id = row.id;
         S.student.education = [...(S.student.education || []), entry];
@@ -3607,7 +3608,7 @@ document.addEventListener('click', e => {
           specialty: entry.specialty, specialization: entry.specialization,
           group_name: entry.group, start_year: entry.startYear, graduation_year: entry.graduationYear,
           is_current: entry.isCurrent
-        }).then(res => res.ok ? finish(res.row) : toast(res.error || 'Təhsil əlavə edilmədi'));
+        }).then(res => res.ok ? finish(res.row) : toast(res.error || 'Təhsil əlavə edilmədi', 'bad'));
       } else finish();
       break;
     }
@@ -3616,7 +3617,7 @@ document.addEventListener('click', e => {
         S.student.education = (S.student.education || []).filter(e => String(e.id) !== String(t.dataset.id));
         Store.save(); rerender(); toast('Təhsil qeydi silindi');
       };
-      if (Store.mode === 'remote') Backend.deleteEducation(t.dataset.id).then(res => res.ok ? remove() : toast(res.error));
+      if (Store.mode === 'remote') Backend.deleteEducation(t.dataset.id).then(res => res.ok ? remove() : toast(res.error, 'bad'));
       else remove();
       break;
     }
@@ -3640,12 +3641,12 @@ document.addEventListener('click', e => {
       toast('Profil məlumatları yükləndi'); break;
     case 'cv-ai-analyze': {
       const text = UI.cvText || cvToText(buildCVFromProfile(S.student));
-      if (text.trim().length < 80) { toast('AI analizi üçün CV mətnini tamamlayın'); break; }
+      if (text.trim().length < 80) { toast('AI analizi üçün CV mətnini tamamlayın', 'bad'); break; }
       UI.aiBusy = true; UI.aiCvResult = null; rerender();
       CareerAI.cvAnalyze(text, UI.compareJob ? Store.jobById(UI.compareJob) : null).then(res => { if (res?.stale) return;
         if (!sameSession()) return;
         UI.aiBusy = false;
-        if (!res.ok) { toast(res.error || 'AI xidməti müvəqqəti əlçatan deyil'); rerender(); return; }
+        if (!res.ok) { toast(res.error || 'AI xidməti müvəqqəti əlçatan deyil', 'bad'); rerender(); return; }
         UI.aiCvResult = res.result;
         if (Store.mode === 'remote') {
           const score = analyzeCV(text).score;
@@ -3659,13 +3660,13 @@ document.addEventListener('click', e => {
     }
     case 'cv-add-exp': {
       const g = id => (document.getElementById(id) || {}).value || '';
-      if (!g('x-role')) { toast('Vəzifə adını yazın'); break; }
+      if (!g('x-role')) { toast('Vəzifə adını yazın', 'bad'); break; }
       S.student.experience.push({ role: g('x-role'), org: g('x-org'), period: g('x-period'), detail: g('x-detail') });
       Store.save(); rerender(); toast('Təcrübə əlavə edildi'); break;
     }
     case 'cv-add-proj': {
       const g = id => (document.getElementById(id) || {}).value || '';
-      if (!g('x-pname')) { toast('Layihə adını yazın'); break; }
+      if (!g('x-pname')) { toast('Layihə adını yazın', 'bad'); break; }
       S.student.projects.push({ name: g('x-pname'), detail: g('x-pdetail') });
       Store.save(); rerender(); toast('Layihə əlavə edildi'); break;
     }
@@ -3735,14 +3736,14 @@ document.addEventListener('click', e => {
     /* Şirkət */
     case 'plan-select':
       Backend.selectCompanyPlan(t.dataset.plan).then(res => { if (res?.stale) return;
-        if (!res.ok) { toast(res.error || 'Paket sorğusu göndərilmədi'); return; }
+        if (!res.ok) { toast(res.error || 'Paket sorğusu göndərilmədi', 'bad'); return; }
         Store.state.subscription = { plan_id: t.dataset.plan, status: t.dataset.plan === 'free' ? 'active' : 'pending', plans: { slug: t.dataset.plan } };
         rerender(); toast(t.dataset.plan === 'free' ? 'Free paket aktivdir' : 'Paket sorğusu adminə göndərildi');
       });
       break;
     case 'v-create': {
       const g = id => (document.getElementById(id) || {}).value || '';
-      if (!g('v-title')) { toast('Vəzifə adını yazın'); break; }
+      if (!g('v-title')) { toast('Vəzifə adını yazın', 'bad'); break; }
       const majors = [...(document.getElementById('v-majors') || { selectedOptions: [] }).selectedOptions].map(o => o.value);
 
       if (Store.mode === 'remote') {
@@ -3775,7 +3776,7 @@ document.addEventListener('click', e => {
           duties: g('v-duties').split('\n').map(x => x.trim()).filter(Boolean),
           requirements: g('v-requirements').split('\n').map(x => x.trim()).filter(Boolean)
         }).then(res => { if (res?.stale) return;
-          if (!res.ok) { toast(res.error || 'Elan yaradılmadı'); return; }
+          if (!res.ok) { toast(res.error || 'Elan yaradılmadı', 'bad'); return; }
           OPPORTUNITIES.push(Adapt.job(res.row, Store.tax,
             COMPANIES.reduce((a, c) => (a[c.id] = c.name, a), {})));
           S.view = 'vacancies'; render();
@@ -3823,7 +3824,7 @@ document.addEventListener('click', e => {
       if (el && navigator.clipboard) {
         navigator.clipboard.writeText(el.textContent).then(
           () => toast('Hesabat panoya kopyalandı'),
-          () => toast('Kopyalamaq alınmadı — mətni seçib əl ilə kopyalayın')
+          () => toast('Kopyalamaq alınmadı — mətni seçib əl ilə kopyalayın', 'bad')
         );
       }
       break;
@@ -3960,7 +3961,7 @@ function loadFeed() {
   Backend.feed().then(res => { if (res?.stale) return;
     if (!window.CareerSession.matches(scope)) return;
     UI.feed = res.ok ? res.rows : [];
-    if (!res.ok && res.error) toast(res.error);
+    if (!res.ok && res.error) toast(res.error, 'bad');
     render();
   });
 }
@@ -3971,7 +3972,7 @@ function loadBenefits() {
   Backend.benefits().then(res => { if (res?.stale) return;
     if (!window.CareerSession.matches(scope)) return;
     UI.benefits = res.ok ? res : { rows: [], claims: [], partners: [] };
-    if (!res.ok && res.error) toast(res.error);
+    if (!res.ok && res.error) toast(res.error, 'bad');
     render();
   });
 }
@@ -4219,7 +4220,7 @@ document.addEventListener('input', e => {
       if (application) {
         application.statusKey = el.value;
         application.status = ({ applied:'Göndərildi',under_review:'Baxılır',shortlisted:'Qısa siyahı',interview:'Müsahibəyə dəvət',offer:'Təklif',rejected:'İmtina',hired:'İşə qəbul' })[el.value] || el.value;
-        Backend.setApplicationStatus(application.id, el.value).then(result => { if (result?.stale) return; if (!result.ok) toast(result.error || 'Mərhələ yenilənmədi'); else toast('Müraciət mərhələsi yeniləndi'); });
+        Backend.setApplicationStatus(application.id, el.value).then(result => { if (result?.stale) return; if (!result.ok) toast(result.error || 'Mərhələ yenilənmədi', 'bad'); else toast('Müraciət mərhələsi yeniləndi'); });
       }
       break;
     }

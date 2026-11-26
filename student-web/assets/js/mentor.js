@@ -107,9 +107,9 @@ var MentorUI = {
     const p={category:String(v.category||''),topic:String(v.topic||'').trim(),details:String(v.details||'').trim(),
       format:String(v.format||'either'),preferred_time:String(v.preferred_time||'').trim()};
     if(!this.types.some(x=>x[0]===p.category)||p.topic.length<5||p.topic.length>140||p.details.length<15||p.details.length>1800||p.preferred_time.length>180){
-      toast('Müraciət məlumatlarını yoxla.');return;
+      toast('Müraciət məlumatlarını yoxla.', 'bad');return;
     }
-    if(Store.mode!=='remote'||!Backend.sb){toast('Serverə qoşulma tələb olunur.');return;}
+    if(Store.mode!=='remote'||!Backend.sb){toast('Serverə qoşulma tələb olunur.', 'bad');return;}
     this.busy=true;form.querySelector('[type="submit"]').disabled=true;
     try{
       const {data:{user},error:authError}=await Backend.sb.auth.getUser();
@@ -119,7 +119,7 @@ var MentorUI = {
       if(error)throw Error(error.message);
       if(!window.CareerSession.matches(scope))return;
       this.rows.unshift(data);this.error='';toast('Mentor müraciətin göndərildi.');render();
-    }catch(e){if(window.CareerSession.matches(scope))toast('Müraciət alınmadı: '+(e.message||'Xəta'));}
+    }catch(e){if(window.CareerSession.matches(scope))toast('Müraciət alınmadı: '+(e.message||'Xəta'), 'bad');}
     finally{if(window.CareerSession.matches(scope)){this.busy=false;const b=document.querySelector('#mentor-request-form [type="submit"]');if(b)b.disabled=false;}}
   },
   async save(id){
@@ -127,8 +127,8 @@ var MentorUI = {
     const scope=window.CareerSession.capture();if(!scope)return;
     const el=k=>document.getElementById('mentor-'+k+'-'+id);
     const status=el('status')?.value,mentor_name=String(el('name')?.value||'').trim(),admin_note=String(el('note')?.value||'').trim();
-    if(!this.statuses[status]||mentor_name.length>120||admin_note.length>1200){toast('Məlumatlar düzgün deyil.');return;}
-    if(status==='matched'&&!mentor_name){toast('Mentor təyin edilib statusu üçün mentor adı lazımdır.');return;}
+    if(!this.statuses[status]||mentor_name.length>120||admin_note.length>1200){toast('Məlumatlar düzgün deyil.', 'bad');return;}
+    if(status==='matched'&&!mentor_name){toast('Mentor təyin edilib statusu üçün mentor adı lazımdır.', 'bad');return;}
     this.busy=true;
     try{
       const {data,error}=await Backend.sb.from('mentor_requests').update({status,mentor_name,admin_note,updated_at:new Date().toISOString()}).eq('id',id).select().single();
@@ -136,7 +136,7 @@ var MentorUI = {
       if(!window.CareerSession.matches(scope))return;
       const i=this.rows.findIndex(r=>r.id===id);if(i>=0)this.rows[i]=data;
       toast('Müraciət yeniləndi.');render();
-    }catch(e){if(window.CareerSession.matches(scope))toast('Yeniləmə alınmadı: '+(e.message||'Xəta'));}
+    }catch(e){if(window.CareerSession.matches(scope))toast('Yeniləmə alınmadı: '+(e.message||'Xəta'), 'bad');}
     finally{if(window.CareerSession.matches(scope))this.busy=false;}
   }
 };

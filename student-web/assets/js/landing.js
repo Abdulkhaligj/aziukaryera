@@ -250,12 +250,12 @@ const Landing = {
     <div class="lp-stage">
       <span class="lp-blob" aria-hidden="true"></span>
       ${mascot('wave', { eager: true })}
-      <div class="lp-badge one"><b>${d.jobs.length}</b><span>aktiv imkan</span></div>
+      ${d.jobs.length ? `<div class="lp-badge one"><b>${d.jobs.length}</b><span>aktiv imkan</span></div>` : ''}
       <div class="lp-badge two"><b>40/40/20</b><span>uyğunluq formulası</span></div>
     </div>
   </div></section>
 
-  <section class="lp-sec" style="padding-bottom:0"><div class="wrap">
+  ${companyLogos.length ? `<section class="lp-sec" style="padding-bottom:0"><div class="wrap">
     <div class="center" style="max-width:620px">
       <h2>Səni gözləyən şirkətlər</h2>
       <p class="lede center" style="margin-top:12px">ADNSU tələbələrinə elan verən tərəfdaşlar.</p>
@@ -263,7 +263,7 @@ const Landing = {
     <div class="lp-logos" aria-label="Tərəfdaş şirkətlərin loqoları"><div class="lp-track">
       ${logoTiles}${logoTilesCopy}
     </div></div>
-  </div></section>
+  </div></section>` : ''}
 
   <section class="lp-sec" id="lp-jobs"><div class="wrap">
     <div class="lp-sec-top">
@@ -295,7 +295,10 @@ const Landing = {
           <span style="margin-left:auto">${this.deadlinePill(j.deadline)}</span>
         </div>
       </article>`).join('')
-        : `<div class="lp-empty">${mascot('think')}<b>Bu filtrlərə uyğun elan yoxdur</b>Açar sözü qısaldın və ya şəhər filtrini sıfırlayın.</div>`}
+        : d.jobs.length
+          ? `<div class="lp-empty">${mascot('think')}<b>Bu filtrlərə uyğun elan yoxdur</b>Açar sözü qısaldın və ya şəhər filtrini sıfırlayın.</div>`
+          : `<div class="lp-empty">${mascot('think')}<b>Hazırda açıq elan yoxdur</b>Yeni elanlar Karyera Mərkəzi təsdiqlədikcə burada görünəcək. Hesab yarat — elan çıxanda uyğunluq faizini öz profilində görəcəksən.
+              <div><button class="b b-primary" data-lp="auth-register">Pulsuz hesab yarat</button></div></div>`}
     </div>
     ${jobs.length > 9 ? `<div style="margin-top:26px;text-align:center">
       <button class="b b-outline b-lg" data-lp="auth-register">Bütün ${jobs.length} elanı gör — pulsuz qeydiyyat</button>
@@ -330,7 +333,8 @@ const Landing = {
             <button class="b b-outline b-sm" data-lp="company" data-id="${esc(c.id)}">Profilə bax</button>
           </div>
         </div>
-      </article>`).join('')}
+      </article>`).join('') || `<div class="lp-empty"><b>Tərəfdaş şirkətlər tezliklə burada olacaq</b>Şirkətiniz ADNSU tələbə və məzunlarını işə götürmək istəyirsə, şirkət hesabı yaradın — profil Karyera Mərkəzi təsdiqindən sonra burada görünəcək.
+        <div><button class="b b-primary" data-lp="auth-register">Şirkət hesabı yarat</button></div></div>`}
     </div>
   </div></section>
 

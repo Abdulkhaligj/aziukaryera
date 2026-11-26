@@ -410,7 +410,7 @@ document.addEventListener('click',async e=>{
       res={ok:true};
     }
     EmployerTools.ui.busy=false;
-    if(!res.ok)toast(res.error||'Status saxlanmadı');
+    if(!res.ok)toast(res.error||'Status saxlanmadı', 'bad');
     else {toast('Müsahibə statusu yeniləndi'); await EmployerTools.load('calendar',true);}
     render();
   }
@@ -469,6 +469,6 @@ document.addEventListener('submit',async e=>{
   }catch(error){result={ok:false,error:String(error.message||error)};}
   EmployerTools.ui.busy=false;
   if(result.ok)toast(action==='interview'?'Müsahibə vaxtı təyin edildi':action==='partnership'?'Müraciət Karyera Mərkəzinə göndərildi':'Qərar saxlanıldı');
-  else toast(result.error||'Əməliyyat alınmadı');
+  else toast(result.error||'Əməliyyat alınmadı', 'bad');
   render();
 });
