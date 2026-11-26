@@ -250,7 +250,6 @@ const Landing = {
       </form>
 
       <div class="lp-cta">
-        <button class="b b-primary b-lg" data-lp="auth-register">Pulsuz başla</button>
         <button class="b b-outline b-lg" data-lp="scroll" data-to="lp-companies">Şirkətlər üçün</button>
       </div>
     </div>

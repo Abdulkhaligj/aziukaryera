@@ -8,6 +8,7 @@
  *    horizontal tab strip, so the student always sees where they are.
  * 3. Phone tables: each cell gets its column name (data-label), which
  *    mobile.css shows when a table turns into one card per row.
+ * 4. Landing logo strip: logos are sized to the same visual area.
  */
 (function () {
   'use strict';
@@ -44,6 +45,33 @@
     });
   }
 
+  /* 4. Landing logo strip: every logo gets about the same visual area, so a
+   *    wide wordmark (Kapital Bank) is lower and a square mark (bp, EY) is
+   *    taller. Equal heights made the square marks look tiny. */
+  function sizeLogo(img) {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) return;
+    const phone = innerWidth <= 520;
+    const area = phone ? 5600 : 8400;
+    const maxH = phone ? 66 : 82, maxW = phone ? 200 : 260;
+    const ratio = w / h;
+    let height = Math.min(maxH, Math.sqrt(area / ratio));
+    let width = height * ratio;
+    if (width > maxW) { width = maxW; height = width / ratio; }
+    img.style.height = Math.round(height) + 'px';
+    img.style.width = Math.round(width) + 'px';
+  }
+
+  function sizeLogos() {
+    document.querySelectorAll('.lp-lgo img').forEach(img => {
+      if (img.complete) sizeLogo(img);
+      else if (!img.dataset.sizing) {
+        img.dataset.sizing = '1';
+        img.addEventListener('load', () => sizeLogo(img), { once: true });
+      }
+    });
+  }
+
   let frame = 0;
   function run(force) {
     if (frame) return;
@@ -52,6 +80,7 @@
       fitLandingHeader();
       showActiveSection();
       labelTables(force === true);
+      sizeLogos();
     });
   }
 
