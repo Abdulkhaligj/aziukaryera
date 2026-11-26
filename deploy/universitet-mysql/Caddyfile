@@ -51,6 +51,12 @@
 		reverse_proxy {$ADMIN_URL} {
 			header_up X-Forwarded-Proto https
 			header_down Location ^https://[^/]+\.vercel\.app/ /
+			# The university WAF accepts at most ~4 KB of response headers (more
+			# is a 502); Vercel's diagnostic headers are not needed here.
+			header_down -X-Vercel-Id
+			header_down -X-Vercel-Cache
+			header_down -X-Matched-Path
+			header_down -Age
 		}
 	}
 

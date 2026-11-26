@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { SESSION_MAX_MS, SESSION_STARTED, sessionCookieOptions } from '@/lib/backend/cookies';
+import { SESSION_MAX_MS, SESSION_STARTED, memoryUserStorage, sessionCookieOptions } from '@/lib/backend/cookies';
 
 // Content-Security-Policy with a fresh nonce per response (audit 2026-11-13,
 // #58): only the scripts Next.js renders with this nonce run; an injected
@@ -58,6 +58,7 @@ export async function proxy(request: NextRequest) {
   if (path !== '/login' && authCookies.length && (!Number.isFinite(started) || !started || Date.now() - started > SESSION_MAX_MS)) return endSession();
   const db = createServerClient(url, key, {
     cookieOptions: sessionCookieOptions,
+    auth: { userStorage: memoryUserStorage() },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(cookiesToSet) {
