@@ -82,7 +82,7 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 
 ### 3.4 E-poçt (SMTP)
 - **SMTP məcburidir:** e-poçt təsdiqi standart olaraq aktivdir (`ENABLE_EMAIL_AUTOCONFIRM=false`).
-- **Lazım olan məlumatlar:** host, port, istifadəçi, şifrə və göndərən ünvan (`career@asoiu.edu.az`). Bunlar API-nin `api.env` faylına yazılır.
+- **Lazım olan məlumatlar:** host, port, istifadəçi, şifrə və göndərən ünvan (`careercenter@asoiu.edu.az`). Bunlar API-nin `api.env` faylına yazılır.
 - **SMTP olmadan:** API production rejimində başlamır; `03-start.sh` bunu əvvəlcədən yoxlayıb dayanır.
 - **Microsoft (Outlook) ilə giriş:** yeni backend-də hələ yoxdur.
 
@@ -152,6 +152,6 @@ Addım-addım təlimat: [`deploy/universitet-mysql/README.md`](../deploy/univers
 - **Ehtiyat nüsxə:** lokal bazaya bərpa edildi, 92 cədvəlin sətir sayları eynidir. MySQL-ə sınaq köçürməsi uğurlu oldu: 58 cədvəl, 963 sətir, 10 istifadəçi şifrə hash-i ilə. 15 faylın hamısı yerindədir.
 
 ## 6. Əlaqə və məsul şəxslər
-- **Platforma sahibi:** ADNSU Karyera Mərkəzi (career@asoiu.edu.az).
+- **Platforma sahibi:** ADNSU Karyera Mərkəzi (careercenter@asoiu.edu.az).
 - **Hesablar:** Vercel `inspire5` və GitHub `Abdulkhaligj/aziukaryera`. Girişləri sahibi ayrıca təhvil verir.
 - **Ehtiyat nüsxə** (`db-final-backup-20261112`): layihə rəhbərindədir. Serverə köçürmə üçün ondan alınır.

@@ -422,7 +422,7 @@ const Landing = {
         <p>CV-ni təkmilləşdirmək, müsahibəyə hazırlaşmaq, təcrübə və ilk iş üçün yol xəritəsi qurmaq istəyirsən? ADNSU Karyera Mərkəzinə mentor dəstəyi üçün müraciət edə bilərsən.</p>
         <div class="lp-mentor-tags"><span>CV və LinkedIn</span><span>Müsahibə hazırlığı</span><span>Karyera planı</span><span>İş və təcrübə</span></div>
       </div>
-      <button type="button" class="b b-primary b-lg lp-mentor-button" data-lp="auth">Mentora müraciət et</button> <a class="lp-mentor-mail" href="mailto:career@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">və ya e-poçtla yaz</a>
+      <button type="button" class="b b-primary b-lg lp-mentor-button" data-lp="auth">Mentora müraciət et</button> <a class="lp-mentor-mail" href="mailto:careercenter@asoiu.edu.az?subject=ADNSU%20Mentor%20d%C9%99st%C9%99yi">və ya e-poçtla yaz</a>
     </div>
   </div></section>
 
@@ -461,7 +461,7 @@ const Landing = {
     </div>
     <div class="lp-emp-cta">
       <button class="b b-primary b-lg" data-lp="auth-register">Şirkət hesabı yarat</button>
-      <a href="mailto:career@asoiu.edu.az?subject=ADNSU%20Karyera%20-%20%C5%9Firk%C9%99t">career@asoiu.edu.az</a>
+      <a href="mailto:careercenter@asoiu.edu.az?subject=ADNSU%20Karyera%20-%20%C5%9Firk%C9%99t">careercenter@asoiu.edu.az</a>
     </div>
     ${d.companies.length ? `<h3 class="lp-subhead">Platformadakı şirkətlər</h3>
     <div class="lp-grid lp-g4">
@@ -578,7 +578,7 @@ const Landing = {
         <li><button data-lp="scroll" data-to="lp-how">Necə işləyir</button></li>
       </ul></div>
       <div class="lp-fcol"><h4>Əlaqə</h4><ul>
-        <li><a href="mailto:career@asoiu.edu.az">career@asoiu.edu.az</a></li>
+        <li><a href="mailto:careercenter@asoiu.edu.az">careercenter@asoiu.edu.az</a></li>
         <li><span>Bakı, Azadlıq pr. 20</span></li>
         <li><button data-lp="scroll" data-to="lp-faq">Suallar</button></li>
       </ul></div>
