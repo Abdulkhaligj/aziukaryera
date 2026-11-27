@@ -12,7 +12,7 @@ test('public landing keeps Awards and Mentor and a scrolling logo strip', () => 
   new Script(landing);
   assert.match(landing, /id="lp-mentor"/);
   assert.match(landing, /Mentor dəstəyi/);
-  assert.match(landing, /mailto:career@asoiu\.edu\.az\?subject=ADNSU/);
+  assert.match(landing, /mailto:careercenter@asoiu\.edu\.az\?subject=ADNSU/);
   assert.match(landing, /id="lp-awards"/);
   assert.match(landing, /from\('company_awards'\)/);
   assert.match(landing, /\.eq\('published', true\)/);
@@ -55,5 +55,5 @@ test('student and employer scripts stay loaded with previous patch versions', ()
   assert.match(index, /app\.js\?v=[0-9a-z]+/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
   assert.match(index, /aida-pow\.js\?v=20261124a/);
-  assert.match(index, /aida-widget\.js\?v=20261124a/);
+  assert.match(index, /aida-widget\.js\?v=20261127a/);
 });

@@ -171,7 +171,7 @@
     } catch (error) {
       if (!current()) return;
       const detail=String(error && error.message || '');
-      const notice=/limit|dolub/i.test(detail) ? detail : 'AIDA hazırda cavab verə bilmir. Yenidən yoxlayın və ya career@asoiu.edu.az ünvanına müraciət edin.';
+      const notice=/limit|dolub/i.test(detail) ? detail : 'AIDA hazırda cavab verə bilmir. Yenidən yoxlayın və ya careercenter@asoiu.edu.az ünvanına müraciət edin.';
       waiting.querySelector('.aida-bubble').textContent=notice;
     } finally {
       if (!current()) return;

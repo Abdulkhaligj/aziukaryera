@@ -26,7 +26,7 @@ test('dashboard/profile mentor card and landing CTA open the platform flow, emai
   const card = read('student-web/assets/js/student-profile-enhancements.js');
   const landing = read('student-web/assets/js/landing.js');
   assert.match(card, /data-act="go" data-view="mentor"/);
-  assert.match(card, /mailto:career@asoiu\.edu\.az/);
+  assert.match(card, /mailto:careercenter@asoiu\.edu\.az/);
   assert.match(landing, /lp-mentor-button" data-lp="auth">Mentora müraciət et/);
   assert.match(landing, /və ya e-poçtla yaz/);
 });

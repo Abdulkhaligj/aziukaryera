@@ -136,7 +136,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       port: intEnv(env, 'SMTP_PORT', 587, 1, 65535),
       user: env.SMTP_USER || '',
       pass: env.SMTP_PASS || '',
-      from: `${env.SMTP_SENDER_NAME || 'ADNSU Karyera Mərkəzi'} <${env.SMTP_ADMIN_EMAIL || 'career@asoiu.edu.az'}>`
+      from: `${env.SMTP_SENDER_NAME || 'ADNSU Karyera Mərkəzi'} <${env.SMTP_ADMIN_EMAIL || 'careercenter@asoiu.edu.az'}>`
     } : null,
     // fileURLToPath: a file path on every system (pathname is /C:/… on Windows: L55).
     storageDir: env.STORAGE_DIR || fileURLToPath(new URL('../storage/', import.meta.url)),

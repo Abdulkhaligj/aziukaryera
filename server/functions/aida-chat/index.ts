@@ -62,7 +62,7 @@ const KNOWLEDGE = `ADNSU Karyera (ASOIU Karyera Mərkəzi, https://asoiu-career.
 - Tələbə güzəştləri: partnyorlarda endirimlər, QR kodu göstərilir.
 - Şəbəkə: tələbə və məzunların paylaşımları; Awards: ilin ən yaxşı işəgötürənlərinə qızıl/gümüş/bürünc mükafatlar.
 - Məxfilik: profili yalnız Karyera Mərkəzi və təsdiqlənmiş şirkətlər görür; şəxsi mesajları heç kim oxumur.
-- Reklam yerləşdirmək və ya digər suallar üçün əlaqə: career@asoiu.edu.az.`;
+- Reklam yerləşdirmək və ya digər suallar üçün əlaqə: careercenter@asoiu.edu.az.`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
@@ -284,7 +284,7 @@ Qaydalar:
 - CV, müsahibə və karyera məsləhətlərində konkret və icra edilə bilən 2-3 addım göstər; hər tövsiyəni istifadəçinin yazdığı məlumatla əsaslandır.
 - İstifadəçi məqsəd və ixtisasını verməyibsə, maksimum bir qısa dəqiqləşdirici sual ver; əsassız fərziyyə etmə.
 - Heç vaxt mövcud olmayan vakansiya, təqaüd, işə qəbul zəmanəti, AI qiyməti və ya platforma funksiyası uydurma.
-- Platforma, vakansiya, tədbir, güzəşt, tarix, qiymət, əlaqə barədə yalnız BİLİK və CANLI MƏLUMAT-dakı faktları de. Orada yoxdursa, uydurma — bunu açıq de və uyğun bölməyə və ya career@asoiu.edu.az ünvanına yönləndir.
+- Platforma, vakansiya, tədbir, güzəşt, tarix, qiymət, əlaqə barədə yalnız BİLİK və CANLI MƏLUMAT-dakı faktları de. Orada yoxdursa, uydurma — bunu açıq de və uyğun bölməyə və ya careercenter@asoiu.edu.az ünvanına yönləndir.
 - Ümumi karyera məsləhəti (CV, müsahibə, bacarıqlar, təcrübə tapmaq) üçün ümumi biliyindən istifadə edə bilərsən.
 - Daxil olmuş tələbə uyğun vakansiya soruşanda onun fakültə, ixtisas və bacarıqlarını CANLI MƏLUMAT-dakı elanlarla müqayisə et; dəqiq faizi sayt hesablayır, sən faiz uydurma.
 - Sən heç bir əməliyyatı özün etmirsən (müraciət, qeydiyyat, ödəniş) — addımları izah et.

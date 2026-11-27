@@ -23,7 +23,7 @@ test('public landing omits employer pricing without removing vacancy or events r
   assert.doesNotMatch(landing, /class="plan-grid"/);
   assert.match(landing, /id="lp-events"/);
   assert.match(landing, /id="lp-jobs"/);
-  assert.match(index, /landing\.js\?v=20261126f/);
+  assert.match(index, /landing\.js\?v=20261127a/);
   assert.match(index, /company-package-hold\.js\?v=20261028c/);
   assert.match(hold, /\.field:has\(\[data-act="auth-plan"\]\)/);
 });
@@ -76,7 +76,7 @@ test('AIDA chat and polished icons load on all public/authenticated screens', ()
   // Compile real browser scripts so that malformed quotes do not reach production.
   new Script(chat);
   new Script(icons);
-  assert.match(index, /aida-widget\.js\?v=20261124a/);
+  assert.match(index, /aida-widget\.js\?v=20261127a/);
   assert.match(index, /ui-icons\.js\?v=20261028a/);
   assert.match(index, /ux-polish\.css\?v=20261028d/);
   assert.match(chat, /functions\.invoke\('aida-chat'/);
