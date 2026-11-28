@@ -61,6 +61,23 @@ function companyLogoPath(name) {
   return COMPANY_LOGOS[key] ? `${COMPANY_LOGOS[key]}?v=${COMPANY_LOGOS_VERSION}` : '';
 }
 
+/* The size of each file in assets/logos (update with the files). The landing
+   logo strip lays every logo out before the picture has loaded, so the
+   strip keeps one width and its animation never jumps. */
+const COMPANY_LOGO_SIZES = Object.freeze({
+  'abb.png': [517, 250], 'azerconnect.png': [392, 242], 'azercosmos.png': [552, 145], 'azerenerji.png': [223, 79],
+  'azerishiq.png': [254, 232], 'bakcell.png': [552, 176], 'baku-steel-company.png': [234, 234], 'bos-shelf.png': [182, 234],
+  'bp.png': [180, 234], 'ey-azerbaijan.png': [230, 234], 'halliburton.svg': [163, 12], 'kapital-bank.png': [552, 139],
+  'pasha-technology.png': [541, 176], 'pwc-azerbaijan.png': [306, 238], 'slb.png': [388, 242], 'socar-polymer.png': [395, 166],
+  'socar.png': [552, 189], 'totalenergies.png': [318, 238]
+});
+
+/** [width, height] of a logo of assets/logos, or null for any other picture. */
+function companyLogoSize(src) {
+  const m = /assets\/logos\/([a-z0-9.-]+?)(\?|$)/.exec(String(src || ''));
+  return m && COMPANY_LOGO_SIZES[m[1]] ? COMPANY_LOGO_SIZES[m[1]] : null;
+}
+
 function companyMark(name) {
   const src = companyLogoPath(name);
   if (!src) return esc(initials(name));

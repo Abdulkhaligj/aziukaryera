@@ -53,7 +53,9 @@
    *    wide wordmark (Kapital Bank) is lower and a square mark (bp, EY) is
    *    taller. Equal heights made the square marks look tiny. */
   function sizeLogo(img) {
-    const w = img.naturalWidth, h = img.naturalHeight;
+    // The size written on the tag (landing.js), not the loaded picture: the
+    // logo is laid out before it arrives and its tile never changes width.
+    const w = Number(img.getAttribute('width')), h = Number(img.getAttribute('height'));
     if (!w || !h) return;
     const phone = innerWidth <= 520;
     const area = phone ? 5600 : 8400;
@@ -67,13 +69,7 @@
   }
 
   function sizeLogos() {
-    document.querySelectorAll('.lp-lgo img').forEach(img => {
-      if (img.complete) sizeLogo(img);
-      else if (!img.dataset.sizing) {
-        img.dataset.sizing = '1';
-        img.addEventListener('load', () => sizeLogo(img), { once: true });
-      }
-    });
+    document.querySelectorAll('.lp-lgo img').forEach(sizeLogo);
   }
 
   let frame = 0;

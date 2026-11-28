@@ -216,9 +216,11 @@
 }
 .lp-logos::before { left: 0; background: linear-gradient(90deg, var(--ground), transparent); }
 .lp-logos::after { right: 0; background: linear-gradient(270deg, var(--ground), transparent); }
-.lp-track { display: flex; gap: 12px; width: max-content; animation: lpRoll 46s linear infinite; }
+.lp-track {
+  display: flex; gap: 12px; width: max-content; animation: lpRoll 46s linear infinite;
+  will-change: transform; backface-visibility: hidden;
+}
 @keyframes lpRoll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.lp-logos:hover .lp-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .lp-track { animation: none; } .lp-logos { overflow-x: auto; }
 }
@@ -459,6 +461,8 @@
   border: 1px solid var(--line); box-shadow: var(--shadow-1);
 }
 .lp-lgo img { width: auto; height: 72px; max-width: 260px; object-fit: contain; display: block; }
+/* A logo of unknown size (a company's own upload) keeps a fixed box. */
+.lp-lgo img:not([width]) { width: 180px; height: 72px; }
 .lp-lgo > span { display: none; }
 .lp-mentor-sec { background: var(--surface); }
 .lp-mentor-panel {
