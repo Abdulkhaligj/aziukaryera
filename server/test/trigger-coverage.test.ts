@@ -28,7 +28,8 @@ test('every Postgres trigger is ported with the same name, events, UPDATE OF col
   const want = expected();
   assert.deepEqual(want.filter(x => !ported.includes(x)), [], 'missing ports');
   // Guards added by the security audit of 2026-11-13 (src/write/rules/hardening.ts) have no Postgres original.
-  const added = (x: string) => /^\S+\.001_security_/.test(x)
+  // Features added after the move to MySQL (src/write/rules/alumni.ts) are prefixed 010_.
+  const added = (x: string) => /^\S+\.001_security_/.test(x) || /^\S+\.010_alumni_/.test(x) || /^alumni_verifications\.security_audit_(changes|deletes) /.test(x)
     || /^(moderation_terms|moderation_allow)\.security_audit_changes /.test(x) || /^(post_comments|messages)\.security_audit_deletes /.test(x);
   assert.deepEqual(ported.filter(x => !want.includes(x) && !added(x)), [], 'ports without a Postgres trigger');
   // 77 on public tables, plus the 2 avatar triggers on storage.objects (the storage service's own triggers are not ours).

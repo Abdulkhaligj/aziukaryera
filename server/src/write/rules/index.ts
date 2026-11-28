@@ -1,5 +1,6 @@
 // Registers every Postgres-trigger equivalent with the write pipeline.
 import './accounts.ts';
+import './alumni.ts';
 import './billing.ts';
 import './checks.ts';
 import './content.ts';

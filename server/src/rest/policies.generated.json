@@ -189,6 +189,79 @@
     }
    ]
   },
+  "alumni_verifications": {
+   "rls": true,
+   "grants": {
+    "anon": [],
+    "authenticated": [
+     "INSERT",
+     "SELECT",
+     "UPDATE"
+    ]
+   },
+   "policies": [
+    {
+     "name": "alumni_verifications_read",
+     "cmd": "SELECT",
+     "permissive": true,
+     "roles": [
+      "authenticated"
+     ],
+     "using": "((profile_id = @auth_uid) OR (@is_admin = 1))",
+     "check": null
+    },
+    {
+     "name": "alumni_verifications_own_insert",
+     "cmd": "INSERT",
+     "permissive": true,
+     "roles": [
+      "authenticated"
+     ],
+     "using": null,
+     "check": "((profile_id = @auth_uid) AND (status = 'submitted'))"
+    },
+    {
+     "name": "alumni_verifications_own_update",
+     "cmd": "UPDATE",
+     "permissive": true,
+     "roles": [
+      "authenticated"
+     ],
+     "using": "((profile_id = @auth_uid) AND (status <> 'approved'))",
+     "check": "((profile_id = @auth_uid) AND (status = 'submitted'))"
+    },
+    {
+     "name": "alumni_verifications_staff",
+     "cmd": "ALL",
+     "permissive": true,
+     "roles": [
+      "authenticated"
+     ],
+     "using": "(@is_admin = 1)",
+     "check": "(@is_admin = 1)"
+    },
+    {
+     "name": "security_staff_insert",
+     "cmd": "INSERT",
+     "permissive": false,
+     "roles": [
+      "authenticated"
+     ],
+     "using": null,
+     "check": "((NOT (@actor_is_staff = 1)) OR admin_can('update', 'students'))"
+    },
+    {
+     "name": "security_staff_update",
+     "cmd": "UPDATE",
+     "permissive": false,
+     "roles": [
+      "authenticated"
+     ],
+     "using": "((NOT (@actor_is_staff = 1)) OR admin_can('update', 'students'))",
+     "check": "((NOT (@actor_is_staff = 1)) OR admin_can('update', 'students'))"
+    }
+   ]
+  },
   "application_status_history": {
    "rls": true,
    "grants": {
