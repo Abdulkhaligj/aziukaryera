@@ -1,9 +1,10 @@
 /* Layout helpers that CSS alone cannot do. They run after every render
  * (the app replaces #app's HTML), after a language switch and on resize.
  *
- * 1. Landing header: when the menu links do not fit on one line (Russian
- *    labels are longer, and narrow laptops), the header switches to the ☰
- *    menu. A wrapped header used to drop its buttons over the page.
+ * 1. Landing header: when the menu links do not fit on one line, they are
+ *    set smaller and closer first (the Russian labels are longer), and only
+ *    when that is not enough either (narrow laptops) the header switches to
+ *    the ☰ menu. A wrapped header used to drop its buttons over the page.
  * 2. Phone section tabs: the open section is scrolled into view in the
  *    horizontal tab strip, so the student always sees where they are.
  * 3. Phone tables: each cell gets its column name (data-label), which
@@ -17,9 +18,12 @@
     const head = document.querySelector('.lp-head');
     const nav = head && head.querySelector('.lp-nav');
     if (!nav) return;
-    head.classList.remove('lp-head-compact');
+    head.classList.remove('lp-head-tight', 'lp-head-compact');
     if (getComputedStyle(nav).display === 'none') return;   // phones: already the ☰ menu
-    if (nav.scrollWidth > nav.clientWidth + 1) head.classList.add('lp-head-compact');
+    const overflows = () => nav.scrollWidth > nav.clientWidth + 1;
+    if (!overflows()) return;
+    head.classList.add('lp-head-tight');
+    if (overflows()) head.classList.add('lp-head-compact');
   }
 
   function showActiveSection() {
@@ -87,6 +91,9 @@
   addEventListener('resize', () => run());
   document.addEventListener('i18n:change', () => { cancelAnimationFrame(frame); frame = 0; run(true); });
   new MutationObserver(() => run()).observe(document.documentElement, { childList: true, subtree: true });
+  // The header is measured again once the web font has loaded: the fallback
+  // font has other widths.
+  if (document.fonts) document.fonts.ready.then(() => run());
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => run());
   else run();
 })();

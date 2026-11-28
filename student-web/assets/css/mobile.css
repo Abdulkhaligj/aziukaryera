@@ -67,14 +67,18 @@ html:has(.modal-back:not([hidden])), html:has(.modal-back:not([hidden])) body { 
 
 /* 9. Landing header. The language switch made the header wider than the page
       on desktop, and its buttons wrapped onto a second line over the page.
-      Everything stays on one line now; when the links still do not fit
-      (Russian, narrow laptops) responsive.js adds .lp-head-compact and the
-      header uses the ☰ menu. The buttons sit at the right edge on phones. */
+      Everything stays on one line now. When the links do not fit,
+      responsive.js first adds .lp-head-tight (smaller, closer links: the
+      Russian labels fit on a 1200px+ screen this way); when they still do
+      not fit (narrow laptops) it adds .lp-head-compact and the header uses
+      the ☰ menu. The buttons sit at the right edge on phones. */
 .lp-head .row { flex-wrap: nowrap; gap: 12px; }
 .lp-head .right { margin-left: auto; gap: 6px; }
 .lp-nav { min-width: 0; overflow: hidden; }
 .lp-nav button, .lp-nav a { flex-shrink: 0; white-space: nowrap; padding-inline: 9px; }
 .lp-head .lang-switch-lp button { min-width: 30px; padding: 6px 7px; }
+.lp-head-tight .lp-nav { gap: 0; margin-left: 4px; }
+.lp-head-tight .lp-nav button, .lp-head-tight .lp-nav a { padding-inline: 6px; font-size: 13px; }
 .lp-head-compact .lp-nav { display: none; }
 .lp-head-compact .lp-burger { display: grid; }
 .lp-head-compact .lp-mob {
