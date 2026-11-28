@@ -2494,10 +2494,11 @@ function authScreen() {
   </div>`;
 }
 
-/* Universitet SSO düymələri. Outlook (universitetin Microsoft 365 poçtu)
-   həmişə görünür: server onu hələ qoşmayıbsa düymə sönük qalır və
-   "Tezliklə" yazılır, qoşulan kimi özü aktiv olur. Google yalnız aktiv
-   olanda göstərilir. */
+/* SSO düymələri. Outlook (universitetin Microsoft 365 poçtu) həmişə görünür;
+   Google (Gmail) girişdə həmişə, qeydiyyatda isə yalnız məzun seçiləndə —
+   yeni Gmail hesabı yalnız məzunlar üçündür. Server provayderi hələ
+   qoşmayıbsa düymə sönük qalır və "Tezliklə" yazılır, qoşulan kimi özü
+   aktiv olur. */
 const OUTLOOK_LOGO = `<svg viewBox="0 0 24 24" aria-hidden="true">
   <rect x="8" y="3" width="15" height="18" rx="1.8" fill="#0364B8"/>
   <path d="M8 8.2 15.5 13 23 8.2v11a1.8 1.8 0 0 1-1.8 1.8H9.8A1.8 1.8 0 0 1 8 19.2z" fill="#28A8EA"/>
@@ -2513,14 +2514,16 @@ function ssoButtons(busy) {
     <button type="button" class="btn-google btn-sso btn-outlook${outlookReady ? '' : ' is-soon'}" data-act="azure" ${busy || !outlookReady ? 'disabled' : ''}>
       ${OUTLOOK_LOGO}<span>${UI.auth.tab === 'register' ? 'Outlook ilə qeydiyyatdan keç' : 'Outlook ilə daxil ol'}</span>${outlookReady ? '' : '<em class="sso-soon">Tezliklə</em>'}
     </button>`];
-  if (UI.providers.google === true) buttons.push(`
-    <button type="button" class="btn-google btn-sso" data-act="google" ${busy ? 'disabled' : ''}>
+  const googleReady = UI.providers.google === true;
+  const register = UI.auth.tab === 'register';
+  if (!register || UI.auth.role === 'alumni') buttons.push(`
+    <button type="button" class="btn-google btn-sso${googleReady ? '' : ' is-soon'}" data-act="google" ${busy || !googleReady ? 'disabled' : ''}>
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z"/>
         <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-      </svg><span>Google ilə davam et</span>
+      </svg><span>${register ? 'Google ilə qeydiyyatdan keç' : 'Google ilə daxil ol'}</span>${googleReady ? '' : '<em class="sso-soon">Tezliklə</em>'}
     </button>`);
   if (!buttons.length) return '';
   return `
@@ -3460,8 +3463,10 @@ document.addEventListener('click', e => {
     case 'auth-plan':
       captureAuthForm(); UI.auth.plan = t.dataset.plan || 'free'; rerender(); break;
     case 'google': {
+      /* Yeni Gmail hesabı yalnız qeydiyyatda məzun seçiləndə yaranır. */
+      const googleRole = UI.auth.tab === 'register' && UI.auth.role === 'alumni' ? 'graduate' : undefined;
       UI.auth.busy = true; UI.auth.error = ''; rerender();
-      Backend.signInWithGoogle().then(res => { if (res?.stale) return;
+      Backend.signInWithGoogle(googleRole).then(res => { if (res?.stale) return;
         /* Uğurlu halda səhifə Google-a yönləndirilir və bura qayıtmır. */
         if (!res.ok) { UI.auth.busy = false; UI.auth.error = res.error; rerender(); }
       });
