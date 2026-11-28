@@ -43,3 +43,24 @@ test('Outlook sign-in is always on the sign-in form with its logo, "coming soon"
     assert.equal(dict.split(`"${key}":`).length - 1, 2, key);   // English and Russian
   }
 });
+
+test('Google (Gmail) sign-in: on the sign-in form always, at sign-up only for graduates, any Google account', () => {
+  const app = read('student-web/assets/js/app.js');
+  const backend = read('student-web/assets/js/backend.js');
+  const dict = read('student-web/assets/js/i18n-dict.js');
+  const sso = app.slice(app.indexOf('function ssoButtons('), app.indexOf('const AUTH_ICONS'));
+  assert.match(sso, /const googleReady = UI\.providers\.google === true;/);
+  assert.match(sso, /if \(!register \|\| UI\.auth\.role === 'alumni'\) buttons\.push/);
+  assert.match(sso, /data-act="google" \$\{busy \|\| !googleReady \? 'disabled' : ''\}/);
+  assert.match(sso, /fill="#4285F4"/);
+  assert.match(app, /const googleRole = UI\.auth\.tab === 'register' && UI\.auth\.role === 'alumni' \? 'graduate' : undefined;/);
+  const google = backend.slice(backend.indexOf('async signInWithGoogle('), backend.indexOf('async signInWithAzure('));
+  assert.doesNotMatch(google, /hd:/, 'not limited to one Google Workspace domain');
+  assert.match(google, /if \(role === 'graduate'\) queryParams\.role = role;/);
+  // The server's Google reasons are known messages, matched before the generic university-domain one.
+  const translate = backend.slice(backend.indexOf('  translate(msg)'));
+  assert.ok(translate.indexOf('Bu Google hesabı ilə hesab yoxdur') < translate.indexOf('asoiu\\.edu\\.az/i.test(m)'));
+  for (const key of ['Google ilə daxil ol', 'Google ilə qeydiyyatdan keç', 'Google girişi təsdiqlənmədi. Yenidən cəhd edin.']) {
+    assert.equal(dict.split(`"${key}":`).length - 1, 2, key);
+  }
+});

@@ -122,7 +122,7 @@ Planlı işlər API-nin içində işləyir, ayrıca cron lazım deyil: moderasiy
 
 ## 8. Microsoft (Outlook) ilə giriş
 
-Tələbələr və məzunlar universitetin Microsoft 365 hesabı (`@asoiu.edu.az`) ilə şifrəsiz daxil olurlar. Saytda "Microsoft (Outlook) ilə davam et" düyməsi API-də aşağıdakı üç dəyər dolu olanda görünür.
+Tələbələr və məzunlar universitetin Microsoft 365 hesabı (`@asoiu.edu.az`) ilə şifrəsiz daxil olurlar. Saytda "Outlook ilə daxil ol" düyməsi həmişə görünür; API-də aşağıdakı üç dəyər dolu olanda aktiv olur (o vaxta qədər "Tezliklə" yazılır).
 
 **İT (Entra ID administratoru) bir dəfə tətbiq qeydiyyatı edir:**
 
@@ -151,3 +151,32 @@ sonra `deploy/universitet-mysql/scripts/03-start.sh`.
 - Bu ünvanla hesab varsa ona daxil olur (rolu dəyişmir). Yoxdursa, yeni hesab yaradılır: qeydiyyat formasında seçilən səviyyəyə görə tələbə, magistr və ya məzun, profil dərhal aktivdir. Təsdiqlənməmiş başqasının qeydiyyatı varsa, onun şifrəsi ləğv olunur.
 - Sayta yalnız brauzerə bağlı birdəfəlik kod qayıdır (PKCE); ünvan sətrində token olmur.
 - Client secret-in müddəti bitəndə İT yenisini yaradır, `api.env`-də `AZURE_CLIENT_SECRET` yenilənir və `03-start.sh` işlədilir.
+
+## 9. Google (Gmail) ilə giriş
+
+Şəxsi Gmail ünvanı ilə hesabı olanlar (məsələn, məzunlar) Google ilə şifrəsiz daxil olurlar. Saytda "Google ilə daxil ol" düyməsi həmişə görünür; API-də aşağıdakı iki dəyər dolu olanda aktiv olur.
+
+**Google Cloud-da bir dəfə:**
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → yeni layihə (məs. `ADNSU Karyera`).
+2. **APIs & Services** → **OAuth consent screen** (Google Auth Platform): User type **External**, tətbiq adı `ADNSU Karyera`, dəstək e-poçtu `careercenter@asoiu.edu.az`, authorized domain `asoiu.edu.az`. Scope-lar: `openid`, `email`, `profile`. Sonra **Publish app** (In production).
+3. **Credentials** → **Create credentials** → **OAuth client ID** → **Web application**:
+   - Authorized JavaScript origins: `https://career.asoiu.edu.az`
+   - Authorized redirect URIs: `https://career.asoiu.edu.az/auth/v1/callback`
+4. **Client ID** (`…apps.googleusercontent.com`) və **Client secret**.
+
+**Serverdə** `api.env`:
+
+```
+GOOGLE_CLIENT_ID=<…apps.googleusercontent.com>
+GOOGLE_CLIENT_SECRET=<client secret>
+```
+
+sonra `deploy/universitet-mysql/scripts/03-start.sh`.
+
+**Necə işləyir:**
+
+- Microsoft girişi ilə eyni axın: API Google-a yönləndirir, kodu client secret ilə tokenə dəyişir və ID tokeni yoxlayır (tətbiq/aud, issuer, nonce, müddət, `email_verified`).
+- Bu ünvanla hesab varsa ona daxil olur (rolu dəyişmir). Yeni hesab yalnız qeydiyyatda "Məzun" seçiləndə yaranır və admin təsdiqinə düşür; tələbə kimi yeni Gmail hesabı yaranmır.
+- `@asoiu.edu.az` ünvanları Google ilə qəbul olunmur: onlar Outlook (universitet kataloqu) ilə daxil olur.
+- Sayta yalnız brauzerə bağlı birdəfəlik kod qayıdır (PKCE); ünvan sətrində token olmur.

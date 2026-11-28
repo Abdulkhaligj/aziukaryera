@@ -14,6 +14,8 @@ import type { CodeChallenge } from './tokens.ts';
 /** The state travels through Microsoft and comes back unchanged; it is signed,
  *  so nobody can change where the result goes or which challenge it is bound to. */
 export interface AzureState {
+  /** Who signs the person in; a state made before Google existed has none (Microsoft). */
+  provider?: 'azure' | 'google';
   /** Where the site wants to go back to (already checked against the allow list). */
   redirect: string;
   pkce: CodeChallenge;
@@ -71,8 +73,8 @@ export function azureAuthorizeUrl(azure: AzureConfig, publicUrl: string, univers
   return `${azure.authority}/${azure.tenantId}/oauth2/v2.0/authorize?${params}`;
 }
 
-/** A Microsoft sign-in that cannot be used; the message goes to the site. */
-export class AzureSignInError extends Error {
+/** A Microsoft or Google sign-in that cannot be used; the message goes to the site. */
+export class OAuthSignInError extends Error {
   readonly errorCode: string;
   constructor(errorCode: string, message: string) { super(message); this.errorCode = errorCode; }
 }
@@ -93,7 +95,7 @@ export async function azureIdentity(azure: AzureConfig, publicUrl: string, unive
     })
   });
   const body = await response.json().catch(() => ({})) as { id_token?: unknown };
-  if (!response.ok || typeof body.id_token !== 'string') throw new AzureSignInError('provider_error', 'Microsoft did not confirm the sign-in');
+  if (!response.ok || typeof body.id_token !== 'string') throw new OAuthSignInError('provider_error', 'Microsoft did not confirm the sign-in');
   const claims = idTokenClaims(body.id_token);
   const now = Date.now() / 1000;
   const ok = claims
@@ -103,13 +105,13 @@ export async function azureIdentity(azure: AzureConfig, publicUrl: string, unive
     && claims.nonce === nonce
     && typeof claims.exp === 'number' && claims.exp > now - 60
     && (typeof claims.nbf !== 'number' || claims.nbf < now + 60);
-  if (!ok) throw new AzureSignInError('provider_error', 'Microsoft did not confirm the sign-in');
+  if (!ok) throw new OAuthSignInError('provider_error', 'Microsoft did not confirm the sign-in');
   // A member of the university's directory signs in with their university
   // address; a guest's name has #EXT# and another domain, and gets no account.
   const email = String(claims.preferred_username || claims.email || '').trim().toLowerCase();
   const local = email.slice(0, email.lastIndexOf('@'));
   if (!email.endsWith('@' + universityDomain) || !/^[a-z0-9._%+-]+$/.test(local)) {
-    throw new AzureSignInError('email_address_not_authorized', `Universitet girişi üçün @${universityDomain} hesabı tələb olunur`);
+    throw new OAuthSignInError('email_address_not_authorized', `Universitet girişi üçün @${universityDomain} hesabı tələb olunur`);
   }
   const objectId = typeof claims.oid === 'string' ? claims.oid : '';
   return { email, name: typeof claims.name === 'string' ? claims.name.trim().slice(0, 200) : '', objectId };

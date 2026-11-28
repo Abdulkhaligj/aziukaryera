@@ -15,7 +15,8 @@ import { deleteRow, updateRow } from '../write/pipeline.ts';
 import { clientKey, RateLimiter } from './rate-limit.ts';
 import { consumeFlowCode, consumeLinkCode, consumeOneTimeToken, createReauthCode, createFlowCode, createOneTimeToken, refreshSession, revokeSessions, sessionIsActive, startSession, type CodeChallenge } from './tokens.ts';
 import { findUserByEmail, findUserById, isBanned, mergeMetadata, normalizeEmail, toGoTrueUser, validEmail, type AuthUser } from './users.ts';
-import { AzureSignInError, azureAuthorizeUrl, azureIdentity, newAzureState, readAzureState, signAzureState, type AzureIdentity, type AzureState } from './azure.ts';
+import { OAuthSignInError, azureAuthorizeUrl, azureIdentity, newAzureState, readAzureState, signAzureState, type AzureState } from './azure.ts';
+import { googleAuthorizeUrl, googleIdentity } from './google.ts';
 
 export interface AuthDeps { config: Config; pool: Pool; schema: Schema; mailer: Mailer }
 
@@ -27,7 +28,7 @@ const PURPOSE: Record<string, string[]> = {
   signup: ['email_confirmation'], email: ['email_confirmation', 'magic_link'], magiclink: ['magic_link'],
   recovery: ['recovery'], invite: ['invite'], email_change: ['email_change']
 };
-const AMR: Record<string, string> = { email_confirmation: 'otp', magic_link: 'otp', recovery: 'recovery', invite: 'invite', email_change: 'email_change', azure: 'oauth' };
+const AMR: Record<string, string> = { email_confirmation: 'otp', magic_link: 'otp', recovery: 'recovery', invite: 'invite', email_change: 'email_change', azure: 'oauth', google: 'oauth' };
 const HALF_CONFIRMED = 'Confirmation link accepted. Please proceed to confirm link sent to the other email';
 
 export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
@@ -179,25 +180,31 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   app.get('/settings', async () => ({
     external: { anonymous_users: false, apple: false, azure: !!config.azure, bitbucket: false, discord: false, facebook: false, figma: false,
-      fly: false, github: false, gitlab: false, google: false, keycloak: false, kakao: false, linkedin: false, linkedin_oidc: false,
+      fly: false, github: false, gitlab: false, google: !!config.google, keycloak: false, kakao: false, linkedin: false, linkedin_oidc: false,
       notion: false, spotify: false, slack: false, slack_oidc: false, workos: false, twitch: false, twitter: false, email: true, phone: false, zoom: false },
     disable_signup: config.disableSignup, mailer_autoconfirm: config.mailerAutoconfirm, phone_autoconfirm: false, sms_provider: '', saml_enabled: false
   }));
 
   app.get('/.well-known/jwks.json', async () => ({ keys: [] }));
 
-  // Microsoft 365 sign-in (azure.ts). Only the university's directory; only a
-  // browser that holds a PKCE verifier can finish it.
+  // Microsoft 365 sign-in (azure.ts: only the university's directory) and
+  // Google sign-in (google.ts). Only a browser that holds a PKCE verifier can
+  // finish either.
   app.get('/authorize', async (req: FastifyRequest<{ Querystring: Body }>, reply: FastifyReply) => {
     const query = req.query || {};
-    if (query.provider !== 'azure' || !config.azure) throw authErrors.validation('Unsupported provider: provider is not enabled');
+    const provider = query.provider === 'azure' && config.azure ? 'azure' : query.provider === 'google' && config.google ? 'google' : null;
+    if (!provider) throw authErrors.validation('Unsupported provider: provider is not enabled');
     const pkce = pkceOf(query);
     if (!pkce) throw authErrors.validation('code_challenge is required');
     limit(signIns, ipKey(req));
     const hint = String(query.role ?? '');
     const role = hint === 'student' || hint === 'master_student' || hint === 'graduate' ? hint : null;
-    const state = newAzureState({ redirect: redirectTarget(query.redirect_to), pkce, role });
-    const target = azureAuthorizeUrl(config.azure, config.publicUrl, config.universityDomain, state, signAzureState(config.jwtSecret, state), query.prompt === 'select_account');
+    const state = newAzureState({ provider, redirect: redirectTarget(query.redirect_to), pkce, role });
+    const signed = signAzureState(config.jwtSecret, state);
+    const selectAccount = query.prompt === 'select_account';
+    const target = provider === 'google'
+      ? googleAuthorizeUrl(config.google!, config.publicUrl, state, signed, selectAccount)
+      : azureAuthorizeUrl(config.azure!, config.publicUrl, config.universityDomain, state, signed, selectAccount);
     return reply.redirect(target, 302);
   });
 
@@ -207,21 +214,25 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     // Without a valid state the place to return to is not known: the site's home.
     const back = (target: string, errorCode: string, description: string) =>
       reply.redirect(`${target}#${new URLSearchParams({ error: 'access_denied', error_code: errorCode, error_description: description })}`, 303);
-    if (!config.azure || !state) return back(config.siteUrl, 'bad_oauth_state', 'OAuth state is invalid or has expired');
-    // Cancelled, or refused by the directory: Microsoft's own text is not passed on.
+    const provider = state?.provider === 'google' ? 'google' : 'azure';
+    const name = provider === 'google' ? 'Google' : 'Microsoft';
+    if (!state || !(provider === 'google' ? config.google : config.azure)) return back(config.siteUrl, 'bad_oauth_state', 'OAuth state is invalid or has expired');
+    // Cancelled, or refused by the provider: its own text is not passed on.
     if (query.error || typeof query.code !== 'string' || !query.code) return back(state.redirect, 'access_denied', 'Sign-in was cancelled');
     limit(signIns, ipKey(req));
-    let identity: AzureIdentity;
+    let identity: { email: string; name: string };
     try {
-      identity = await azureIdentity(config.azure, config.publicUrl, config.universityDomain, query.code, state.nonce);
+      identity = provider === 'google'
+        ? await googleIdentity(config.google!, config.publicUrl, config.universityDomain, query.code, state.nonce)
+        : await azureIdentity(config.azure!, config.publicUrl, config.universityDomain, query.code, state.nonce);
     } catch (error) {
-      if (error instanceof AzureSignInError) return back(state.redirect, error.errorCode, error.message);
-      app.log.error({ err: error }, 'Microsoft token exchange failed');
-      return back(state.redirect, 'provider_error', 'Microsoft did not confirm the sign-in');
+      if (error instanceof OAuthSignInError) return back(state.redirect, error.errorCode, error.message);
+      app.log.error({ err: error }, `${name} token exchange failed`);
+      return back(state.redirect, 'provider_error', `${name} did not confirm the sign-in`);
     }
     let code: string;
     try {
-      code = await transaction(pool, tx => azureSignIn(tx, identity, state));
+      code = await transaction(pool, tx => oauthSignIn(tx, provider, identity, state));
     } catch (error) {
       if (error instanceof AuthError) return back(state.redirect, error.errorCode, error.message);
       if (isRuleFailure(error)) return back(state.redirect, 'signup_disabled', error instanceof DbRuleError ? error.message : 'Database error saving new user');
@@ -231,16 +242,22 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
     return reply.redirect(`${base}${base.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}${fragment !== undefined ? `#${fragment}` : ''}`, 303);
   });
 
-  /** The account of a Microsoft identity: the one with its address, or a new
-   *  one. The directory vouches for the mailbox, as a confirmation link would. */
-  async function azureSignIn(tx: Tx, identity: AzureIdentity, state: AzureState): Promise<string> {
+  /** The account of a Microsoft or Google identity: the one with its address,
+   *  or a new one. The provider vouches for the mailbox, as a confirmation link
+   *  would. Google makes a new account only for a graduate (staff review it);
+   *  students sign up with their university address. */
+  async function oauthSignIn(tx: Tx, provider: 'azure' | 'google', identity: { email: string; name: string }, state: AzureState): Promise<string> {
     let user = await findUserByEmail(tx, identity.email, true);
     if (!user) {
       if (config.disableSignup) throw authErrors.signupDisabled();
+      if (provider === 'google' && state.role !== 'graduate') {
+        throw new AuthError(422, 'signup_disabled',
+          `Bu Google hesabı ilə hesab yoxdur. Tələbələr @${config.universityDomain} (Outlook) ilə daxil olur; məzunlar qeydiyyatda "Məzun" seçib Google ilə davam edə bilər.`);
+      }
       const status = state.role === 'graduate' ? 'alumni' : state.role === 'master_student' ? 'master_student' : 'student';
       user = await createAuthUser(tx, {
         email: identity.email, password: null, confirmed: true,
-        appMeta: { provider: 'azure', providers: ['azure'] },
+        appMeta: { provider, providers: [provider] },
         userMeta: { full_name: identity.name || undefined, role: state.role === 'graduate' ? 'graduate' : 'student', account_status: status }
       });
     } else {
@@ -256,12 +273,12 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
         await exec(tx, 'UPDATE auth_users SET email_confirmed_at = CURRENT_TIMESTAMP(6) WHERE id = ?', [user.id]);
       }
       const providers = Array.isArray(user.raw_app_meta_data?.providers) ? user.raw_app_meta_data.providers as unknown[] : [];
-      if (!providers.includes('azure')) {
+      if (!providers.includes(provider)) {
         await exec(tx, `UPDATE auth_users SET raw_app_meta_data = JSON_SET(COALESCE(raw_app_meta_data, JSON_OBJECT()), '$.providers', CAST(? AS JSON)) WHERE id = ?`,
-          [JSON.stringify([...providers, 'azure']), user.id]);
+          [JSON.stringify([...providers, provider]), user.id]);
       }
     }
-    return createFlowCode(tx, user.id, 'azure', state.pkce);
+    return createFlowCode(tx, user.id, provider, state.pkce);
   }
 
   app.post('/signup', async (req: FastifyRequest<{ Body: Body; Querystring: Body }>) => {

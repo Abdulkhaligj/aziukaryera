@@ -151,19 +151,17 @@ const Backend = {
     } catch (e) { return {}; }
   },
 
-  /**
-   * Google ilə giriş. Universitet hesabı tələb olunur — `hd` parametri
-   * Google-a yalnız @asoiu.edu.az hesablarını göstərməyi tövsiyə edir,
-   * əsl məcburiyyət isə bazadakı trigger-dədir (klient tərəfə etibar edilmir).
-   */
-  async signInWithGoogle() {
+  /** Google (Gmail) ilə giriş: həmin ünvanlı hesaba daxil olur. Yeni hesab
+   *  yalnız `role` = 'graduate' olanda yaranır və admin təsdiqinə düşür;
+   *  tələbələr universitet e-poçtu (Outlook) ilə daxil olur. Qaydalar
+   *  serverdədir (server/src/auth/google.ts), klient tərəfə etibar edilmir. */
+  async signInWithGoogle(role) {
     if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
+    const queryParams = { prompt: 'select_account' };
+    if (role === 'graduate') queryParams.role = role;
     const { error } = await this.sb.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}${window.location.pathname}`,
-        queryParams: { hd: UNI_DOMAIN, prompt: 'select_account' }
-      }
+      options: { redirectTo: `${window.location.origin}${window.location.pathname}`, queryParams }
     });
     /* Uğurlu halda brauzer Google-a yönləndirilir — bu sətrə qayıtmır. */
     return error ? { ok: false, error: this.translate(error.message) } : { ok: true };
@@ -362,6 +360,15 @@ const Backend = {
       return 'Bu e-poçt ünvanı qəbul edilmədi. Mövcud və işlək bir ünvan yazın.';
     }
     if (/Password should be at least|weak.?password/i.test(m)) return 'Şifrə ən azı 8 simvol olmalıdır.';
+    // Google (Gmail) sign-in: the server's own reasons (server/src/auth/google.ts).
+    if (/Bu Google hesabı ilə hesab yoxdur/.test(m)) {
+      return 'Bu Google hesabı ilə hesab tapılmadı. Tələbələr universitet e-poçtu (Outlook) ilə daxil olur; ' +
+             'məzunlar qeydiyyatda "Məzun" seçib Google ilə davam edə bilər.';
+    }
+    if (/hesabı Outlook \(Microsoft\) ilə daxil olur/.test(m)) return `@${UNI_DOMAIN} hesabı ilə "Outlook ilə daxil ol" düyməsindən istifadə edin.`;
+    if (/Google hesabının e-poçtu/.test(m)) return 'Google hesabınızın e-poçtu təsdiqlənməyib və ya qəbul olunmadı.';
+    if (/Google did not confirm/i.test(m)) return 'Google girişi təsdiqlənmədi. Yenidən cəhd edin.';
+    if (/Microsoft did not confirm/i.test(m)) return 'Microsoft girişi təsdiqlənmədi. Yenidən cəhd edin.';
     if (/asoiu\.edu\.az/i.test(m)) return 'Tələbə qeydiyyatı üçün @asoiu.edu.az e-poçtu tələb olunur.';
     if (/over_email_send_rate_limit|rate limit|too many requests|429/i.test(m)) {
       return 'E-poçt göndərmə limitinə çatıldı. Bir saat gözləyin.';
@@ -373,14 +380,10 @@ const Backend = {
     if (/Failed to fetch|NetworkError/i.test(m)) {
       return 'Serverə qoşulmaq alınmadı. İnternet bağlantınızı yoxlayın.';
     }
-    if (/yalnız universitet hesabı|Google ilə giriş yalnız/i.test(m)) {
-      return `Google ilə giriş yalnız universitet hesabı (@${UNI_DOMAIN}) ilə mümkündür. ` +
-             `Şəxsi Gmail ilə deyil, ADNSU hesabınızla daxil olun.`;
-    }
     if (/provider is not enabled|Unsupported provider/i.test(m)) {
-      return 'Google ilə giriş hələ aktivləşdirilməyib. Karyera Mərkəzi ilə əlaqə saxlayın.';
+      return 'Bu giriş üsulu hələ aktivləşdirilməyib. Karyera Mərkəzi ilə əlaqə saxlayın.';
     }
-    if (/access_denied|cancel/i.test(m)) return 'Google girişi ləğv edildi.';
+    if (/access_denied|cancel/i.test(m)) return 'Giriş ləğv edildi.';
     return m;
   },
 
