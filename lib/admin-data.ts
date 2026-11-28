@@ -139,6 +139,22 @@ async function readRelated(db: AdminContext['db'], table: RelatedTable): Promise
   return rows;
 }
 
+/** Graduates' diploma details for the check (alumni_verifications), by profile.
+ *  Read on its own, in pages, as the WAF wants (no embedded select or in()). */
+async function alumniRequests(db: AdminContext['db']): Promise<Map<string, any>> {
+  const rows = new Map<string, any>();
+  for (let from = 0; from < 50 * RELATED_PAGE; from += RELATED_PAGE) {
+    const { data, error } = await db.from('alumni_verifications')
+      .select('profile_id,full_name,diploma_number,graduation_year,faculty,specialty,status,review_note,updated_at')
+      .order('profile_id').range(from, from + RELATED_PAGE - 1);
+    // Before the API has the table (migration 0011) the list still opens.
+    if (error) { console.error('alumni_verifications', error.message); return rows; }
+    (data || []).forEach((row: any) => rows.set(String(row.profile_id), row));
+    if (!data || data.length < RELATED_PAGE) break;
+  }
+  return rows;
+}
+
 function related(db: AdminContext['db'], table: RelatedTable) {
   let perDb = relatedCache.get(db);
   if (!perDb) relatedCache.set(db, perDb = new Map());
@@ -230,12 +246,17 @@ export async function loadResource(context: AdminContext, resource: ResourceKey,
     const { data, error } = await query.order('updated_at', { ascending: false });
     if (error) throw error;
     const pics = await signAvatars(context, (data || []).map((row: any) => row.avatar_path));
+    const requests = alumni ? await alumniRequests(db) : new Map<string, any>();
+    const alumniMeta = (row: any, request: any) => row.alumni_verified ? 'Təsdiqlənmiş məzun'
+      : request?.status === 'submitted' ? `Diplom göndərilib · ${request.graduation_year}`
+        : request?.status === 'rejected' ? 'Diplom: imtina edilib' : 'Diplom məlumatı gözlənilir';
     return (data || []).map((row: any) => ({
       id: row.id, title: row.full_name || (alumni ? 'Məzun' : 'Magistr'),
       avatar: photo(pics, row.avatar_path), avatarKind: 'photo' as const,
       subtitle: `${label.major(row.major_id) || 'İxtisas qeyd edilməyib'} · ${row.email || ''}`,
-      status: accountStatus(row.status), meta: alumni ? (row.alumni_verified ? 'Təsdiqlənmiş məzun' : 'Təsdiq gözləyir') : `${row.course || '—'}. kurs`,
-      updatedAt: dateLabel(row.updated_at), fields: { full_name: row.full_name, email: row.email, personal_email: row.personal_email, phone: row.phone, city: row.city, faculty_id: row.faculty_id, major_id: row.major_id, course: row.course, gpa: row.gpa, status: row.status, account_status: row.account_status, alumni_verified: row.alumni_verified }
+      status: accountStatus(row.status), meta: alumni ? alumniMeta(row, requests.get(String(row.id))) : `${row.course || '—'}. kurs`,
+      updatedAt: dateLabel(row.updated_at), fields: { full_name: row.full_name, email: row.email, personal_email: row.personal_email, phone: row.phone, city: row.city, faculty_id: row.faculty_id, major_id: row.major_id, course: row.course, gpa: row.gpa, status: row.status, account_status: row.account_status, alumni_verified: row.alumni_verified,
+        ...(alumni ? { alumni_request: requests.get(String(row.id)) ?? null } : {}) }
     }));
   }
   if (resource === 'network') {

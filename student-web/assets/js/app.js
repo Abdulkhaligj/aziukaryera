@@ -371,7 +371,7 @@ function viewStudentDashboard() {
   const soon = jobs.filter(j => daysLeft(j.deadline) >= 0 && daysLeft(j.deadline) <= 21 && j.status !== 'pending')
     .sort((a, b) => a.deadline.localeCompare(b.deadline)).slice(0, 4);
 
-  return `
+  return `${alumniVerifyCard()}
   <div class="welcome">
     <div class="welcome-text">
       <div class="eyebrow" style="color:#A7B6EE">Tələbə kabineti</div>
@@ -3230,9 +3230,84 @@ function jobDetailModal(id) {
     </div>`);
 }
 
+/* Məzun təsdiqi (2026-11-28). Şəxsi e-poçtla (Google və ya e-poçt) qeydiyyatdan
+   keçən məzunun hesabı Karyera Mərkəzi diplom məlumatlarını yoxlayana qədər
+   gözləmədədir: profil və CV doldurula, vakansiyalara baxıla bilər, müraciət
+   isə təsdiqdən sonradır (server: applications_insert, app_account_active). */
+function isGraduateProfile() {
+  const s = Store.state.student;
+  return Auth.currentUser()?.role === 'student' && !!s && (s.accountStatus === 'alumni' || s.accountStatus === 'graduate');
+}
+function alumniPending() {
+  return isGraduateProfile() && Auth.currentUser()?.status === 'pending';
+}
+function alumniVerifyCard() {
+  if (Store.mode !== 'remote' || !isGraduateProfile() || Store.state.student.alumniVerified) return '';
+  const v = Store.state.alumniVerification;
+  const after = alumniPending()
+    ? 'Karyera Mərkəzi təsdiqlədikdən sonra vakansiyalara müraciət edə biləcəksiniz.'
+    : 'Təsdiqdən sonra profilinizdə "Təsdiqlənmiş məzun" nişanı görünəcək.';
+  if (v && v.status === 'submitted') return `<div class="card alumni-verify" style="margin-bottom:16px">
+    <div class="eyebrow">Məzun təsdiqi</div>
+    <h3 style="margin:6px 0">Diplom məlumatlarınız yoxlanılır</h3>
+    <p style="margin:0 0 6px">${esc(v.full_name)} · ${esc(v.specialty)} · ${esc(String(v.graduation_year))} · № ${esc(v.diploma_number)}</p>
+    <p style="color:var(--muted);margin:0 0 12px">${after}</p>
+    <button class="btn sm" data-act="alumni-verify">Məlumatlara düzəliş et</button></div>`;
+  if (v && v.status === 'rejected') return `<div class="card alumni-verify" style="margin-bottom:16px">
+    <div class="eyebrow">Məzun təsdiqi</div>
+    <h3 style="margin:6px 0">Məzun təsdiqi alınmadı</h3>
+    <p style="margin:0 0 12px">${esc(v.review_note || 'Diplom məlumatlarını yoxlayıb yenidən göndərin.')}</p>
+    <button class="btn sm primary" data-act="alumni-verify">Yenidən göndər</button></div>`;
+  return `<div class="card alumni-verify" style="margin-bottom:16px">
+    <div class="eyebrow">Məzun təsdiqi</div>
+    <h3 style="margin:6px 0">Məzun olduğunuzu təsdiqləyin</h3>
+    <p style="margin:0 0 6px">Diplom nömrəsi, buraxılış ili və ixtisasınızı göndərin — Karyera Mərkəzi yoxlayıb hesabınızı təsdiqləyəcək.</p>
+    <p style="color:var(--muted);margin:0 0 12px">${after}</p>
+    <button class="btn sm primary" data-act="alumni-verify">Diplom məlumatlarını göndər</button></div>`;
+}
+function alumniVerifyModal() {
+  const s = Store.state.student || {};
+  const v = Store.state.alumniVerification || {};
+  const year = new Date().getFullYear();
+  openModal(`
+    <div class="modal-head">
+      <div style="flex:1">
+        <div class="eyebrow">Məzun təsdiqi</div>
+        <h2 style="margin-top:6px">ADNSU məzunu olduğunuzu təsdiqləyin</h2>
+        <div style="color:var(--muted);font-size:12.5px">Karyera Mərkəzi məlumatları universitetin arxivi ilə yoxlayır.</div>
+      </div>
+      <button class="icon-btn" data-act="close-modal" aria-label="Bağla">×</button>
+    </div>
+    <form class="stack" data-act="alumni-verify-form" novalidate>
+      <div class="field"><label for="av-name">Ad və soyad (diplomdakı kimi)</label>
+        <input id="av-name" name="full_name" required maxlength="200" autocomplete="name" value="${esc(v.full_name || s.name || '')}"></div>
+      <div class="grid c2">
+        <div class="field"><label for="av-diploma">Diplom nömrəsi</label>
+          <input id="av-diploma" name="diploma_number" required maxlength="40" placeholder="Məs.: AA 123456" value="${esc(v.diploma_number || '')}"></div>
+        <div class="field"><label for="av-year">Buraxılış ili</label>
+          <input id="av-year" name="graduation_year" type="number" inputmode="numeric" min="1950" max="${year}" required value="${esc(String(v.graduation_year || ''))}"></div>
+      </div>
+      <div class="field"><label for="av-faculty">Fakültə</label>
+        <input id="av-faculty" name="faculty" required maxlength="200" list="av-faculties" value="${esc(v.faculty || s.faculty || '')}">
+        <datalist id="av-faculties">${Object.keys(FACULTIES).map(f => `<option value="${esc(f)}">`).join('')}</datalist></div>
+      <div class="field"><label for="av-specialty">İxtisas</label>
+        <input id="av-specialty" name="specialty" required maxlength="200" value="${esc(v.specialty || s.major || '')}"></div>
+      <p style="color:var(--muted);font-size:12.5px;margin:0">Bu məlumatları yalnız siz və Karyera Mərkəzi görür.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" type="submit">Göndər</button>
+        <button class="btn" type="button" data-act="close-modal">İmtina</button>
+      </div>
+    </form>`);
+}
+
 function applyModal(id) {
   const job = Store.jobById(id);
   if (!job) return;
+  if (alumniPending()) {
+    toast('Məzun statusunuz təsdiqlənəndən sonra müraciət edə biləcəksiniz.', 'bad');
+    if (!Store.state.alumniVerification || Store.state.alumniVerification.status === 'rejected') alumniVerifyModal();
+    return;
+  }
   if (daysLeft(job.deadline) < 0) { toast('Bu elanın müraciət müddəti bitib.', 'bad'); return; }
   const s = Store.state.student;
   const c = companyOf(job.companyId);
@@ -3578,6 +3653,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'apply': applyModal(t.dataset.id); break;
+    case 'alumni-verify': alumniVerifyModal(); break;
     case 'apply-confirm': {
       const note = document.getElementById('apply-note');
       Store.apply(t.dataset.id, note ? note.value.trim() : '');
@@ -4078,6 +4154,29 @@ function captureAuthForm() {
   const terms = form.elements['terms'];
   if (terms) UI.auth.terms = terms.checked;
 }
+
+/* Məzun təsdiqi forması */
+document.addEventListener('submit', e => {
+  const form = e.target;
+  if (!form || form.dataset.act !== 'alumni-verify-form') return;
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(form));
+  Object.keys(d).forEach(k => { d[k] = String(d[k] || '').trim(); });
+  if (!d.full_name || !d.diploma_number || !d.graduation_year || !d.faculty || !d.specialty) { toast('Bütün sahələri doldurun.', 'bad'); return; }
+  const year = Number(d.graduation_year);
+  if (!Number.isInteger(year) || year < 1950 || year > new Date().getFullYear()) { toast('Buraxılış ilini düzgün yazın', 'bad'); return; }
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+  Backend.submitAlumniVerification(d).then(res => {
+    if (res?.stale) return;
+    if (button) button.disabled = false;
+    if (!res.ok) { toast(res.error, 'bad'); return; }
+    Store.state.alumniVerification = res.row;
+    closeModal();
+    toast('Göndərildi. Karyera Mərkəzi məlumatları yoxlayacaq.');
+    render();
+  });
+});
 
 document.addEventListener('submit', e => {
   const form = e.target;

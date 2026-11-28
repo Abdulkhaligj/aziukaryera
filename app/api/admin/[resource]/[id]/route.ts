@@ -83,6 +83,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     /* "Şifrəni sıfırla": yeni müvəqqəti şifrə qaytarılır (yalnız hesab yaratmaq hüququ olanlar) */
     const action = body.__action === 'reset_password' ? 'reset_password' : 'update';
     if (action === 'reset_password' && !can(context.role, 'create', key)) return NextResponse.json({ error: 'Şifrəni sıfırlamağa icazəniz yoxdur' }, { status: 403 });
+    // A decision on a graduate's diploma details (alumni_verifications).
+    // Approval opens the account and marks the graduate verified (the API's
+    // 010_alumni_ rules close the request and notify the graduate); a refusal
+    // keeps the account waiting and tells the graduate why.
+    if (key === 'alumni' && action === 'update' && (body.alumni_decision === 'approved' || body.alumni_decision === 'rejected')) {
+      if (body.alumni_decision === 'approved') {
+        body.status = 'active';
+        body.alumni_verified = 'true';
+      } else {
+        const note = typeof body.review_note === 'string' ? body.review_note.trim().slice(0, 1000) : '';
+        const { data: refused, error: refuseError } = await context.db.from('alumni_verifications')
+          .update({ status: 'rejected', review_note: note || null }).eq('profile_id', id).select('profile_id').maybeSingle();
+        if (refuseError) return NextResponse.json({ error: publicError(refuseError) }, { status: 400 });
+        if (!refused) return NextResponse.json({ error: 'Məzunun diplom məlumatı tapılmadı və ya bu əməliyyata icazə yoxdur.' }, { status: 404 });
+      }
+    }
     // Only the fields of this section go to the function, never the raw body (M38).
     const { data, error } = await context.db.functions.invoke('admin-users', {
       body: { ...(action === 'update' ? peopleFields(key, body) : {}), action, resource: key, id }

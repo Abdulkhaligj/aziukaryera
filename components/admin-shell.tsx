@@ -104,7 +104,29 @@ function FacultyMajorPicker({ lookups, faculties, majors }: { lookups: Lookups; 
   </fieldset>;
 }
 
-function EditorFields({ resource, row, data, lookups, mode, self = false, role = '' }: { resource: ResourceKey; row?: AdminRow; data: Store; lookups: Lookups; mode: 'create' | 'edit'; self?: boolean; role?: string }) {
+type AlumniRequestRow = { full_name: string; diploma_number: string; graduation_year: number; faculty: string; specialty: string; status: 'submitted' | 'approved' | 'rejected'; review_note: string | null };
+
+/** A graduate's diploma details (sent from the student site) and the decision on them. */
+function AlumniRequest({ request, verified }: { request?: AlumniRequestRow | null; verified: boolean }) {
+  if (!request) return <p className="fieldHint">{verified ? 'Təsdiqlənmiş məzun.' : 'Məzun hələ diplom məlumatlarını göndərməyib.'}</p>;
+  const state = request.status === 'approved' ? 'Təsdiqlənib' : request.status === 'rejected' ? 'İmtina edilib' : 'Yoxlama gözləyir';
+  return <>
+    <div className="readGrid">
+      <div><span>Diplomdakı ad</span><b>{request.full_name}</b></div>
+      <div><span>Diplom nömrəsi</span><b>{request.diploma_number}</b></div>
+      <div><span>Buraxılış ili</span><b>{request.graduation_year}</b></div>
+      <div><span>Fakültə · ixtisas</span><b>{request.faculty} · {request.specialty}</b></div>
+      <div><span>Diplom yoxlaması</span><b>{state}</b></div>
+    </div>
+    {request.status !== 'approved' && <>
+      <label className="field">Qərar<select name="alumni_decision" defaultValue=""><option value="">— Qərar verilməyib —</option><option value="approved">Təsdiqlə: hesab aktivləşir, “təsdiqlənmiş məzun” olur</option><option value="rejected">İmtina et: məzun düzəldib yenidən göndərə bilər</option></select></label>
+      <label className="field">İmtina səbəbi (məzuna göstərilir)<textarea name="review_note" rows={2} maxLength={1000} defaultValue={String(request.review_note || '')} placeholder="Məsələn: diplom nömrəsi arxivdə tapılmadı"/></label>
+      <p className="fieldHint">Diplom məlumatlarını universitetin arxivi ilə tutuşdurun, sonra qərar verin.</p>
+    </>}
+  </>;
+}
+
+function EditorFields({ resource, row, data, lookups, mode, self = false, role = '' }:{ resource: ResourceKey; row?: AdminRow; data: Store; lookups: Lookups; mode: 'create' | 'edit'; self?: boolean; role?: string }) {
   const f = row?.fields || {};
   const companies = data.companies;
   if (resource === 'pending_jobs') return <>
@@ -210,6 +232,7 @@ function EditorFields({ resource, row, data, lookups, mode, self = false, role =
     <div className="formGrid"><label className="field">Kurs<input name="course" type="number" inputMode="numeric" min="1" max="6" defaultValue={String(f.course || 1)}/></label><label className="field">ÜOMG / GPA<input name="gpa" type="number" inputMode="decimal" min="0" max="100" step="0.01" defaultValue={String(f.gpa ?? '')}/></label></div>
     <div className="formGrid"><label className="field">Telefon<input name="phone" type="tel" defaultValue={String(f.phone || '')}/></label><label className="field">Şəhər<input name="city" defaultValue={String(f.city || 'Bakı, Azərbaycan')}/></label></div>
     <label className="field">Hesab statusu<select name="status" defaultValue={String(f.status || 'active')}><option value="active">Aktiv</option><option value="pending">Təsdiq gözləyir</option><option value="rejected">Dayandırılıb</option></select></label>
+    {resource === 'alumni' && <AlumniRequest request={f.alumni_request as AlumniRequestRow | null | undefined} verified={Boolean(f.alumni_verified)}/>}
     {resource === 'alumni' && <label className="checkLine"><input type="checkbox" name="alumni_verified" value="true" defaultChecked={Boolean(f.alumni_verified)}/> Təsdiqlənmiş ADNSU məzunu</label>}
   </>;
   if (resource === 'admins') return <>

@@ -238,6 +238,7 @@ const Store = {
       }
     };
     this.state.subscription = p.subscription ? { ...p.subscription } : null;
+    this.state.alumniVerification = p.alumniVerification || null;
     const subscription = this.state.subscription;
     if (subscription?.status === 'active' && subscription.plan_id !== 'free') {
       const start = subscription.starts_at ? Date.parse(subscription.starts_at) : NaN;

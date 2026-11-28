@@ -413,7 +413,7 @@ const Backend = {
     /* The university WAF answers 403 to embedded selects such as
        `plans!subscriptions_plan_id_fkey(*)`, so the plan is read on its own
        and joined below (2026-11-26). */
-    const [fac, maj, profile, education, candidates, companies, jobs, apps, saved, invites, events, regs, subscription, plans, notifications, broadcasts, broadcastReads] = await Promise.all([
+    const [fac, maj, profile, education, candidates, companies, jobs, apps, saved, invites, events, regs, subscription, plans, notifications, broadcasts, broadcastReads, alumniVerification] = await Promise.all([
       this.sb.from('faculties').select('*').order('sort_order'),
       this.sb.from('majors').select('*'),
       this.sb.from('profiles').select('*').eq('id', uid).single(),
@@ -430,7 +430,9 @@ const Backend = {
       this.sb.from('plans').select('*'),
       this.sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(100),
       this.sb.from('broadcast_notifications').select('*').order('created_at', { ascending: false }).limit(100),
-      this.sb.from('broadcast_notification_reads').select('broadcast_id,read_at')
+      this.sb.from('broadcast_notification_reads').select('broadcast_id,read_at'),
+      // Graduate verification (only the own row; staff could read every row).
+      this.sb.from('alumni_verifications').select('*').eq('profile_id', uid).maybeSingle()
     ]);
 
     const err = [fac, maj, profile, education, candidates, companies, jobs, apps, saved, invites, events, regs, notifications, broadcasts, broadcastReads]
@@ -457,8 +459,22 @@ const Backend = {
         : { ...subscription.data, plans: (plans.data || []).find(plan => String(plan.id) === String(subscription.data.plan_id)) || null },
       notifications: notifications.data || [],
       broadcasts: broadcasts.data || [],
-      broadcastReads: broadcastReads.data || []
+      broadcastReads: broadcastReads.data || [],
+      alumniVerification: alumniVerification.error ? null : alumniVerification.data || null
     };
+  },
+
+  /** Məzun təsdiqi: diplom məlumatlarını Karyera Mərkəzinə göndərir (və ya
+   *  düzəldir). Status və qərarı yalnız əməkdaş dəyişir (server qaydası). */
+  async submitAlumniVerification(d) {
+    if (!this.init()) return { ok: false, error: 'Server bağlantısı konfiqurasiya olunmayıb.' };
+    const session = await this.getSession();
+    if (!session) return { ok: false, error: 'Sessiya yoxdur.' };
+    const { data, error } = await this.sb.from('alumni_verifications').upsert({
+      profile_id: session.user.id, full_name: d.full_name, diploma_number: d.diploma_number,
+      graduation_year: Number(d.graduation_year), faculty: d.faculty, specialty: d.specialty
+    }, { onConflict: 'profile_id' }).select().single();
+    return error ? { ok: false, error: this.translate(error.message) } : { ok: true, row: data };
   },
 
   /* ---------------------------------------------------------------- *
@@ -470,7 +486,9 @@ const Backend = {
     const [personal, broadcasts, reads] = await Promise.all([
       this.sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(limit),
       this.sb.from('broadcast_notifications').select('*').order('created_at', { ascending: false }).limit(limit),
-      this.sb.from('broadcast_notification_reads').select('broadcast_id,read_at')
+      this.sb.from('broadcast_notification_reads').select('broadcast_id,read_at'),
+      // Graduate verification (only the own row; staff could read every row).
+      this.sb.from('alumni_verifications').select('*').eq('profile_id', uid).maybeSingle()
     ]);
     const bad = [personal, broadcasts, reads].find(result => result.error);
     if (bad) return { ok: false, rows: [], error: this.translate(bad.error.message) };
