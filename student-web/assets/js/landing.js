@@ -174,10 +174,18 @@ const Landing = {
       ...tickerNames.map(name => ({ name, src: companyLogoPath(name) })),
       ...d.companies.map(c => ({ name: c.name, src: /^https:\/\//i.test(String(c.logoUrl || '')) ? c.logoUrl : companyLogoPath(c.name) }))
     ].filter(item => item.src && !seen.has(item.src) && seen.add(item.src));
+    /* Every logo is loaded at once (no lazy loading: in a moving strip the
+       tiles stayed white until each picture arrived) and carries its size, so
+       responsive.js sizes it before it has loaded and the strip keeps one
+       width. A logo of unknown size (uploaded by a company) gets a fixed box. */
+    const logoImg = (item, alt) => {
+      const size = companyLogoSize(item.src);
+      return `<img src="${esc(item.src)}" alt="${alt}"${size ? ` width="${size[0]}" height="${size[1]}"` : ''} decoding="async">`;
+    };
     const logoTiles = companyLogos.map(item => `<span class="lp-lgo" role="img" aria-label="${esc(item.name)}">
-      <img src="${esc(item.src)}" alt="${esc(item.name)}" loading="lazy" decoding="async"></span>`).join('');
+      ${logoImg(item, esc(item.name))}</span>`).join('');
     const logoTilesCopy = companyLogos.map(item => `<span class="lp-lgo" aria-hidden="true">
-      <img src="${esc(item.src)}" alt="" loading="lazy" decoding="async"></span>`).join('');
+      ${logoImg(item, '')}</span>`).join('');
 
     /* Header links: sections with no content (no event, no award yet) are left out. */
     const navItems = [
