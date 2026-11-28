@@ -27,7 +27,10 @@ step "Servislər"
 dc up -d --build mysql
 for _ in $(seq 1 60); do [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q mysql)" 2>/dev/null)" = healthy ] && break; sleep 2; done
 # New migrations of an update are applied as root before the API starts (#55, #72).
+# The API image is built first: the migrations run from it, and an image of
+# the previous version does not have the new files (0011 was skipped once).
 step "Migration-lar"
+dc build api
 migrate
 dc up -d --build
 
