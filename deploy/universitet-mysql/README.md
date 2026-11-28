@@ -177,6 +177,6 @@ sonra `deploy/universitet-mysql/scripts/03-start.sh`.
 **Necə işləyir:**
 
 - Microsoft girişi ilə eyni axın: API Google-a yönləndirir, kodu client secret ilə tokenə dəyişir və ID tokeni yoxlayır (tətbiq/aud, issuer, nonce, müddət, `email_verified`).
-- Bu ünvanla hesab varsa ona daxil olur (rolu dəyişmir). Yeni hesab yalnız qeydiyyatda "Məzun" seçiləndə yaranır və admin təsdiqinə düşür; tələbə kimi yeni Gmail hesabı yaranmır.
+- Bu ünvanla hesab varsa ona daxil olur (rolu dəyişmir). Yoxdursa, yeni **məzun** hesabı yaranır (həm "Daxil ol", həm qeydiyyatda "Məzun"): hesab gözləmədə qalır, məzun diplom məlumatlarını göndərir, Karyera Mərkəzi admin panelində (Məzunlar → Qərar) təsdiqləyir. Təsdiqə qədər müraciət edə bilmir. Qeydiyyatda "Tələbə"/"Magistr" seçib Google ilə yeni hesab yaranmır.
 - `@asoiu.edu.az` ünvanları Google ilə qəbul olunmur: onlar Outlook (universitet kataloqu) ilə daxil olur.
 - Sayta yalnız brauzerə bağlı birdəfəlik kod qayıdır (PKCE); ünvan sətrində token olmur.

@@ -361,9 +361,8 @@ const Backend = {
     }
     if (/Password should be at least|weak.?password/i.test(m)) return 'Şifrə ən azı 8 simvol olmalıdır.';
     // Google (Gmail) sign-in: the server's own reasons (server/src/auth/google.ts).
-    if (/Bu Google hesabı ilə hesab yoxdur/.test(m)) {
-      return 'Bu Google hesabı ilə hesab tapılmadı. Tələbələr universitet e-poçtu (Outlook) ilə daxil olur; ' +
-             'məzunlar qeydiyyatda "Məzun" seçib Google ilə davam edə bilər.';
+    if (/Tələbə hesabı .*\(Outlook\) ilə yaradılır/.test(m)) {
+      return 'Tələbə hesabı universitet e-poçtu (Outlook) ilə yaradılır. Məzunsunuzsa, qeydiyyatda "Məzun" seçin.';
     }
     if (/hesabı Outlook \(Microsoft\) ilə daxil olur/.test(m)) return `@${UNI_DOMAIN} hesabı ilə "Outlook ilə daxil ol" düyməsindən istifadə edin.`;
     if (/Google hesabının e-poçtu/.test(m)) return 'Google hesabınızın e-poçtu təsdiqlənməyib və ya qəbul olunmadı.';

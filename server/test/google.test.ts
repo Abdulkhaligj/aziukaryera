@@ -133,13 +133,22 @@ test('a graduate picked on the sign-up form gets a graduate account that staff r
     { role: 'graduate', account_status: 'alumni', status: 'pending', full_name: 'Sevinc Əliyeva', alumni_verified: 0 });
 });
 
-test('a Gmail address without an account gets none as a student or from the sign-in tab', async () => {
-  for (const role of [undefined, 'student', 'master_student']) {
+test('from the sign-in tab a new Gmail address becomes a graduate account that staff review', async () => {
+  const { client, google } = await start();
+  const back = await finish(google, claimsFor(google, { email: 'yeni.mezun@gmail.com', name: 'Yeni Məzun' }));
+  const { data, error } = await client.auth.exchangeCodeForSession(back.searchParams.get('code')!);
+  assert.equal(error, null);
+  const p = await one<{ role: string; account_status: string; status: string }>(h.pool, 'SELECT role, account_status, status FROM profiles WHERE id = ?', [data.user!.id]);
+  assert.deepEqual(p, { role: 'graduate', account_status: 'alumni', status: 'pending' });
+});
+
+test('"Tələbə" or "Magistr" picked at sign-up with a Gmail address gets no account', async () => {
+  for (const role of ['student', 'master_student']) {
     const { google } = await start(role);
     const back = await finish(google, claimsFor(google, { email: 'yeni.telebe@gmail.com' }));
-    assert.equal(back.searchParams.get('code'), null, String(role));
+    assert.equal(back.searchParams.get('code'), null, role);
     const f = failure(back);
-    assert.equal(f.error_code, 'signup_disabled', String(role));
+    assert.equal(f.error_code, 'signup_disabled', role);
     assert.match(f.error_description, /Outlook/);
   }
   assert.equal(await userCount('yeni.telebe@gmail.com'), 0);

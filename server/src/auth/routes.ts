@@ -244,21 +244,24 @@ export async function authRoutes(app: FastifyInstance, deps: AuthDeps) {
 
   /** The account of a Microsoft or Google identity: the one with its address,
    *  or a new one. The provider vouches for the mailbox, as a confirmation link
-   *  would. Google makes a new account only for a graduate (staff review it);
-   *  students sign up with their university address. */
+   *  would. A new Google account is always a graduate's, also from the sign-in
+   *  tab (most graduates have no university mailbox any more): it waits until
+   *  staff have checked the diploma details (alumni.ts). Students sign up with
+   *  their university address, so "Tələbə"/"Magistr" with Google is refused. */
   async function oauthSignIn(tx: Tx, provider: 'azure' | 'google', identity: { email: string; name: string }, state: AzureState): Promise<string> {
     let user = await findUserByEmail(tx, identity.email, true);
     if (!user) {
       if (config.disableSignup) throw authErrors.signupDisabled();
-      if (provider === 'google' && state.role !== 'graduate') {
+      if (provider === 'google' && state.role !== null && state.role !== 'graduate') {
         throw new AuthError(422, 'signup_disabled',
-          `Bu Google hesabı ilə hesab yoxdur. Tələbələr @${config.universityDomain} (Outlook) ilə daxil olur; məzunlar qeydiyyatda "Məzun" seçib Google ilə davam edə bilər.`);
+          `Tələbə hesabı @${config.universityDomain} (Outlook) ilə yaradılır. Məzunsunuzsa, qeydiyyatda "Məzun" seçin.`);
       }
-      const status = state.role === 'graduate' ? 'alumni' : state.role === 'master_student' ? 'master_student' : 'student';
+      const role = provider === 'google' ? 'graduate' : state.role;
+      const status = role === 'graduate' ? 'alumni' : role === 'master_student' ? 'master_student' : 'student';
       user = await createAuthUser(tx, {
         email: identity.email, password: null, confirmed: true,
         appMeta: { provider, providers: [provider] },
-        userMeta: { full_name: identity.name || undefined, role: state.role === 'graduate' ? 'graduate' : 'student', account_status: status }
+        userMeta: { full_name: identity.name || undefined, role: role === 'graduate' ? 'graduate' : 'student', account_status: status }
       });
     } else {
       if (isBanned(user)) throw authErrors.banned();

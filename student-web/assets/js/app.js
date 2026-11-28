@@ -3263,6 +3263,7 @@ function alumniVerifyCard() {
     <h3 style="margin:6px 0">Məzun olduğunuzu təsdiqləyin</h3>
     <p style="margin:0 0 6px">Diplom nömrəsi, buraxılış ili və ixtisasınızı göndərin — Karyera Mərkəzi yoxlayıb hesabınızı təsdiqləyəcək.</p>
     <p style="color:var(--muted);margin:0 0 12px">${after}</p>
+    <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px">Hələ tələbəsinizsə, çıxış edib universitet e-poçtu (Outlook) ilə daxil olun.</p>
     <button class="btn sm primary" data-act="alumni-verify">Diplom məlumatlarını göndər</button></div>`;
 }
 function alumniVerifyModal() {

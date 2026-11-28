@@ -59,7 +59,7 @@ test('Google (Gmail) sign-in: on the sign-in form always, at sign-up only for gr
   assert.match(google, /if \(role === 'graduate'\) queryParams\.role = role;/);
   // The server's Google reasons are known messages, matched before the generic university-domain one.
   const translate = backend.slice(backend.indexOf('  translate(msg)'));
-  assert.ok(translate.indexOf('Bu Google hesabı ilə hesab yoxdur') < translate.indexOf('asoiu\\.edu\\.az/i.test(m)'));
+  assert.ok(translate.indexOf('Tələbə hesabı .*') < translate.indexOf('asoiu\\.edu\\.az/i.test(m)'));
   for (const key of ['Google ilə daxil ol', 'Google ilə qeydiyyatdan keç', 'Google girişi təsdiqlənmədi. Yenidən cəhd edin.']) {
     assert.equal(dict.split(`"${key}":`).length - 1, 2, key);
   }
