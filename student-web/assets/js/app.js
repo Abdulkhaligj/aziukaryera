@@ -2494,10 +2494,25 @@ function authScreen() {
   </div>`;
 }
 
-/* Universitet SSO düymələri aktiv provayderə görə göstərilir. */
+/* Universitet SSO düymələri. Outlook (universitetin Microsoft 365 poçtu)
+   həmişə görünür: server onu hələ qoşmayıbsa düymə sönük qalır və
+   "Tezliklə" yazılır, qoşulan kimi özü aktiv olur. Google yalnız aktiv
+   olanda göstərilir. */
+const OUTLOOK_LOGO = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <rect x="8" y="3" width="15" height="18" rx="1.8" fill="#0364B8"/>
+  <path d="M8 8.2 15.5 13 23 8.2v11a1.8 1.8 0 0 1-1.8 1.8H9.8A1.8 1.8 0 0 1 8 19.2z" fill="#28A8EA"/>
+  <path d="M8 8.2 15.5 13 23 8.2V4.8A1.8 1.8 0 0 0 21.2 3H9.8A1.8 1.8 0 0 0 8 4.8z" fill="#0078D4"/>
+  <rect x="1" y="6" width="12" height="12" rx="1.8" fill="#0A5BB8"/>
+  <ellipse cx="7" cy="12" rx="2.9" ry="3.5" fill="none" stroke="#fff" stroke-width="1.9"/>
+</svg>`;
+
 function ssoButtons(busy) {
   if (Store.mode !== 'remote') return '';
-  const buttons = [];
+  const outlookReady = UI.providers.azure === true;
+  const buttons = [`
+    <button type="button" class="btn-google btn-sso btn-outlook${outlookReady ? '' : ' is-soon'}" data-act="azure" ${busy || !outlookReady ? 'disabled' : ''}>
+      ${OUTLOOK_LOGO}<span>${UI.auth.tab === 'register' ? 'Outlook ilə qeydiyyatdan keç' : 'Outlook ilə daxil ol'}</span>${outlookReady ? '' : '<em class="sso-soon">Tezliklə</em>'}
+    </button>`];
   if (UI.providers.google === true) buttons.push(`
     <button type="button" class="btn-google btn-sso" data-act="google" ${busy ? 'disabled' : ''}>
       <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -2506,13 +2521,6 @@ function ssoButtons(busy) {
         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z"/>
         <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
       </svg><span>Google ilə davam et</span>
-    </button>`);
-  if (UI.providers.azure === true) buttons.push(`
-    <button type="button" class="btn-google btn-sso" data-act="azure" ${busy ? 'disabled' : ''}>
-      <svg viewBox="0 0 21 21" aria-hidden="true">
-        <path fill="#F25022" d="M1 1h9v9H1z"/><path fill="#7FBA00" d="M11 1h9v9h-9z"/>
-        <path fill="#00A4EF" d="M1 11h9v9H1z"/><path fill="#FFB900" d="M11 11h9v9h-9z"/>
-      </svg><span>Microsoft (Outlook) ilə davam et</span>
     </button>`);
   if (!buttons.length) return '';
   return `
